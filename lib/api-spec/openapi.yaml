@@ -3,13 +3,28 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Sentinel file intelligence API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Dashboard metrics and summaries
+  - name: scans
+    description: File scan operations
+  - name: files
+    description: File management and categorisation
+  - name: duplicates
+    description: Duplicate file detection and resolution
+  - name: categories
+    description: File categories
+  - name: activity
+    description: Activity log
+  - name: reports
+    description: Reports and analytics
+
 paths:
   /healthz:
     get:
@@ -24,6 +39,380 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary metrics
+      description: Returns total files, organised %, duplicates count, space saved, and system status
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getDashboardRecentActivity
+      tags: [dashboard]
+      summary: Get recent activity for dashboard
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Recent activity entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEntry"
+
+  /dashboard/category-breakdown:
+    get:
+      operationId: getDashboardCategoryBreakdown
+      tags: [dashboard]
+      summary: File counts grouped by category
+      responses:
+        "200":
+          description: Category breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CategoryCount"
+
+  /dashboard/needs-attention:
+    get:
+      operationId: getDashboardNeedsAttention
+      tags: [dashboard]
+      summary: Items requiring user attention
+      responses:
+        "200":
+          description: Attention items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttentionSummary"
+
+  /scans:
+    get:
+      operationId: listScans
+      tags: [scans]
+      summary: List all scans
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of scans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Scan"
+    post:
+      operationId: createScan
+      tags: [scans]
+      summary: Start a new scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScanInput"
+      responses:
+        "201":
+          description: Scan created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scan"
+
+  /scans/{id}:
+    get:
+      operationId: getScan
+      tags: [scans]
+      summary: Get scan by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scan details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scan"
+        "404":
+          description: Not found
+
+  /scans/{id}/cancel:
+    post:
+      operationId: cancelScan
+      tags: [scans]
+      summary: Cancel a running scan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scan cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Scan"
+
+  /files:
+    get:
+      operationId: listFiles
+      tags: [files]
+      summary: List indexed files
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ready, review, action_required, corrupted]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of files
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileListResponse"
+
+  /files/{id}:
+    get:
+      operationId: getFile
+      tags: [files]
+      summary: Get file by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: File details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateFile
+      tags: [files]
+      summary: Update file category or tags
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileUpdate"
+      responses:
+        "200":
+          description: Updated file
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/File"
+
+  /files/stats:
+    get:
+      operationId: getFileStats
+      tags: [files]
+      summary: File statistics summary
+      responses:
+        "200":
+          description: File statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileStats"
+
+  /duplicates:
+    get:
+      operationId: listDuplicates
+      tags: [duplicates]
+      summary: List duplicate file groups
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, resolved, ignored]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Duplicate groups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateListResponse"
+
+  /duplicates/{id}/resolve:
+    post:
+      operationId: resolveDuplicate
+      tags: [duplicates]
+      summary: Resolve a duplicate group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DuplicateResolveInput"
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DuplicateGroup"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /activity:
+    get:
+      operationId: listActivity
+      tags: [activity]
+      summary: List activity log entries
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Activity entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEntry"
+
+  /reports/overview:
+    get:
+      operationId: getReportsOverview
+      tags: [reports]
+      summary: Full report overview with charts data
+      responses:
+        "200":
+          description: Reports overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReportsOverview"
+
+  /reports/scan-history:
+    get:
+      operationId: getReportsScanHistory
+      tags: [reports]
+      summary: Scan history over time
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Scan history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScanHistoryEntry"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +423,307 @@ components:
       required:
         - status
 
+    DashboardSummary:
+      type: object
+      required:
+        - totalFiles
+        - organisedPercent
+        - duplicatesCount
+        - spaceSavedBytes
+        - corruptedCount
+        - inProgressScans
+        - systemStatus
+        - lastScanAt
+        - currentScanPath
+        - currentScanProgress
+      properties:
+        totalFiles:
+          type: integer
+        organisedPercent:
+          type: number
+        duplicatesCount:
+          type: integer
+        spaceSavedBytes:
+          type: integer
+        corruptedCount:
+          type: integer
+        inProgressScans:
+          type: integer
+        systemStatus:
+          type: string
+          enum: [ready, scanning, idle]
+        lastScanAt:
+          type: ["string", "null"]
+        currentScanPath:
+          type: ["string", "null"]
+        currentScanProgress:
+          type: ["integer", "null"]
+
+    CategoryCount:
+      type: object
+      required: [category, count, label, icon]
+      properties:
+        category:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+        count:
+          type: integer
+        percentOfTotal:
+          type: number
+
+    AttentionSummary:
+      type: object
+      required: [corruptedFiles, duplicates, untaggedFiles]
+      properties:
+        corruptedFiles:
+          type: integer
+        duplicates:
+          type: integer
+        untaggedFiles:
+          type: integer
+
+    Scan:
+      type: object
+      required: [id, path, status, filesScanned, filesTotal, startedAt]
+      properties:
+        id:
+          type: integer
+        path:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, cancelled, failed]
+        filesScanned:
+          type: integer
+        filesTotal:
+          type: integer
+        progressPercent:
+          type: integer
+        startedAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+        errorMessage:
+          type: ["string", "null"]
+        duplicatesFound:
+          type: integer
+        corruptedFound:
+          type: integer
+
+    ScanInput:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+
+    File:
+      type: object
+      required: [id, name, path, extension, sizeBytes, category, status, tags, createdAt, indexedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        path:
+          type: string
+        extension:
+          type: string
+        sizeBytes:
+          type: integer
+        category:
+          type: string
+        subcategory:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [ready, review, action_required, corrupted]
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+        indexedAt:
+          type: string
+        renamedName:
+          type: ["string", "null"]
+
+    FileUpdate:
+      type: object
+      properties:
+        category:
+          type: string
+        subcategory:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [ready, review, action_required]
+
+    FileListResponse:
+      type: object
+      required: [files, total]
+      properties:
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/File"
+        total:
+          type: integer
+
+    FileStats:
+      type: object
+      required: [total, byStatus, totalSizeBytes]
+      properties:
+        total:
+          type: integer
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+        totalSizeBytes:
+          type: integer
+
+    DuplicateGroup:
+      type: object
+      required: [id, files, status, totalSizeBytes, createdAt]
+      properties:
+        id:
+          type: integer
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/File"
+        status:
+          type: string
+          enum: [pending, resolved, ignored]
+        totalSizeBytes:
+          type: integer
+        savedBytes:
+          type: integer
+        createdAt:
+          type: string
+        resolvedAt:
+          type: ["string", "null"]
+
+    DuplicateListResponse:
+      type: object
+      required: [groups, total, totalSaveable]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/DuplicateGroup"
+        total:
+          type: integer
+        totalSaveable:
+          type: integer
+
+    DuplicateResolveInput:
+      type: object
+      required: [action, keepFileId]
+      properties:
+        action:
+          type: string
+          enum: [keep_one, ignore]
+        keepFileId:
+          type: ["integer", "null"]
+
+    Category:
+      type: object
+      required: [id, name, label, icon, subfolders, extensions, tags]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+        subfolders:
+          type: array
+          items:
+            type: string
+        extensions:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    ActivityEntry:
+      type: object
+      required: [id, type, message, status, timestamp]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [scan_complete, scan_started, duplicate_found, file_indexed, classification_complete, error]
+        message:
+          type: string
+        status:
+          type: string
+          enum: [success, warning, info, error]
+        timestamp:
+          type: string
+        meta:
+          type: object
+          additionalProperties: true
+
+    ReportsOverview:
+      type: object
+      required: [totalFilesIndexed, totalScans, duplicatesResolved, spaceSavedBytes, categoryBreakdown, fileTypeBreakdown, scanHistory]
+      properties:
+        totalFilesIndexed:
+          type: integer
+        totalScans:
+          type: integer
+        duplicatesResolved:
+          type: integer
+        spaceSavedBytes:
+          type: integer
+        categoryBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryCount"
+        fileTypeBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileTypeCount"
+        scanHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanHistoryEntry"
+
+    FileTypeCount:
+      type: object
+      required: [extension, count, sizeBytes]
+      properties:
+        extension:
+          type: string
+        count:
+          type: integer
+        sizeBytes:
+          type: integer
+
+    ScanHistoryEntry:
+      type: object
+      required: [date, filesScanned, duplicatesFound]
+      properties:
+        date:
+          type: string
+        filesScanned:
+          type: integer
+        duplicatesFound:
+          type: integer
