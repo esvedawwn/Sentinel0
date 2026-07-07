@@ -5,14 +5,19 @@
  * Sentinel file intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { ScanMode } from './scanMode';
 import type { ScanStatus } from './scanStatus';
 
 export interface Scan {
   id: number;
   path: string;
+  mode: ScanMode;
   status: ScanStatus;
   filesScanned: number;
+  foldersScanned: number;
+  bytesScanned: number;
   filesTotal: number;
+  findingsCount: number;
   progressPercent?: number;
   startedAt: string;
   /** @nullable */

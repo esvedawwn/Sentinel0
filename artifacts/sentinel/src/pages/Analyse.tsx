@@ -29,7 +29,7 @@ export default function Analyse() {
   const { data: categories } = useListCategories();
   const { data: fileData, isLoading } = useListFiles(
     { search: search || undefined, category: category || undefined, status: status || undefined, limit: 100 },
-    { query: { keepPreviousData: true } }
+    { query: { queryKey: getListFilesQueryKey({ search: search || undefined, category: category || undefined, status: status || undefined, limit: 100 }), placeholderData: (prev: import("@workspace/api-client-react").FileListResponse | undefined) => prev } }
   );
   const updateFile = useUpdateFile({
     mutation: {

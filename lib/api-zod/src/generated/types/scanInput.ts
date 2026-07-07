@@ -5,7 +5,9 @@
  * Sentinel file intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { ScanInputMode } from './scanInputMode';
 
 export interface ScanInput {
   path: string;
+  mode?: ScanInputMode;
 }

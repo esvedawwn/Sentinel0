@@ -7,6 +7,8 @@ import {
   useGetDashboardNeedsAttention,
   useCreateScan,
   getGetDashboardSummaryQueryKey,
+  getGetDashboardRecentActivityQueryKey,
+  getGetDashboardNeedsAttentionQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatBytes, formatNumber, formatTimestamp, activityIcon, statusColor } from "@/lib/utils";
@@ -53,6 +55,7 @@ export default function Dashboard() {
 
   const { data: summary, isLoading } = useGetDashboardSummary({
     query: {
+      queryKey: getGetDashboardSummaryQueryKey(),
       refetchInterval: (q) =>
         q.state.data?.systemStatus === "scanning" ? 2000 : 10000,
     },
@@ -60,11 +63,11 @@ export default function Dashboard() {
 
   const { data: activity } = useGetDashboardRecentActivity(
     { limit: 15 },
-    { query: { refetchInterval: 5000 } }
+    { query: { queryKey: getGetDashboardRecentActivityQueryKey({ limit: 15 }), refetchInterval: 5000 } }
   );
 
   const { data: attention } = useGetDashboardNeedsAttention({
-    query: { refetchInterval: 10000 },
+    query: { queryKey: getGetDashboardNeedsAttentionQueryKey(), refetchInterval: 10000 },
   });
 
   const createScan = useCreateScan({
@@ -79,7 +82,14 @@ export default function Dashboard() {
 
   const handleScan = () => {
     if (!scanPath.trim()) return;
-    createScan.mutate({ data: { path: scanPath.trim() } });
+    createScan.mutate({ data: { path: scanPath.trim(), mode: "simulate" } });
+  };
+
+  const handleSampleScan = () => {
+    createScan.mutate(
+      { data: { path: "sample-data", mode: "sample" } },
+      { onSuccess: () => navigate("/findings") }
+    );
   };
 
   const organisedColor =
@@ -106,13 +116,27 @@ export default function Dashboard() {
         </div>
         <div className="flex gap-3">
           {!showScanInput ? (
-            <button
-              onClick={() => setShowScanInput(true)}
-              className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
-              style={{ background: "#34D399", color: "#111111" }}
-            >
-              New Scan
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSampleScan}
+                disabled={createScan.isPending}
+                className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
+                style={{
+                  background: "rgba(52,211,153,0.12)",
+                  color: "#34D399",
+                  border: "1px solid rgba(52,211,153,0.3)",
+                }}
+              >
+                {createScan.isPending ? "Scanning…" : "Scan Sample Data"}
+              </button>
+              <button
+                onClick={() => setShowScanInput(true)}
+                className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
+                style={{ background: "#34D399", color: "#111111" }}
+              >
+                Simulate Scan
+              </button>
+            </div>
           ) : (
             <div className="flex gap-2">
               <input

@@ -1,18 +1,19 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { useGetDashboardSummary } from "@workspace/api-client-react";
+import { useGetDashboardSummary, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 
 const NAV_ITEMS = [
   { key: "1", label: "Home", path: "/dashboard", shortcut: "⌘1" },
   { key: "2", label: "Analyse", path: "/analyse", shortcut: "⌘2" },
   { key: "3", label: "Organise", path: "/organise", shortcut: "⌘3" },
-  { key: "4", label: "Reports", path: "/reports", shortcut: "⌘4" },
+  { key: "4", label: "Findings", path: "/findings", shortcut: "⌘4" },
+  { key: "5", label: "Reports", path: "/reports", shortcut: "⌘5" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const { data: summary } = useGetDashboardSummary({
-    query: { refetchInterval: 5000 },
+    query: { queryKey: getGetDashboardSummaryQueryKey(), refetchInterval: 5000 },
   });
 
   useEffect(() => {
@@ -21,7 +22,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         if (e.key === "1") { e.preventDefault(); navigate("/dashboard"); }
         if (e.key === "2") { e.preventDefault(); navigate("/analyse"); }
         if (e.key === "3") { e.preventDefault(); navigate("/organise"); }
-        if (e.key === "4") { e.preventDefault(); navigate("/reports"); }
+        if (e.key === "4") { e.preventDefault(); navigate("/findings"); }
+        if (e.key === "5") { e.preventDefault(); navigate("/reports"); }
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -44,6 +46,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             style={{ color: "#34D399", fontFamily: "var(--app-font-sans)" }}
           >
             Sentinel
+          </span>
+          <span
+            className="ml-2 text-xs font-mono px-1.5 py-0.5 rounded"
+            style={{
+              color: "rgba(255,255,255,0.3)",
+              background: "rgba(255,255,255,0.06)",
+              fontFamily: "var(--app-font-mono)",
+              fontSize: "0.6rem",
+            }}
+          >
+            v0.1-α
           </span>
         </div>
 

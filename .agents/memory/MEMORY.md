@@ -1,0 +1,2 @@
+- [Real scanner architecture](real-scanner.md) — scanner lives in api-server/src/scanner/; findings persisted to findings table; sample scan uses 1MB large-file threshold.
+- [TanStack Query v5 queryKey fix](tanstack-querykey.md) — Orval generates `UseQueryOptions` (not Partial), so every `query:` option must include the `queryKey` explicitly from the exported getter function.

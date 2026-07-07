@@ -1,0 +1,94 @@
+You are the lead engineer for Sentinel, a React + TypeScript + pnpm monorepo application.
+
+Goal:
+Continue building Sentinel v0.1 Alpha from the current repository.
+
+Important context:
+Sentinel is a file intelligence platform, not just a file cleaner. It should eventually become a digital operating system for files, projects, AI search, automation, and cleanup.
+
+For now, build the Replit/cloud-compatible MVP. Do not attempt to scan the user's real Mac folders. In Replit, only scan folders inside the project workspace or a sample test directory.
+
+Current priorities:
+1. Inspect the repository structure.
+2. Identify the main app package.
+3. Ensure the project installs and runs with pnpm.
+4. Add or fix a real scan engine that can scan a selected local workspace directory.
+5. Add a findings engine that detects:
+   - empty folders
+   - zero-byte files
+   - .idlk files
+   - .locked files
+   - installers / archives
+   - large files
+   - duplicate hashes for files under 100 MB
+6. Add API routes for:
+   - starting a scan
+   - listing scan results
+   - listing findings
+   - clearing scan results
+7. Add a dashboard UI showing:
+   - total files scanned
+   - folders scanned
+   - bytes scanned
+   - safe delete candidates
+   - review candidates
+   - duplicate groups
+   - live activity log
+8. Add a findings table with filters:
+   - all
+   - safe delete
+   - review
+   - duplicates
+   - large files
+   - lock files
+9. Add a sample scan directory with test fixtures so the app works inside Replit.
+10. Add documentation:
+   - docs/VISION.md
+   - docs/ROADMAP.md
+   - docs/ARCHITECTURE.md
+   - docs/BACKLOG.md
+   - docs/CHANGELOG.md
+
+Safety requirements:
+- Do not delete, move, rename, or modify user files.
+- This alpha must be preview-only.
+- Any destructive action should be stubbed as “coming soon”.
+- The scanner must skip node_modules, .git, dist, build, .cache, and package internals.
+- The app must not freeze during scans.
+
+Design requirements:
+Use the Sentinel design language:
+- dark background #111111
+- panels #1A1A1A
+- cards #222222
+- ready green #34D399
+- review amber #FBBF24
+- action red #F87171
+- in-progress blue #60A5FA
+- monospaced font for data/status
+- calm, precise, trustworthy, fast, quietly powerful
+
+Implementation requirements:
+- Keep code modular.
+- Do not put filesystem logic inside React components.
+- Create scanner/classifier services.
+- Add typed interfaces for ScanResult, ScanFinding, ActivityEvent, DuplicateGroup.
+- Add basic tests if the project already has a test setup.
+- If the repo uses a different structure, adapt without unnecessary rewrites.
+- Fix TypeScript errors.
+- Ensure pnpm install and pnpm run dev work.
+
+Deliverables:
+- Working app in Replit.
+- Dashboard loads.
+- User can run a scan against sample data.
+- Findings appear in the UI.
+- Activity log updates.
+- Documentation added.
+- CHANGELOG updated with “v0.1.0-alpha”.
+
+After implementing:
+1. Run typecheck if available.
+2. Run tests if available.
+3. Run the dev server.
+4. Summarise files changed and remaining issues.

@@ -24,6 +24,8 @@ tags:
     description: Activity log
   - name: reports
     description: Reports and analytics
+  - name: findings
+    description: Real scan findings (empty folders, zero-byte, lock files, duplicates, etc.)
 
 paths:
   /healthz:
@@ -413,6 +415,84 @@ paths:
                 items:
                   $ref: "#/components/schemas/ScanHistoryEntry"
 
+  /findings:
+    get:
+      operationId: listFindings
+      tags: [findings]
+      summary: List scan findings with optional filters
+      parameters:
+        - name: scanId
+          in: query
+          schema:
+            type: integer
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [empty_folder, zero_byte, idlk_file, locked_file, installer, large_file, duplicate]
+        - name: findingStatus
+          in: query
+          schema:
+            type: string
+            enum: [safe_delete, review, duplicate]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Findings list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingsListResponse"
+
+  /findings/summary:
+    get:
+      operationId: getFindingsSummary
+      tags: [findings]
+      summary: Findings count summary by type and status
+      parameters:
+        - name: scanId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FindingsSummary"
+
+  /findings/clear:
+    delete:
+      operationId: clearFindings
+      tags: [findings]
+      summary: Clear all findings (or by scanId)
+      parameters:
+        - name: scanId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cleared]
+                properties:
+                  cleared:
+                    type: integer
+
 components:
   schemas:
     HealthStatus:
@@ -487,18 +567,27 @@ components:
 
     Scan:
       type: object
-      required: [id, path, status, filesScanned, filesTotal, startedAt]
+      required: [id, path, mode, status, filesScanned, foldersScanned, bytesScanned, filesTotal, findingsCount, startedAt]
       properties:
         id:
           type: integer
         path:
           type: string
+        mode:
+          type: string
+          enum: [real, sample, simulate]
         status:
           type: string
           enum: [pending, running, completed, cancelled, failed]
         filesScanned:
           type: integer
+        foldersScanned:
+          type: integer
+        bytesScanned:
+          type: integer
         filesTotal:
+          type: integer
+        findingsCount:
           type: integer
         progressPercent:
           type: integer
@@ -519,6 +608,10 @@ components:
       properties:
         path:
           type: string
+        mode:
+          type: string
+          enum: [real, sample, simulate]
+          default: simulate
 
     File:
       type: object
@@ -727,3 +820,62 @@ components:
           type: integer
         duplicatesFound:
           type: integer
+
+    Finding:
+      type: object
+      required: [id, scanId, type, path, name, extension, sizeBytes, findingStatus, reason, createdAt]
+      properties:
+        id:
+          type: integer
+        scanId:
+          type: integer
+        type:
+          type: string
+          enum: [empty_folder, zero_byte, idlk_file, locked_file, installer, large_file, duplicate]
+        path:
+          type: string
+        name:
+          type: string
+        extension:
+          type: string
+        sizeBytes:
+          type: integer
+        hash:
+          type: ["string", "null"]
+        duplicateGroupHash:
+          type: ["string", "null"]
+        findingStatus:
+          type: string
+          enum: [safe_delete, review, duplicate, ignored]
+        reason:
+          type: string
+        createdAt:
+          type: string
+
+    FindingsListResponse:
+      type: object
+      required: [findings, total]
+      properties:
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        total:
+          type: integer
+
+    FindingsSummary:
+      type: object
+      required: [total, safeDelete, review, duplicate, byType]
+      properties:
+        total:
+          type: integer
+        safeDelete:
+          type: integer
+        review:
+          type: integer
+        duplicate:
+          type: integer
+        byType:
+          type: object
+          additionalProperties:
+            type: integer

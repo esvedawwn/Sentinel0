@@ -5,6 +5,7 @@ import Dashboard from "@/pages/Dashboard";
 import Analyse from "@/pages/Analyse";
 import Organise from "@/pages/Organise";
 import Reports from "@/pages/Reports";
+import Findings from "@/pages/Findings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -27,6 +28,7 @@ function Router() {
         <Route path="/analyse" component={Analyse} />
         <Route path="/organise" component={Organise} />
         <Route path="/reports" component={Reports} />
+        <Route path="/findings" component={Findings} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

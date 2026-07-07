@@ -48,6 +48,15 @@ export interface AttentionSummary {
   untaggedFiles: number;
 }
 
+export type ScanMode = typeof ScanMode[keyof typeof ScanMode];
+
+
+export const ScanMode = {
+  real: 'real',
+  sample: 'sample',
+  simulate: 'simulate',
+} as const;
+
 export type ScanStatus = typeof ScanStatus[keyof typeof ScanStatus];
 
 
@@ -62,9 +71,13 @@ export const ScanStatus = {
 export interface Scan {
   id: number;
   path: string;
+  mode: ScanMode;
   status: ScanStatus;
   filesScanned: number;
+  foldersScanned: number;
+  bytesScanned: number;
   filesTotal: number;
+  findingsCount: number;
   progressPercent?: number;
   startedAt: string;
   /** @nullable */
@@ -75,8 +88,18 @@ export interface Scan {
   corruptedFound?: number;
 }
 
+export type ScanInputMode = typeof ScanInputMode[keyof typeof ScanInputMode];
+
+
+export const ScanInputMode = {
+  real: 'real',
+  sample: 'sample',
+  simulate: 'simulate',
+} as const;
+
 export interface ScanInput {
   path: string;
+  mode?: ScanInputMode;
 }
 
 export type FileStatus = typeof FileStatus[keyof typeof FileStatus];
@@ -240,6 +263,61 @@ export interface ReportsOverview {
   scanHistory: ScanHistoryEntry[];
 }
 
+export type FindingType = typeof FindingType[keyof typeof FindingType];
+
+
+export const FindingType = {
+  empty_folder: 'empty_folder',
+  zero_byte: 'zero_byte',
+  idlk_file: 'idlk_file',
+  locked_file: 'locked_file',
+  installer: 'installer',
+  large_file: 'large_file',
+  duplicate: 'duplicate',
+} as const;
+
+export type FindingFindingStatus = typeof FindingFindingStatus[keyof typeof FindingFindingStatus];
+
+
+export const FindingFindingStatus = {
+  safe_delete: 'safe_delete',
+  review: 'review',
+  duplicate: 'duplicate',
+  ignored: 'ignored',
+} as const;
+
+export interface Finding {
+  id: number;
+  scanId: number;
+  type: FindingType;
+  path: string;
+  name: string;
+  extension: string;
+  sizeBytes: number;
+  /** @nullable */
+  hash?: string | null;
+  /** @nullable */
+  duplicateGroupHash?: string | null;
+  findingStatus: FindingFindingStatus;
+  reason: string;
+  createdAt: string;
+}
+
+export interface FindingsListResponse {
+  findings: Finding[];
+  total: number;
+}
+
+export type FindingsSummaryByType = {[key: string]: number};
+
+export interface FindingsSummary {
+  total: number;
+  safeDelete: number;
+  review: number;
+  duplicate: number;
+  byType: FindingsSummaryByType;
+}
+
 export type GetDashboardRecentActivityParams = {
 limit?: number;
 };
@@ -290,5 +368,47 @@ offset?: number;
 
 export type GetReportsScanHistoryParams = {
 days?: number;
+};
+
+export type ListFindingsParams = {
+scanId?: number;
+type?: ListFindingsType;
+findingStatus?: ListFindingsFindingStatus;
+limit?: number;
+offset?: number;
+};
+
+export type ListFindingsType = typeof ListFindingsType[keyof typeof ListFindingsType];
+
+
+export const ListFindingsType = {
+  empty_folder: 'empty_folder',
+  zero_byte: 'zero_byte',
+  idlk_file: 'idlk_file',
+  locked_file: 'locked_file',
+  installer: 'installer',
+  large_file: 'large_file',
+  duplicate: 'duplicate',
+} as const;
+
+export type ListFindingsFindingStatus = typeof ListFindingsFindingStatus[keyof typeof ListFindingsFindingStatus];
+
+
+export const ListFindingsFindingStatus = {
+  safe_delete: 'safe_delete',
+  review: 'review',
+  duplicate: 'duplicate',
+} as const;
+
+export type GetFindingsSummaryParams = {
+scanId?: number;
+};
+
+export type ClearFindingsParams = {
+scanId?: number;
+};
+
+export type ClearFindings200 = {
+  cleared: number;
 };
 

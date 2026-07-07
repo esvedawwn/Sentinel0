@@ -92,9 +92,13 @@ export const ListScansQueryParams = zod.object({
 export const ListScansResponseItem = zod.object({
   "id": zod.number(),
   "path": zod.string(),
+  "mode": zod.enum(['real', 'sample', 'simulate']),
   "status": zod.enum(['pending', 'running', 'completed', 'cancelled', 'failed']),
   "filesScanned": zod.number(),
+  "foldersScanned": zod.number(),
+  "bytesScanned": zod.number(),
   "filesTotal": zod.number(),
+  "findingsCount": zod.number(),
   "progressPercent": zod.number().optional(),
   "startedAt": zod.string(),
   "completedAt": zod.string().nullish(),
@@ -108,16 +112,23 @@ export const ListScansResponse = zod.array(ListScansResponseItem)
 /**
  * @summary Start a new scan
  */
+export const createScanBodyModeDefault = `simulate`;
+
 export const CreateScanBody = zod.object({
-  "path": zod.string()
+  "path": zod.string(),
+  "mode": zod.enum(['real', 'sample', 'simulate']).default(createScanBodyModeDefault)
 })
 
 export const CreateScanResponse = zod.object({
   "id": zod.number(),
   "path": zod.string(),
+  "mode": zod.enum(['real', 'sample', 'simulate']),
   "status": zod.enum(['pending', 'running', 'completed', 'cancelled', 'failed']),
   "filesScanned": zod.number(),
+  "foldersScanned": zod.number(),
+  "bytesScanned": zod.number(),
   "filesTotal": zod.number(),
+  "findingsCount": zod.number(),
   "progressPercent": zod.number().optional(),
   "startedAt": zod.string(),
   "completedAt": zod.string().nullish(),
@@ -137,9 +148,13 @@ export const GetScanParams = zod.object({
 export const GetScanResponse = zod.object({
   "id": zod.number(),
   "path": zod.string(),
+  "mode": zod.enum(['real', 'sample', 'simulate']),
   "status": zod.enum(['pending', 'running', 'completed', 'cancelled', 'failed']),
   "filesScanned": zod.number(),
+  "foldersScanned": zod.number(),
+  "bytesScanned": zod.number(),
   "filesTotal": zod.number(),
+  "findingsCount": zod.number(),
   "progressPercent": zod.number().optional(),
   "startedAt": zod.string(),
   "completedAt": zod.string().nullish(),
@@ -159,9 +174,13 @@ export const CancelScanParams = zod.object({
 export const CancelScanResponse = zod.object({
   "id": zod.number(),
   "path": zod.string(),
+  "mode": zod.enum(['real', 'sample', 'simulate']),
   "status": zod.enum(['pending', 'running', 'completed', 'cancelled', 'failed']),
   "filesScanned": zod.number(),
+  "foldersScanned": zod.number(),
+  "bytesScanned": zod.number(),
   "filesTotal": zod.number(),
+  "findingsCount": zod.number(),
   "progressPercent": zod.number().optional(),
   "startedAt": zod.string(),
   "completedAt": zod.string().nullish(),
@@ -424,5 +443,66 @@ export const GetReportsScanHistoryResponseItem = zod.object({
   "duplicatesFound": zod.number()
 })
 export const GetReportsScanHistoryResponse = zod.array(GetReportsScanHistoryResponseItem)
+
+
+/**
+ * @summary List scan findings with optional filters
+ */
+export const listFindingsQueryLimitDefault = 200;
+export const listFindingsQueryOffsetDefault = 0;
+
+export const ListFindingsQueryParams = zod.object({
+  "scanId": zod.coerce.number().optional(),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'large_file', 'duplicate']).optional(),
+  "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate']).optional(),
+  "limit": zod.coerce.number().default(listFindingsQueryLimitDefault),
+  "offset": zod.coerce.number().default(listFindingsQueryOffsetDefault)
+})
+
+export const ListFindingsResponse = zod.object({
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "scanId": zod.number(),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'large_file', 'duplicate']),
+  "path": zod.string(),
+  "name": zod.string(),
+  "extension": zod.string(),
+  "sizeBytes": zod.number(),
+  "hash": zod.string().nullish(),
+  "duplicateGroupHash": zod.string().nullish(),
+  "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
+  "reason": zod.string(),
+  "createdAt": zod.string()
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Findings count summary by type and status
+ */
+export const GetFindingsSummaryQueryParams = zod.object({
+  "scanId": zod.coerce.number().optional()
+})
+
+export const GetFindingsSummaryResponse = zod.object({
+  "total": zod.number(),
+  "safeDelete": zod.number(),
+  "review": zod.number(),
+  "duplicate": zod.number(),
+  "byType": zod.record(zod.string(), zod.number())
+})
+
+
+/**
+ * @summary Clear all findings (or by scanId)
+ */
+export const ClearFindingsQueryParams = zod.object({
+  "scanId": zod.coerce.number().optional()
+})
+
+export const ClearFindingsResponse = zod.object({
+  "cleared": zod.number()
+})
 
 

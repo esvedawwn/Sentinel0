@@ -14,7 +14,7 @@ export default function Organise() {
 
   const { data: dupData, isLoading: dupsLoading } = useListDuplicates(
     { status: "pending", limit: 50 },
-    { query: { refetchInterval: 10000 } }
+    { query: { queryKey: getListDuplicatesQueryKey({ status: "pending", limit: 50 }), refetchInterval: 10000 } }
   );
 
   const { data: corruptedData } = useListFiles(

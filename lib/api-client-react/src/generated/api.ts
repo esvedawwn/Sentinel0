@@ -24,6 +24,8 @@ import type {
   AttentionSummary,
   Category,
   CategoryCount,
+  ClearFindings200,
+  ClearFindingsParams,
   DashboardSummary,
   DuplicateGroup,
   DuplicateListResponse,
@@ -32,12 +34,16 @@ import type {
   FileListResponse,
   FileStats,
   FileUpdate,
+  FindingsListResponse,
+  FindingsSummary,
   GetDashboardRecentActivityParams,
+  GetFindingsSummaryParams,
   GetReportsScanHistoryParams,
   HealthStatus,
   ListActivityParams,
   ListDuplicatesParams,
   ListFilesParams,
+  ListFindingsParams,
   ListScansParams,
   ReportsOverview,
   Scan,
@@ -1552,4 +1558,249 @@ export function useGetReportsScanHistory<TData = Awaited<ReturnType<typeof getRe
 
 
 
+
+export const getListFindingsUrl = (params?: ListFindingsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/findings?${stringifiedParams}` : `/api/findings`
+}
+
+/**
+ * @summary List scan findings with optional filters
+ */
+export const listFindings = async (params?: ListFindingsParams, options?: RequestInit): Promise<FindingsListResponse> => {
+
+  return customFetch<FindingsListResponse>(getListFindingsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFindingsQueryKey = (params?: ListFindingsParams,) => {
+    return [
+    `/api/findings`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFindingsQueryOptions = <TData = Awaited<ReturnType<typeof listFindings>>, TError = ErrorType<unknown>>(params?: ListFindingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFindings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFindingsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFindings>>> = ({ signal }) => listFindings(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFindings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFindingsQueryResult = NonNullable<Awaited<ReturnType<typeof listFindings>>>
+export type ListFindingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List scan findings with optional filters
+ */
+
+export function useListFindings<TData = Awaited<ReturnType<typeof listFindings>>, TError = ErrorType<unknown>>(
+ params?: ListFindingsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFindings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFindingsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetFindingsSummaryUrl = (params?: GetFindingsSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/findings/summary?${stringifiedParams}` : `/api/findings/summary`
+}
+
+/**
+ * @summary Findings count summary by type and status
+ */
+export const getFindingsSummary = async (params?: GetFindingsSummaryParams, options?: RequestInit): Promise<FindingsSummary> => {
+
+  return customFetch<FindingsSummary>(getGetFindingsSummaryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFindingsSummaryQueryKey = (params?: GetFindingsSummaryParams,) => {
+    return [
+    `/api/findings/summary`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetFindingsSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getFindingsSummary>>, TError = ErrorType<unknown>>(params?: GetFindingsSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFindingsSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFindingsSummaryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFindingsSummary>>> = ({ signal }) => getFindingsSummary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFindingsSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFindingsSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getFindingsSummary>>>
+export type GetFindingsSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Findings count summary by type and status
+ */
+
+export function useGetFindingsSummary<TData = Awaited<ReturnType<typeof getFindingsSummary>>, TError = ErrorType<unknown>>(
+ params?: GetFindingsSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFindingsSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFindingsSummaryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getClearFindingsUrl = (params?: ClearFindingsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/findings/clear?${stringifiedParams}` : `/api/findings/clear`
+}
+
+/**
+ * @summary Clear all findings (or by scanId)
+ */
+export const clearFindings = async (params?: ClearFindingsParams, options?: RequestInit): Promise<ClearFindings200> => {
+
+  return customFetch<ClearFindings200>(getClearFindingsUrl(params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getClearFindingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearFindings>>, TError,{params?: ClearFindingsParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearFindings>>, TError,{params?: ClearFindingsParams}, TContext> => {
+
+const mutationKey = ['clearFindings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearFindings>>, {params?: ClearFindingsParams}> = (props) => {
+          const {params} = props ?? {};
+
+          return  clearFindings(params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearFindingsMutationResult = NonNullable<Awaited<ReturnType<typeof clearFindings>>>
+
+    export type ClearFindingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clear all findings (or by scanId)
+ */
+export const useClearFindings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearFindings>>, TError,{params?: ClearFindingsParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearFindings>>,
+        TError,
+        {params?: ClearFindingsParams},
+        TContext
+      > => {
+      return useMutation(getClearFindingsMutationOptions(options));
+    }
 
