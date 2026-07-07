@@ -9,6 +9,7 @@ export const findingTypeEnum = pgEnum("finding_type", [
   "idlk_file",
   "locked_file",
   "installer",
+  "archive",
   "large_file",
   "duplicate",
 ]);

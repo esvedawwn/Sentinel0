@@ -1,10 +1,11 @@
 import path from "path";
 import fs from "fs/promises";
 import { Router, type IRouter } from "express";
-import { db, scansTable, filesTable, activityTable } from "@workspace/db";
-import { eq, desc, count } from "drizzle-orm";
+import { db, scansTable, activityTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
 import { CreateScanBody, GetScanParams, CancelScanParams, ListScansQueryParams } from "@workspace/api-zod";
 import { runRealScan } from "../scanner/realScanner.js";
+import { simulateScan } from "../scanner/simulateScanner.js";
 
 const router: IRouter = Router();
 
@@ -56,19 +57,17 @@ router.post("/scans", async (req, res): Promise<void> => {
   let scanPath = parsed.data.path.trim();
   let mode: "real" | "sample" | "simulate" = requestedMode;
 
-  // When mode is "sample", always use the workspace sample-data directory
   if (mode === "sample") {
     scanPath = SAMPLE_DATA_PATH;
   }
 
-  // Auto-upgrade to real scan if the path exists on the filesystem
+  // Auto-upgrade to real scan if path exists on filesystem
   if (mode === "simulate" && scanPath.startsWith("/")) {
     try {
       await fs.access(scanPath);
-      // Path exists on FS — run as real scan
       mode = "real";
     } catch {
-      // Path doesn't exist, keep simulate mode
+      // Path doesn't exist — keep simulate mode
     }
   }
 
@@ -86,7 +85,7 @@ router.post("/scans", async (req, res): Promise<void> => {
   if (mode === "real" || mode === "sample") {
     runRealScan(scan.id, scanPath, mode === "sample").catch(() => {});
   } else {
-    simulateScan(scan.id, scanPath);
+    simulateScan(scan.id, scanPath).catch(() => {});
   }
 
   res.status(201).json(mapScan(scan));
@@ -134,82 +133,5 @@ router.post("/scans/:id/cancel", async (req, res): Promise<void> => {
 
   res.json(mapScan(scan));
 });
-
-async function simulateScan(scanId: number, scanPath: string) {
-  const categories = ["Legal", "Banking", "Design", "Templates", "Screenshots", "Security", "Media", "Documents", "Projects", "Downloads"];
-  const statuses: Array<"ready" | "review" | "action_required" | "corrupted"> = ["ready", "ready", "ready", "ready", "review", "review", "action_required", "corrupted"];
-  const extensions = [".pdf", ".docx", ".jpg", ".png", ".xlsx", ".psd", ".ai", ".mp4", ".zip", ".txt", ".csv", ".mov"];
-
-  const totalFiles = Math.floor(Math.random() * 5000) + 500;
-  await db.update(scansTable).set({ filesTotal: totalFiles }).where(eq(scansTable.id, scanId));
-
-  const steps = 10;
-  for (let step = 1; step <= steps; step++) {
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    const [currentScan] = await db.select().from(scansTable).where(eq(scansTable.id, scanId));
-    if (!currentScan || currentScan.status === "cancelled") return;
-
-    const filesScanned = Math.floor((totalFiles * step) / steps);
-    const progress = Math.floor((step / steps) * 100);
-
-    const batchSize = Math.floor(totalFiles / steps);
-    const fileRows = Array.from({ length: Math.min(batchSize, 50) }, (_, i) => {
-      const ext = extensions[Math.floor(Math.random() * extensions.length)];
-      const cat = categories[Math.floor(Math.random() * categories.length)];
-      const stat = statuses[Math.floor(Math.random() * statuses.length)];
-      const name = `file_${scanId}_${step}_${i}${ext}`;
-      return {
-        name,
-        path: `${scanPath}/${cat}/${name}`,
-        extension: ext,
-        sizeBytes: Math.floor(Math.random() * 50_000_000) + 1000,
-        category: cat,
-        status: stat,
-        tags: [cat.toLowerCase()],
-      };
-    });
-
-    await db.insert(filesTable).values(fileRows);
-    await db.update(scansTable).set({ filesScanned, progressPercent: progress }).where(eq(scansTable.id, scanId));
-
-    if (step === 5) {
-      await db.insert(activityTable).values({
-        type: "classification_complete",
-        message: `Classification complete — ${Math.floor(totalFiles / 2).toLocaleString()} files categorised`,
-        status: "success",
-      });
-    }
-  }
-
-  const [finalFileCount] = await db.select({ total: count() }).from(filesTable);
-  const corruptedCount = Math.floor(Math.random() * 25) + 5;
-  const duplicatesCount = Math.floor(Math.random() * 200) + 50;
-
-  await db
-    .update(scansTable)
-    .set({
-      status: "completed",
-      filesScanned: totalFiles,
-      progressPercent: 100,
-      completedAt: new Date(),
-      duplicatesFound: duplicatesCount,
-      corruptedFound: corruptedCount,
-    })
-    .where(eq(scansTable.id, scanId));
-
-  await db.insert(activityTable).values([
-    {
-      type: "duplicate_found",
-      message: `${duplicatesCount} potential duplicates detected`,
-      status: "warning",
-    },
-    {
-      type: "scan_complete",
-      message: `Scan complete — ${totalFiles.toLocaleString()} files processed`,
-      status: "success",
-    },
-  ]);
-}
 
 export default router;

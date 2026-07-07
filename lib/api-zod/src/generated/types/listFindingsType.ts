@@ -15,6 +15,7 @@ export const ListFindingsType = {
   idlk_file: 'idlk_file',
   locked_file: 'locked_file',
   installer: 'installer',
+  archive: 'archive',
   large_file: 'large_file',
   duplicate: 'duplicate',
 } as const;

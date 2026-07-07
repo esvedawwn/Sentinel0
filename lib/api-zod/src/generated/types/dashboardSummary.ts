@@ -12,6 +12,7 @@ export interface DashboardSummary {
   organisedPercent: number;
   duplicatesCount: number;
   spaceSavedBytes: number;
+  bytesRecoverable: number;
   corruptedCount: number;
   inProgressScans: number;
   systemStatus: DashboardSummarySystemStatus;

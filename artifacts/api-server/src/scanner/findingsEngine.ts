@@ -19,7 +19,6 @@ export function classifyFile(
 ): ScanFinding | null {
   const ext = path.extname(name).toLowerCase();
 
-  // Zero-byte file
   if (sizeBytes === 0) {
     return {
       type: "zero_byte",
@@ -32,7 +31,6 @@ export function classifyFile(
     };
   }
 
-  // InDesign lock file
   if (ext === IDLK_EXT) {
     return {
       type: "idlk_file",
@@ -45,7 +43,6 @@ export function classifyFile(
     };
   }
 
-  // Generic lock file
   if (ext === LOCKED_EXT) {
     return {
       type: "locked_file",
@@ -58,7 +55,6 @@ export function classifyFile(
     };
   }
 
-  // Installer (higher priority than archive)
   if (INSTALLER_EXTS.has(ext)) {
     return {
       type: "installer",
@@ -71,10 +67,9 @@ export function classifyFile(
     };
   }
 
-  // Archive
   if (ARCHIVE_EXTS.has(ext)) {
     return {
-      type: "installer",
+      type: "archive",
       path: filePath,
       name,
       extension: ext,
@@ -84,7 +79,6 @@ export function classifyFile(
     };
   }
 
-  // Large file
   if (sizeBytes > largeFileBytes) {
     const mb = (sizeBytes / (1024 * 1024)).toFixed(1);
     return {
@@ -135,7 +129,7 @@ export function classifyDuplicate(
 }
 
 /**
- * Given a map of hash → file entries, produce a list of duplicate findings.
+ * Given a map of hash → file entries, produce duplicate findings.
  * Only hashes that appear more than once are duplicates.
  */
 export function detectDuplicates(

@@ -10,6 +10,10 @@ const NAV_ITEMS = [
   { key: "5", label: "Reports", path: "/reports", shortcut: "⌘5" },
 ];
 
+const NAV_BOTTOM = [
+  { key: "6", label: "Settings", path: "/settings", shortcut: "⌘6" },
+];
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
   const { data: summary } = useGetDashboardSummary({
@@ -24,6 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         if (e.key === "3") { e.preventDefault(); navigate("/organise"); }
         if (e.key === "4") { e.preventDefault(); navigate("/findings"); }
         if (e.key === "5") { e.preventDefault(); navigate("/reports"); }
+        if (e.key === "6") { e.preventDefault(); navigate("/settings"); }
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -31,6 +36,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [navigate]);
 
   const systemStatus = summary?.systemStatus ?? "idle";
+
+  function NavItem({ item }: { item: typeof NAV_ITEMS[number] }) {
+    const isActive = location.startsWith(item.path);
+    return (
+      <Link href={item.path}>
+        <div
+          className="flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors duration-150 mx-2 rounded"
+          style={{
+            background: isActive ? "rgba(52, 211, 153, 0.1)" : "transparent",
+            color: isActive ? "#34D399" : "rgba(255,255,255,0.7)",
+          }}
+          onMouseEnter={(e) => {
+            if (!isActive) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
+          }}
+          onMouseLeave={(e) => {
+            if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent";
+          }}
+        >
+          <span className="text-sm font-medium">{item.label}</span>
+          <span
+            className="text-xs font-mono"
+            style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+          >
+            {item.shortcut}
+          </span>
+        </div>
+      </Link>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#111111" }}>
@@ -60,37 +94,24 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </span>
         </div>
 
-        {/* Navigation */}
+        {/* Primary navigation */}
         <nav className="flex-1 py-3">
-          {NAV_ITEMS.map((item) => {
-            const isActive = location.startsWith(item.path);
-            return (
-              <Link key={item.key} href={item.path}>
-                <div
-                  className="flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors duration-150 mx-2 rounded"
-                  style={{
-                    background: isActive ? "rgba(52, 211, 153, 0.1)" : "transparent",
-                    color: isActive ? "#34D399" : "rgba(255,255,255,0.7)",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.04)";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) (e.currentTarget as HTMLElement).style.background = "transparent";
-                  }}
-                >
-                  <span className="text-sm font-medium">{item.label}</span>
-                  <span
-                    className="text-xs font-mono"
-                    style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
-                  >
-                    {item.shortcut}
-                  </span>
-                </div>
-              </Link>
-            );
-          })}
+          {NAV_ITEMS.map((item) => (
+            <NavItem key={item.key} item={item} />
+          ))}
         </nav>
+
+        {/* Bottom: settings + status */}
+        <div className="pb-2">
+          <div
+            className="mx-2 mb-1"
+            style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.5rem" }}
+          >
+            {NAV_BOTTOM.map((item) => (
+              <NavItem key={item.key} item={item} />
+            ))}
+          </div>
+        </div>
 
         {/* System status */}
         <div

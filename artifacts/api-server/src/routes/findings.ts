@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, findingsTable } from "@workspace/db";
-import { eq, and, count, isNull, sql } from "drizzle-orm";
+import { eq, and, count, ilike, or, sql } from "drizzle-orm";
 import { ListFindingsQueryParams, GetFindingsSummaryQueryParams, ClearFindingsQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -29,11 +29,19 @@ router.get("/findings", async (req, res): Promise<void> => {
   const scanId = params.success ? params.data.scanId : undefined;
   const type = params.success ? params.data.type : undefined;
   const findingStatus = params.success ? params.data.findingStatus : undefined;
+  const search = params.success ? params.data.search : undefined;
 
   const conditions = [];
   if (scanId) conditions.push(eq(findingsTable.scanId, scanId));
   if (type) conditions.push(eq(findingsTable.type, type));
   if (findingStatus) conditions.push(eq(findingsTable.findingStatus, findingStatus));
+  if (search?.trim()) {
+    const term = `%${search.trim()}%`;
+    conditions.push(or(
+      ilike(findingsTable.name, term),
+      ilike(findingsTable.path, term)
+    ));
+  }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

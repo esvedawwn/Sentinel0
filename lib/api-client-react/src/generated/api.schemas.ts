@@ -23,6 +23,7 @@ export interface DashboardSummary {
   organisedPercent: number;
   duplicatesCount: number;
   spaceSavedBytes: number;
+  bytesRecoverable: number;
   corruptedCount: number;
   inProgressScans: number;
   systemStatus: DashboardSummarySystemStatus;
@@ -272,6 +273,7 @@ export const FindingType = {
   idlk_file: 'idlk_file',
   locked_file: 'locked_file',
   installer: 'installer',
+  archive: 'archive',
   large_file: 'large_file',
   duplicate: 'duplicate',
 } as const;
@@ -374,6 +376,7 @@ export type ListFindingsParams = {
 scanId?: number;
 type?: ListFindingsType;
 findingStatus?: ListFindingsFindingStatus;
+search?: string;
 limit?: number;
 offset?: number;
 };
@@ -387,6 +390,7 @@ export const ListFindingsType = {
   idlk_file: 'idlk_file',
   locked_file: 'locked_file',
   installer: 'installer',
+  archive: 'archive',
   large_file: 'large_file',
   duplicate: 'duplicate',
 } as const;

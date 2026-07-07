@@ -7,7 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [v0.1.0-alpha] — 2026-07-07
+## [v0.1.1-alpha] — 2026-07-07 — Sprint 1 Hardening
+
+### Fixed
+- **Double-counting bug** — `totalFindings` in `realScanner.ts` was adding `dupFindings.length` twice (they were already pushed into `findings[]` at the dedup pass)
+- **OOM risk** — `computeHash` switched from `fs.readFile` (entire file loaded into memory) to `fs.createReadStream` (streaming MD5); safe for files up to 100 MB
+- **Archive type** — archives (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.tgz`, `.bz2`, `.xz`) were incorrectly classified as `type: "installer"`; now use distinct `type: "archive"`
+- **`formatBytes` duplication** — `Findings.tsx` defined its own copy; now imports canonical version from `@/lib/utils`
+- **Dead code** — `artifacts/sentinel/src/lib/formatters.ts` deleted (unused, duplicated `utils.ts` functions)
+- **Empty folder detection** — `countChildren` now excludes `.DS_Store` and `._*` macOS shadow files; previously a folder with only a `.DS_Store` would not be flagged as empty
+- **`simulateScan` separation** — moved from `routes/scans.ts` into `scanner/simulateScanner.ts` (single responsibility)
+- **`INSTALLER_EXTS`** — removed `.sh` (shell scripts are scripts, not installers)
+
+### Added
+- **`archive` finding type** — separate DB enum value, distinct badge colour (`#C084FC`), and dedicated "Archives" filter tab on Findings page
+- **Search on Findings** — `GET /api/findings?search=` parameter filters by name or path (`ilike`); UI has a search input (press Enter to commit, Escape to clear)
+- **Settings page** (⌘6) — scan configuration reference: detection toggles, large-file threshold input, skip-dir chip list, about panel
+- **`bytesRecoverable`** — new field on `GET /api/dashboard/summary`; sums `size_bytes` of all non-duplicate findings; shown on Dashboard as "Recoverable" metric card
+- Settings nav item pinned to sidebar bottom, above system status indicator
+
+### Schema
+- `finding_type` enum: added `"archive"` value (DB migration applied)
+- `GET /api/findings`: added `search?: string` query parameter
+- `DashboardSummary`: added `bytesRecoverable: integer`
+
+---
+
+## [v0.1.0-alpha] — 2026-07-07 — Sprint 1: Foundation
 
 ### Added
 
@@ -32,7 +58,6 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - **idlk_file** — Adobe InDesign lock files (status: safe_delete)
 - **locked_file** — generic `.locked` files (status: review)
 - **installer** — `.dmg`, `.pkg`, `.exe`, `.msi`, `.deb`, `.rpm` (status: review)
-- **installer** (archive) — `.zip`, `.rar`, `.7z`, `.tar`, `.gz` (status: review)
 - **large_file** — files exceeding threshold (50 MB real, 1 MB sample)
 - **duplicate** — identical MD5 hash across multiple files
 

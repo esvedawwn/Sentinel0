@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, scansTable, filesTable, duplicateGroupsTable, activityTable } from "@workspace/db";
+import { db, scansTable, filesTable, duplicateGroupsTable, activityTable, findingsTable } from "@workspace/db";
 import { sql, eq, desc, count } from "drizzle-orm";
 
 const router: IRouter = Router();
@@ -10,7 +10,6 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
       total: count(),
       ready: sql<number>`sum(case when status = 'ready' then 1 else 0 end)::int`,
       corrupted: sql<number>`sum(case when status = 'corrupted' then 1 else 0 end)::int`,
-      totalBytes: sql<number>`coalesce(sum(size_bytes), 0)::bigint`,
     })
     .from(filesTable);
 
@@ -42,11 +41,18 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     .from(duplicateGroupsTable)
     .where(eq(duplicateGroupsTable.status, "resolved"));
 
+  // Sum of sizes of all non-duplicate findings (files that could be removed)
+  const [recoverableResult] = await db
+    .select({ bytes: sql<number>`coalesce(sum(size_bytes), 0)::bigint` })
+    .from(findingsTable)
+    .where(sql`finding_status != 'duplicate'`);
+
   res.json({
     totalFiles: total,
     organisedPercent: organised,
     duplicatesCount: Number(dupCounts?.total ?? 0),
     spaceSavedBytes: Number(resolvedDups?.saved ?? 0),
+    bytesRecoverable: Number(recoverableResult?.bytes ?? 0),
     corruptedCount: corrupted,
     inProgressScans: activeScan ? 1 : 0,
     systemStatus: activeScan ? "scanning" : total > 0 ? "ready" : "idle",

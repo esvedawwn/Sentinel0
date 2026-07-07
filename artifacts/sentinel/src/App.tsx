@@ -6,6 +6,7 @@ import Analyse from "@/pages/Analyse";
 import Organise from "@/pages/Organise";
 import Reports from "@/pages/Reports";
 import Findings from "@/pages/Findings";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -27,8 +28,9 @@ function Router() {
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/analyse" component={Analyse} />
         <Route path="/organise" component={Organise} />
-        <Route path="/reports" component={Reports} />
         <Route path="/findings" component={Findings} />
+        <Route path="/reports" component={Reports} />
+        <Route path="/settings" component={Settings} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

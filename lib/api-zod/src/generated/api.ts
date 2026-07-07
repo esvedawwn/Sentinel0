@@ -26,6 +26,7 @@ export const GetDashboardSummaryResponse = zod.object({
   "organisedPercent": zod.number(),
   "duplicatesCount": zod.number(),
   "spaceSavedBytes": zod.number(),
+  "bytesRecoverable": zod.number(),
   "corruptedCount": zod.number(),
   "inProgressScans": zod.number(),
   "systemStatus": zod.enum(['ready', 'scanning', 'idle']),
@@ -453,8 +454,9 @@ export const listFindingsQueryOffsetDefault = 0;
 
 export const ListFindingsQueryParams = zod.object({
   "scanId": zod.coerce.number().optional(),
-  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'large_file', 'duplicate']).optional(),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'archive', 'large_file', 'duplicate']).optional(),
   "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate']).optional(),
+  "search": zod.coerce.string().optional(),
   "limit": zod.coerce.number().default(listFindingsQueryLimitDefault),
   "offset": zod.coerce.number().default(listFindingsQueryOffsetDefault)
 })
@@ -463,7 +465,7 @@ export const ListFindingsResponse = zod.object({
   "findings": zod.array(zod.object({
   "id": zod.number(),
   "scanId": zod.number(),
-  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'large_file', 'duplicate']),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'archive', 'large_file', 'duplicate']),
   "path": zod.string(),
   "name": zod.string(),
   "extension": zod.string(),

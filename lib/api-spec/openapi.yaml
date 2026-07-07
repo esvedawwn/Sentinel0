@@ -429,12 +429,16 @@ paths:
           in: query
           schema:
             type: string
-            enum: [empty_folder, zero_byte, idlk_file, locked_file, installer, large_file, duplicate]
+            enum: [empty_folder, zero_byte, idlk_file, locked_file, installer, archive, large_file, duplicate]
         - name: findingStatus
           in: query
           schema:
             type: string
             enum: [safe_delete, review, duplicate]
+        - name: search
+          in: query
+          schema:
+            type: string
         - name: limit
           in: query
           schema:
@@ -510,6 +514,7 @@ components:
         - organisedPercent
         - duplicatesCount
         - spaceSavedBytes
+        - bytesRecoverable
         - corruptedCount
         - inProgressScans
         - systemStatus
@@ -524,6 +529,8 @@ components:
         duplicatesCount:
           type: integer
         spaceSavedBytes:
+          type: integer
+        bytesRecoverable:
           type: integer
         corruptedCount:
           type: integer
@@ -831,7 +838,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [empty_folder, zero_byte, idlk_file, locked_file, installer, large_file, duplicate]
+          enum: [empty_folder, zero_byte, idlk_file, locked_file, installer, archive, large_file, duplicate]
         path:
           type: string
         name:

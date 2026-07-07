@@ -12,6 +12,7 @@ export type ListFindingsParams = {
 scanId?: number;
 type?: ListFindingsType;
 findingStatus?: ListFindingsFindingStatus;
+search?: string;
 limit?: number;
 offset?: number;
 };

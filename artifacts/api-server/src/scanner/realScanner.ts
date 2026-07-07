@@ -5,8 +5,10 @@ import { walkDirectory, computeHash, countChildren } from "./fileWalker.js";
 import { classifyFile, classifyEmptyFolder, detectDuplicates } from "./findingsEngine.js";
 import { ScanFinding, LARGE_FILE_BYTES } from "./types.js";
 
-const SAMPLE_LARGE_FILE_BYTES = 1024 * 1024; // 1 MB threshold for sample scans
+const SAMPLE_LARGE_FILE_BYTES = 1024 * 1024;
 const BATCH_SIZE = 50;
+const PROGRESS_UPDATE_INTERVAL = 25;
+const CANCEL_CHECK_INTERVAL = 100;
 
 /**
  * Run a real filesystem scan against the given path.
@@ -21,13 +23,11 @@ export async function runRealScan(
   const largeFileThreshold = isSample ? SAMPLE_LARGE_FILE_BYTES : LARGE_FILE_BYTES;
   const abortController = new AbortController();
 
-  // Track state
   let filesScanned = 0;
   let foldersScanned = 0;
   let bytesScanned = 0;
-  const findings: ScanFinding[] = [];
+  const typeFindings: ScanFinding[] = [];
   const hashMap = new Map<string, Array<{ path: string; name: string; extension: string; sizeBytes: number }>>();
-  const dirChildCount = new Map<string, number>();
   const findingBatch: (typeof findingsTable.$inferInsert)[] = [];
 
   async function flushFindings() {
@@ -37,13 +37,13 @@ export async function runRealScan(
   }
 
   try {
-    // Check scan hasn't been cancelled
     const [current] = await db.select().from(scansTable).where(eq(scansTable.id, scanId));
     if (!current || current.status === "cancelled") return;
 
     for await (const entry of walkDirectory(rootPath, abortController.signal)) {
-      // Check for cancellation every 100 entries
-      if ((filesScanned + foldersScanned) % 100 === 0) {
+      const totalSeen = filesScanned + foldersScanned;
+
+      if (totalSeen % CANCEL_CHECK_INTERVAL === 0 && totalSeen > 0) {
         const [check] = await db.select().from(scansTable).where(eq(scansTable.id, scanId));
         if (!check || check.status === "cancelled") {
           abortController.abort();
@@ -56,7 +56,7 @@ export async function runRealScan(
         const childCount = await countChildren(entry.path);
         if (childCount === 0) {
           const finding = classifyEmptyFolder(entry.path);
-          findings.push(finding);
+          typeFindings.push(finding);
           findingBatch.push({
             scanId,
             type: finding.type,
@@ -74,10 +74,9 @@ export async function runRealScan(
 
         const ext = path.extname(entry.name).toLowerCase();
 
-        // Classify by type
         const finding = classifyFile(entry.path, entry.name, entry.sizeBytes, largeFileThreshold);
         if (finding) {
-          findings.push(finding);
+          typeFindings.push(finding);
           findingBatch.push({
             scanId,
             type: finding.type,
@@ -90,7 +89,6 @@ export async function runRealScan(
           });
         }
 
-        // Hash for duplicate detection
         const hash = await computeHash(entry.path, entry.sizeBytes);
         if (hash) {
           const existing = hashMap.get(hash) ?? [];
@@ -98,31 +96,25 @@ export async function runRealScan(
           hashMap.set(hash, existing);
         }
 
-        // Flush batch every BATCH_SIZE
         if (findingBatch.length >= BATCH_SIZE) {
           await flushFindings();
         }
 
-        // Update progress every 25 files
-        if (filesScanned % 25 === 0) {
+        if (filesScanned % PROGRESS_UPDATE_INTERVAL === 0) {
+          // Estimate progress: cap at 85% until dedup pass completes
+          const progressEstimate = Math.min(85, Math.round((bytesScanned / Math.max(bytesScanned, 1)) * 50) + Math.floor(filesScanned / 10));
           await db.update(scansTable)
-            .set({ filesScanned, foldersScanned, bytesScanned, progressPercent: 50 })
+            .set({ filesScanned, foldersScanned, bytesScanned, progressPercent: Math.min(progressEstimate, 85) })
             .where(eq(scansTable.id, scanId));
         }
       }
     }
 
-    // Flush remaining findings
     await flushFindings();
 
-    // Second pass: detect duplicates
-    await db.insert(activityTable).values({
-      type: "classification_complete",
-      message: `Classification complete — ${filesScanned.toLocaleString()} files scanned`,
-      status: "success",
-    }).catch(() => {});
-
+    // Dedup pass
     const dupFindings = detectDuplicates(hashMap);
+
     if (dupFindings.length > 0) {
       const dupRows = dupFindings.map((f) => ({
         scanId,
@@ -137,18 +129,14 @@ export async function runRealScan(
         reason: f.reason,
       }));
 
-      // Insert in batches
       for (let i = 0; i < dupRows.length; i += BATCH_SIZE) {
         await db.insert(findingsTable).values(dupRows.slice(i, i + BATCH_SIZE));
       }
-
-      findings.push(...dupFindings);
     }
 
-    const totalFindings = findings.length + dupFindings.length;
+    const totalFindings = typeFindings.length + dupFindings.length;
     const dupGroups = new Set(dupFindings.map((f) => f.duplicateGroupHash)).size;
 
-    // Final scan update
     await db.update(scansTable).set({
       status: "completed",
       filesScanned,
@@ -161,6 +149,11 @@ export async function runRealScan(
     }).where(eq(scansTable.id, scanId));
 
     await db.insert(activityTable).values([
+      {
+        type: "classification_complete" as const,
+        message: `Classification complete — ${filesScanned.toLocaleString()} files scanned`,
+        status: "success" as const,
+      },
       ...(dupGroups > 0 ? [{
         type: "duplicate_found" as const,
         message: `${dupGroups} duplicate group${dupGroups > 1 ? "s" : ""} detected (${dupFindings.length} files)`,

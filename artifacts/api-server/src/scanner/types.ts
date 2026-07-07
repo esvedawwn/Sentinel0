@@ -4,6 +4,7 @@ export type FindingType =
   | "idlk_file"
   | "locked_file"
   | "installer"
+  | "archive"
   | "large_file"
   | "duplicate";
 
@@ -57,14 +58,14 @@ export const SKIP_DIRS = new Set([
 
 export const INSTALLER_EXTS = new Set([
   ".dmg", ".pkg", ".exe", ".msi", ".deb", ".rpm", ".appimage",
-  ".run", ".sh",
+  ".run",
 ]);
 
 export const ARCHIVE_EXTS = new Set([
   ".zip", ".rar", ".7z", ".tar", ".gz", ".bz2", ".xz", ".tgz",
 ]);
 
-/** Files > this size trigger a "large_file" finding in real/sample mode (50 MB) */
+/** Files > this size trigger a "large_file" finding in real mode (50 MB) */
 export const LARGE_FILE_BYTES = 50 * 1024 * 1024;
 
 /** Files > this size are NOT hashed for duplicate detection (100 MB) */

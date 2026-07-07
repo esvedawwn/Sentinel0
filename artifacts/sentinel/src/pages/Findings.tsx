@@ -8,8 +8,17 @@ import {
   getGetFindingsSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { formatBytes } from "@/lib/utils";
 
-type FindingTypeFilter = "empty_folder" | "zero_byte" | "idlk_file" | "locked_file" | "installer" | "large_file" | "duplicate";
+type FindingTypeFilter =
+  | "empty_folder"
+  | "zero_byte"
+  | "idlk_file"
+  | "locked_file"
+  | "installer"
+  | "archive"
+  | "large_file"
+  | "duplicate";
 type FindingStatusFilter = "safe_delete" | "review";
 type TabKey = "all" | FindingTypeFilter | FindingStatusFilter;
 
@@ -18,7 +27,8 @@ const TYPE_LABELS: Record<string, string> = {
   zero_byte: "Zero-Byte",
   idlk_file: "Lock (.idlk)",
   locked_file: "Lock (.locked)",
-  installer: "Installer / Archive",
+  installer: "Installer",
+  archive: "Archive",
   large_file: "Large File",
   duplicate: "Duplicate",
 };
@@ -29,6 +39,7 @@ const TYPE_COLORS: Record<string, string> = {
   idlk_file: "#FBBF24",
   locked_file: "#FBBF24",
   installer: "#A78BFA",
+  archive: "#C084FC",
   large_file: "#F97316",
   duplicate: "#EC4899",
 };
@@ -39,14 +50,6 @@ const STATUS_COLORS: Record<string, string> = {
   duplicate: "#EC4899",
   ignored: "rgba(255,255,255,0.3)",
 };
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
-}
 
 function TypeBadge({ type }: { type: string }) {
   const label = TYPE_LABELS[type] ?? type;
@@ -68,7 +71,11 @@ function TypeBadge({ type }: { type: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const color = STATUS_COLORS[status] ?? "#888";
-  const label = status === "safe_delete" ? "Safe Delete" : status === "review" ? "Review" : status === "duplicate" ? "Duplicate" : status;
+  const label =
+    status === "safe_delete" ? "Safe Delete"
+    : status === "review" ? "Review"
+    : status === "duplicate" ? "Duplicate"
+    : status;
   return (
     <span
       className="inline-block px-2 py-0.5 rounded text-xs font-mono"
@@ -92,6 +99,7 @@ const FILTER_TABS: { key: TabKey; label: string }[] = [
   { key: "duplicate", label: "Duplicates" },
   { key: "large_file", label: "Large Files" },
   { key: "installer", label: "Installers" },
+  { key: "archive", label: "Archives" },
   { key: "idlk_file", label: "Lock Files" },
   { key: "empty_folder", label: "Empty Folders" },
   { key: "zero_byte", label: "Zero-Byte" },
@@ -100,26 +108,36 @@ const FILTER_TABS: { key: TabKey; label: string }[] = [
 export default function Findings() {
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [committedSearch, setCommittedSearch] = useState("");
   const queryClient = useQueryClient();
 
-  // Determine filter params — "duplicate" tab shows status=duplicate findings
   const isStatusFilter = STATUS_FILTER_KEYS.has(activeTab);
   const isDuplicateTab = activeTab === "duplicate";
   const typeParam: FindingTypeFilter | undefined =
-    !isStatusFilter && !isDuplicateTab && activeTab !== "all" ? (activeTab as FindingTypeFilter) : undefined;
+    !isStatusFilter && !isDuplicateTab && activeTab !== "all"
+      ? (activeTab as FindingTypeFilter)
+      : undefined;
   const statusParam: "safe_delete" | "review" | "duplicate" | undefined =
-    isStatusFilter ? (activeTab as "safe_delete" | "review") : isDuplicateTab ? "duplicate" : undefined;
+    isStatusFilter
+      ? (activeTab as "safe_delete" | "review")
+      : isDuplicateTab
+      ? "duplicate"
+      : undefined;
 
   const findingsParams = {
     ...(typeParam ? { type: typeParam } : {}),
     ...(statusParam ? { findingStatus: statusParam } : {}),
+    ...(committedSearch ? { search: committedSearch } : {}),
     limit: 200,
   };
 
-  const { data: findingsData, isLoading } = useListFindings(
-    findingsParams,
-    { query: { queryKey: getListFindingsQueryKey(findingsParams), refetchInterval: 8000 } }
-  );
+  const { data: findingsData, isLoading } = useListFindings(findingsParams, {
+    query: {
+      queryKey: getListFindingsQueryKey(findingsParams),
+      refetchInterval: 8000,
+    },
+  });
 
   const { data: summary } = useGetFindingsSummary(
     {},
@@ -140,6 +158,11 @@ export default function Findings() {
   const total = findingsData?.total ?? 0;
   const selectedFinding = findings.find((f) => f.id === selectedId) ?? null;
 
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") setCommittedSearch(search);
+    if (e.key === "Escape") { setSearch(""); setCommittedSearch(""); }
+  }
+
   return (
     <div className="p-8 max-w-7xl">
       {/* Header */}
@@ -153,19 +176,47 @@ export default function Findings() {
             REAL SCAN RESULTS · {(summary?.total ?? 0).toLocaleString()} TOTAL FINDINGS
           </p>
         </div>
-        <button
-          onClick={() => clearFindings.mutate({})}
-          disabled={clearFindings.isPending || (summary?.total ?? 0) === 0}
-          className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
-          style={{
-            background: "rgba(248,113,113,0.12)",
-            color: (summary?.total ?? 0) === 0 ? "rgba(255,255,255,0.2)" : "#F87171",
-            border: "1px solid rgba(248,113,113,0.25)",
-            cursor: (summary?.total ?? 0) === 0 ? "not-allowed" : "pointer",
-          }}
-        >
-          {clearFindings.isPending ? "Clearing…" : "Clear All Findings"}
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Search */}
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Search files… (Enter)"
+              className="px-3 py-1.5 text-xs rounded text-white outline-none w-52"
+              style={{
+                background: "#222222",
+                border: "1px solid rgba(255,255,255,0.12)",
+                fontFamily: "var(--app-font-mono)",
+                color: "rgba(255,255,255,0.8)",
+              }}
+            />
+            {committedSearch && (
+              <button
+                onClick={() => { setSearch(""); setCommittedSearch(""); }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs"
+                style={{ color: "rgba(255,255,255,0.4)" }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => clearFindings.mutate({})}
+            disabled={clearFindings.isPending || (summary?.total ?? 0) === 0}
+            className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
+            style={{
+              background: "rgba(248,113,113,0.12)",
+              color: (summary?.total ?? 0) === 0 ? "rgba(255,255,255,0.2)" : "#F87171",
+              border: "1px solid rgba(248,113,113,0.25)",
+              cursor: (summary?.total ?? 0) === 0 ? "not-allowed" : "pointer",
+            }}
+          >
+            {clearFindings.isPending ? "Clearing…" : "Clear All"}
+          </button>
+        </div>
       </div>
 
       {/* Summary ribbon */}
@@ -195,8 +246,8 @@ export default function Findings() {
         </div>
       )}
 
-      {/* Empty state — no findings yet */}
-      {!isLoading && (summary?.total ?? 0) === 0 && (
+      {/* Empty state */}
+      {!isLoading && (summary?.total ?? 0) === 0 && !committedSearch && (
         <div
           className="rounded-lg p-12 text-center"
           style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.06)" }}
@@ -206,14 +257,16 @@ export default function Findings() {
           <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.875rem" }}>
             Run a scan from the Dashboard to detect issues in your file system.
             <br />
-            Click <strong style={{ color: "#34D399" }}>Scan Sample Data</strong> to try it with the included test fixtures.
+            Click{" "}
+            <strong style={{ color: "#34D399" }}>Scan Sample Data</strong> to try it
+            with the included test fixtures.
           </div>
         </div>
       )}
 
-      {(summary?.total ?? 0) > 0 && (
+      {((summary?.total ?? 0) > 0 || committedSearch) && (
         <div className="flex gap-6">
-          {/* Left panel — filter + table */}
+          {/* Left panel */}
           <div className="flex-1 min-w-0">
             {/* Filter tabs */}
             <div
@@ -222,37 +275,48 @@ export default function Findings() {
             >
               {FILTER_TABS.map((tab) => {
                 const isActive = activeTab === tab.key;
-                const count =
-                  tab.key === "all" ? summary?.total :
-                  tab.key === "safe_delete" ? summary?.safeDelete :
-                  tab.key === "review" ? summary?.review :
-                  tab.key === "duplicate" ? summary?.duplicate :
-                  summary?.byType?.[tab.key];
+                const tabCount =
+                  tab.key === "all" ? summary?.total
+                  : tab.key === "safe_delete" ? summary?.safeDelete
+                  : tab.key === "review" ? summary?.review
+                  : tab.key === "duplicate" ? summary?.duplicate
+                  : summary?.byType?.[tab.key];
 
                 return (
                   <button
                     key={tab.key}
-                    onClick={() => { setActiveTab(tab.key); setSelectedId(null); }}
+                    onClick={() => {
+                      setActiveTab(tab.key);
+                      setSelectedId(null);
+                    }}
                     className="flex items-center gap-2 px-3 py-1.5 rounded text-xs whitespace-nowrap transition-colors duration-150 shrink-0"
                     style={{
-                      background: isActive ? "rgba(52,211,153,0.12)" : "rgba(255,255,255,0.04)",
+                      background: isActive
+                        ? "rgba(52,211,153,0.12)"
+                        : "rgba(255,255,255,0.04)",
                       color: isActive ? "#34D399" : "rgba(255,255,255,0.5)",
-                      border: `1px solid ${isActive ? "rgba(52,211,153,0.3)" : "transparent"}`,
+                      border: `1px solid ${
+                        isActive ? "rgba(52,211,153,0.3)" : "transparent"
+                      }`,
                       fontFamily: "var(--app-font-mono)",
                     }}
                   >
                     {tab.label}
-                    {count != null && count > 0 && (
+                    {tabCount != null && tabCount > 0 && (
                       <span
                         className="px-1.5 py-0.5 rounded-full text-xs"
                         style={{
-                          background: isActive ? "rgba(52,211,153,0.2)" : "rgba(255,255,255,0.08)",
-                          color: isActive ? "#34D399" : "rgba(255,255,255,0.4)",
+                          background: isActive
+                            ? "rgba(52,211,153,0.2)"
+                            : "rgba(255,255,255,0.08)",
+                          color: isActive
+                            ? "#34D399"
+                            : "rgba(255,255,255,0.4)",
                           fontFamily: "var(--app-font-mono)",
                           fontSize: "0.65rem",
                         }}
                       >
-                        {count}
+                        {tabCount}
                       </span>
                     )}
                   </button>
@@ -262,19 +326,24 @@ export default function Findings() {
 
             {/* Table */}
             {isLoading ? (
-              <div className="text-center py-16" style={{ color: "rgba(255,255,255,0.3)" }}>
+              <div
+                className="text-center py-16"
+                style={{ color: "rgba(255,255,255,0.3)" }}
+              >
                 Loading findings…
               </div>
             ) : findings.length === 0 ? (
-              <div className="text-center py-16" style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.875rem" }}>
-                No findings for this filter
+              <div
+                className="text-center py-16"
+                style={{ color: "rgba(255,255,255,0.3)", fontSize: "0.875rem" }}
+              >
+                {committedSearch ? `No findings matching "${committedSearch}"` : "No findings for this filter"}
               </div>
             ) : (
               <div
                 className="rounded-lg overflow-hidden"
                 style={{ border: "1px solid rgba(255,255,255,0.06)" }}
               >
-                {/* Table header */}
                 <div
                   className="grid text-xs font-mono px-4 py-2.5"
                   style={{
@@ -291,7 +360,6 @@ export default function Findings() {
                   <span className="text-right">SIZE</span>
                 </div>
 
-                {/* Table rows */}
                 <div style={{ background: "#111111" }}>
                   {findings.map((finding, idx) => {
                     const isSelected = selectedId === finding.id;
@@ -306,16 +374,24 @@ export default function Findings() {
                           gridTemplateColumns: "2fr 1fr 1fr 80px",
                           background: isSelected
                             ? "rgba(52,211,153,0.06)"
-                            : idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
+                            : idx % 2 === 0
+                            ? "transparent"
+                            : "rgba(255,255,255,0.015)",
                           borderBottom: "1px solid rgba(255,255,255,0.04)",
-                          borderLeft: isSelected ? "2px solid #34D399" : "2px solid transparent",
+                          borderLeft: isSelected
+                            ? "2px solid #34D399"
+                            : "2px solid transparent",
                         }}
-                        onClick={() => setSelectedId(isSelected ? null : finding.id)}
+                        onClick={() =>
+                          setSelectedId(isSelected ? null : finding.id)
+                        }
                       >
                         <div className="min-w-0 pr-4">
                           <div
                             className="text-sm font-medium truncate"
-                            style={{ color: isSelected ? "#34D399" : "#ffffff" }}
+                            style={{
+                              color: isSelected ? "#34D399" : "#ffffff",
+                            }}
                           >
                             {finding.name}
                           </div>
@@ -327,7 +403,10 @@ export default function Findings() {
                               fontSize: "0.7rem",
                             }}
                           >
-                            {finding.path.replace(/^\/home\/runner\/workspace\/sample-data\//, "sample-data/")}
+                            {finding.path.replace(
+                              /^\/home\/runner\/workspace\/sample-data\//,
+                              "sample-data/"
+                            )}
                           </div>
                         </div>
                         <TypeBadge type={finding.type} />
@@ -339,14 +418,15 @@ export default function Findings() {
                             fontFamily: "var(--app-font-mono)",
                           }}
                         >
-                          {finding.sizeBytes > 0 ? formatBytes(finding.sizeBytes) : "—"}
+                          {finding.sizeBytes > 0
+                            ? formatBytes(finding.sizeBytes)
+                            : "—"}
                         </div>
                       </motion.div>
                     );
                   })}
                 </div>
 
-                {/* Footer */}
                 <div
                   className="px-4 py-2 text-xs font-mono"
                   style={{
@@ -357,12 +437,17 @@ export default function Findings() {
                   }}
                 >
                   Showing {findings.length} of {total} findings
+                  {committedSearch && (
+                    <span style={{ color: "rgba(255,255,255,0.4)" }}>
+                      {" "}— filtered by "{committedSearch}"
+                    </span>
+                  )}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Right detail panel */}
+          {/* Detail panel */}
           {selectedFinding && (
             <motion.div
               key={selectedFinding.id}
@@ -386,7 +471,11 @@ export default function Findings() {
                 </span>
                 <button
                   onClick={() => setSelectedId(null)}
-                  style={{ color: "rgba(255,255,255,0.3)", fontSize: "1.1rem", lineHeight: 1 }}
+                  style={{
+                    color: "rgba(255,255,255,0.3)",
+                    fontSize: "1.1rem",
+                    lineHeight: 1,
+                  }}
                 >
                   ×
                 </button>
@@ -396,7 +485,10 @@ export default function Findings() {
                 <div>
                   <div
                     className="text-xs tracking-widest uppercase mb-1"
-                    style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                    style={{
+                      color: "rgba(255,255,255,0.3)",
+                      fontFamily: "var(--app-font-mono)",
+                    }}
                   >
                     Finding Type
                   </div>
@@ -406,7 +498,10 @@ export default function Findings() {
                 <div>
                   <div
                     className="text-xs tracking-widest uppercase mb-1"
-                    style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                    style={{
+                      color: "rgba(255,255,255,0.3)",
+                      fontFamily: "var(--app-font-mono)",
+                    }}
                   >
                     Status
                   </div>
@@ -416,11 +511,20 @@ export default function Findings() {
                 <div>
                   <div
                     className="text-xs tracking-widest uppercase mb-1"
-                    style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                    style={{
+                      color: "rgba(255,255,255,0.3)",
+                      fontFamily: "var(--app-font-mono)",
+                    }}
                   >
                     Reason
                   </div>
-                  <p className="text-xs" style={{ color: "rgba(255,255,255,0.6)", lineHeight: 1.5 }}>
+                  <p
+                    className="text-xs"
+                    style={{
+                      color: "rgba(255,255,255,0.6)",
+                      lineHeight: 1.5,
+                    }}
+                  >
                     {selectedFinding.reason}
                   </p>
                 </div>
@@ -428,13 +532,20 @@ export default function Findings() {
                 <div>
                   <div
                     className="text-xs tracking-widest uppercase mb-1"
-                    style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                    style={{
+                      color: "rgba(255,255,255,0.3)",
+                      fontFamily: "var(--app-font-mono)",
+                    }}
                   >
                     Full Path
                   </div>
                   <p
                     className="text-xs break-all"
-                    style={{ color: "rgba(255,255,255,0.5)", fontFamily: "var(--app-font-mono)", lineHeight: 1.5 }}
+                    style={{
+                      color: "rgba(255,255,255,0.5)",
+                      fontFamily: "var(--app-font-mono)",
+                      lineHeight: 1.5,
+                    }}
                   >
                     {selectedFinding.path}
                   </p>
@@ -443,12 +554,20 @@ export default function Findings() {
                 <div>
                   <div
                     className="text-xs tracking-widest uppercase mb-1"
-                    style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                    style={{
+                      color: "rgba(255,255,255,0.3)",
+                      fontFamily: "var(--app-font-mono)",
+                    }}
                   >
                     Size
                   </div>
-                  <p className="text-sm font-mono" style={{ color: "#ffffff", fontFamily: "var(--app-font-mono)" }}>
-                    {selectedFinding.sizeBytes > 0 ? formatBytes(selectedFinding.sizeBytes) : "0 B (empty)"}
+                  <p
+                    className="text-sm font-mono"
+                    style={{ color: "#ffffff", fontFamily: "var(--app-font-mono)" }}
+                  >
+                    {selectedFinding.sizeBytes > 0
+                      ? formatBytes(selectedFinding.sizeBytes)
+                      : "0 B (empty)"}
                   </p>
                 </div>
 
@@ -456,29 +575,37 @@ export default function Findings() {
                   <div>
                     <div
                       className="text-xs tracking-widest uppercase mb-1"
-                      style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                      style={{
+                        color: "rgba(255,255,255,0.3)",
+                        fontFamily: "var(--app-font-mono)",
+                      }}
                     >
                       MD5 Hash
                     </div>
                     <p
                       className="text-xs break-all"
-                      style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)" }}
+                      style={{
+                        color: "rgba(255,255,255,0.4)",
+                        fontFamily: "var(--app-font-mono)",
+                      }}
                     >
                       {selectedFinding.hash}
                     </p>
                   </div>
                 )}
 
-                {/* Action buttons — stubbed for alpha */}
                 <div
                   className="pt-3 mt-3"
                   style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
                 >
                   <div
                     className="text-xs mb-2"
-                    style={{ color: "rgba(255,255,255,0.25)", fontFamily: "var(--app-font-mono)" }}
+                    style={{
+                      color: "rgba(255,255,255,0.25)",
+                      fontFamily: "var(--app-font-mono)",
+                    }}
                   >
-                    ACTIONS (coming in v0.2)
+                    ACTIONS (v0.2)
                   </div>
                   <div className="space-y-2">
                     <button

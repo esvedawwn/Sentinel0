@@ -1,20 +1,22 @@
-import fs from "fs/promises";
+import fs from "fs";
+import fsPromises from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { SKIP_DIRS, MAX_HASH_SIZE } from "./types.js";
 
 /**
- * Compute MD5 hash of a file. Returns null if the file is too large,
- * unreadable, or an error occurs. Non-blocking via streaming.
+ * Compute MD5 hash of a file using a read stream.
+ * Returns null if the file is too large, unreadable, or an error occurs.
  */
-export async function computeHash(filePath: string, sizeBytes: number): Promise<string | null> {
-  if (sizeBytes > MAX_HASH_SIZE || sizeBytes === 0) return null;
-  try {
-    const content = await fs.readFile(filePath);
-    return crypto.createHash("md5").update(content).digest("hex");
-  } catch {
-    return null;
-  }
+export function computeHash(filePath: string, sizeBytes: number): Promise<string | null> {
+  if (sizeBytes > MAX_HASH_SIZE || sizeBytes === 0) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const hash = crypto.createHash("md5");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+    stream.on("error", () => resolve(null));
+  });
 }
 
 export interface WalkEntry {
@@ -36,7 +38,7 @@ export async function* walkDirectory(
 
   let entries;
   try {
-    entries = await fs.readdir(rootPath, { withFileTypes: true });
+    entries = await fsPromises.readdir(rootPath, { withFileTypes: true });
   } catch {
     return;
   }
@@ -46,23 +48,15 @@ export async function* walkDirectory(
 
     const fullPath = path.join(rootPath, entry.name);
 
-    // Skip known non-user directories
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
-
-      let stat;
-      try {
-        stat = await fs.stat(fullPath);
-      } catch {
-        continue;
-      }
 
       yield { path: fullPath, name: entry.name, sizeBytes: 0, isDir: true };
       yield* walkDirectory(fullPath, signal);
     } else if (entry.isFile() || entry.isSymbolicLink()) {
       let stat;
       try {
-        stat = await fs.stat(fullPath);
+        stat = await fsPromises.stat(fullPath);
         if (!stat.isFile()) continue;
       } catch {
         continue;
@@ -74,12 +68,13 @@ export async function* walkDirectory(
 }
 
 /**
- * Count direct children of a directory. Returns 0 if unreadable.
+ * Count direct children of a directory that aren't hidden system files.
+ * Returns 0 if unreadable.
  */
 export async function countChildren(dirPath: string): Promise<number> {
   try {
-    const entries = await fs.readdir(dirPath);
-    return entries.length;
+    const entries = await fsPromises.readdir(dirPath);
+    return entries.filter((e) => e !== ".DS_Store" && !e.startsWith("._")).length;
   } catch {
     return 0;
   }

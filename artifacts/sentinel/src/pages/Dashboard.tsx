@@ -195,9 +195,10 @@ export default function Dashboard() {
           sub="awaiting review"
         />
         <MetricCard
-          label="Space Saved"
-          value={isLoading ? "—" : formatBytes(summary?.spaceSavedBytes ?? 0)}
+          label="Recoverable"
+          value={isLoading ? "—" : formatBytes(summary?.bytesRecoverable ?? 0)}
           color="#34D399"
+          sub="from findings"
         />
       </div>
 
