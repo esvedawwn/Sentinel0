@@ -19,6 +19,12 @@ function mapFinding(f: typeof findingsTable.$inferSelect) {
     findingStatus: f.findingStatus,
     reason: f.reason,
     createdAt: f.createdAt.toISOString(),
+    // AI classification fields
+    aiCategory: f.aiCategory ?? null,
+    aiConfidence: f.aiConfidence ?? null,
+    aiExplanation: f.aiExplanation ?? null,
+    aiTags: f.aiTags ?? null,
+    aiProvider: f.aiProvider ?? null,
   };
 }
 
@@ -37,7 +43,6 @@ router.get("/findings", async (req, res): Promise<void> => {
   if (findingStatus) conditions.push(eq(findingsTable.findingStatus, findingStatus));
   if (search?.trim()) {
     const term = `%${search.trim()}%`;
-    // SQLite LIKE is case-insensitive for ASCII by default
     conditions.push(or(
       like(findingsTable.name, term),
       like(findingsTable.path, term)

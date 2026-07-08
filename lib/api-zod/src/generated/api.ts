@@ -461,6 +461,11 @@ export const ListFindingsQueryParams = zod.object({
   "offset": zod.coerce.number().default(listFindingsQueryOffsetDefault)
 })
 
+export const listFindingsResponseFindingsItemAiConfidenceMin = 0;
+export const listFindingsResponseFindingsItemAiConfidenceMax = 100;
+
+
+
 export const ListFindingsResponse = zod.object({
   "findings": zod.array(zod.object({
   "id": zod.number(),
@@ -474,7 +479,12 @@ export const ListFindingsResponse = zod.object({
   "duplicateGroupHash": zod.string().nullish(),
   "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
   "reason": zod.string(),
-  "createdAt": zod.string()
+  "createdAt": zod.string(),
+  "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Media, Software)'),
+  "aiConfidence": zod.number().min(listFindingsResponseFindingsItemAiConfidenceMin).max(listFindingsResponseFindingsItemAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
+  "aiExplanation": zod.string().nullish().describe('Human-readable explanation of why this category was chosen'),
+  "aiTags": zod.array(zod.string()).nullish().describe('Semantic tags assigned by the AI classifier'),
+  "aiProvider": zod.string().nullish().describe('Identifier of the AI provider that produced this classification')
 })),
   "total": zod.number()
 })

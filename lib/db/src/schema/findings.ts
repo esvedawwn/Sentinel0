@@ -29,6 +29,12 @@ export const findingsTable = sqliteTable("findings", {
   duplicateGroupHash: text("duplicate_group_hash"),
   findingStatus: text("finding_status").$type<FindingStatus>().notNull(),
   reason: text("reason").notNull().default(""),
+  // AI classification fields (populated during scan by the AI service layer)
+  aiCategory: text("ai_category"),
+  aiConfidence: integer("ai_confidence"),
+  aiExplanation: text("ai_explanation"),
+  aiTags: text("ai_tags", { mode: "json" }).$type<string[]>(),
+  aiProvider: text("ai_provider"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -44,6 +50,7 @@ export const insertFindingSchema = createInsertSchema(findingsTable, {
     "duplicate",
   ]),
   findingStatus: z.enum(["safe_delete", "review", "duplicate", "ignored"]),
+  aiTags: z.array(z.string()).optional(),
 }).omit({ id: true });
 export type InsertFinding = z.infer<typeof insertFindingSchema>;
 export type Finding = typeof findingsTable.$inferSelect;

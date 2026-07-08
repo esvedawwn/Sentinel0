@@ -828,6 +828,18 @@ components:
         duplicatesFound:
           type: integer
 
+    AIRecommendation:
+      type: object
+      required: [action, reason, safe]
+      properties:
+        action:
+          type: string
+          enum: [delete, review, archive, keep, ignore]
+        reason:
+          type: string
+        safe:
+          type: boolean
+
     Finding:
       type: object
       required: [id, scanId, type, path, name, extension, sizeBytes, findingStatus, reason, createdAt]
@@ -858,6 +870,25 @@ components:
           type: string
         createdAt:
           type: string
+        aiCategory:
+          type: ["string", "null"]
+          description: "High-level AI category (e.g. Legal, Media, Software)"
+        aiConfidence:
+          type: ["integer", "null"]
+          minimum: 0
+          maximum: 100
+          description: "AI classification confidence 0–100"
+        aiExplanation:
+          type: ["string", "null"]
+          description: "Human-readable explanation of why this category was chosen"
+        aiTags:
+          type: ["array", "null"]
+          items:
+            type: string
+          description: "Semantic tags assigned by the AI classifier"
+        aiProvider:
+          type: ["string", "null"]
+          description: "Identifier of the AI provider that produced this classification"
 
     FindingsListResponse:
       type: object

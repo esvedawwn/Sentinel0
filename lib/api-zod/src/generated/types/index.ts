@@ -10,6 +10,8 @@ export * from './activityEntry';
 export * from './activityEntryMeta';
 export * from './activityEntryStatus';
 export * from './activityEntryType';
+export * from './aIRecommendation';
+export * from './aIRecommendationAction';
 export * from './attentionSummary';
 export * from './category';
 export * from './categoryCount';

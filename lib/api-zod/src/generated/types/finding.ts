@@ -23,4 +23,31 @@ export interface Finding {
   findingStatus: FindingFindingStatus;
   reason: string;
   createdAt: string;
+  /**
+     * High-level AI category (e.g. Legal, Media, Software)
+     * @nullable
+     */
+  aiCategory?: string | null;
+  /**
+     * AI classification confidence 0–100
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  aiConfidence?: number | null;
+  /**
+     * Human-readable explanation of why this category was chosen
+     * @nullable
+     */
+  aiExplanation?: string | null;
+  /**
+     * Semantic tags assigned by the AI classifier
+     * @nullable
+     */
+  aiTags?: string[] | null;
+  /**
+     * Identifier of the AI provider that produced this classification
+     * @nullable
+     */
+  aiProvider?: string | null;
 }

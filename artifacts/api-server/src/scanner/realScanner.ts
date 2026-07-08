@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { walkDirectory, computeHash, countChildren } from "./fileWalker.js";
 import { classifyFile, classifyEmptyFolder, detectDuplicates } from "./findingsEngine.js";
 import { ScanFinding, LARGE_FILE_BYTES } from "./types.js";
+import { classifyWithAI } from "../ai/index.js";
 
 const SAMPLE_LARGE_FILE_BYTES = 1024 * 1024;
 const BATCH_SIZE = 50;
@@ -12,7 +13,8 @@ const CANCEL_CHECK_INTERVAL = 100;
 
 /**
  * Run a real filesystem scan against the given path.
- * Walks files, classifies findings, hashes files for dedup.
+ * Walks files, classifies findings, hashes files for dedup,
+ * and enriches each finding with AI classification metadata.
  * Updates scan progress in the DB and fires activity events.
  */
 export async function runRealScan(
@@ -57,6 +59,16 @@ export async function runRealScan(
         if (childCount === 0) {
           const finding = classifyEmptyFolder(entry.path);
           typeFindings.push(finding);
+
+          // AI classification for empty folder findings
+          const aiResult = await classifyWithAI({
+            path: finding.path,
+            name: finding.name,
+            extension: finding.extension,
+            sizeBytes: finding.sizeBytes,
+            findingType: finding.type,
+          });
+
           findingBatch.push({
             scanId,
             type: finding.type,
@@ -66,6 +78,11 @@ export async function runRealScan(
             sizeBytes: finding.sizeBytes,
             findingStatus: finding.findingStatus,
             reason: finding.reason,
+            aiCategory: aiResult.category,
+            aiConfidence: aiResult.confidence,
+            aiExplanation: aiResult.explanation,
+            aiTags: aiResult.tags,
+            aiProvider: aiResult.provider,
           });
         }
       } else {
@@ -77,6 +94,16 @@ export async function runRealScan(
         const finding = classifyFile(entry.path, entry.name, entry.sizeBytes, largeFileThreshold);
         if (finding) {
           typeFindings.push(finding);
+
+          // AI classification for file findings
+          const aiResult = await classifyWithAI({
+            path: finding.path,
+            name: finding.name,
+            extension: finding.extension,
+            sizeBytes: finding.sizeBytes,
+            findingType: finding.type,
+          });
+
           findingBatch.push({
             scanId,
             type: finding.type,
@@ -86,6 +113,11 @@ export async function runRealScan(
             sizeBytes: finding.sizeBytes,
             findingStatus: finding.findingStatus,
             reason: finding.reason,
+            aiCategory: aiResult.category,
+            aiConfidence: aiResult.confidence,
+            aiExplanation: aiResult.explanation,
+            aiTags: aiResult.tags,
+            aiProvider: aiResult.provider,
           });
         }
 
@@ -101,7 +133,6 @@ export async function runRealScan(
         }
 
         if (filesScanned % PROGRESS_UPDATE_INTERVAL === 0) {
-          // Estimate progress: cap at 85% until dedup pass completes
           const progressEstimate = Math.min(85, Math.round((bytesScanned / Math.max(bytesScanned, 1)) * 50) + Math.floor(filesScanned / 10));
           await db.update(scansTable)
             .set({ filesScanned, foldersScanned, bytesScanned, progressPercent: Math.min(progressEstimate, 85) })
@@ -112,22 +143,39 @@ export async function runRealScan(
 
     await flushFindings();
 
-    // Dedup pass
+    // Dedup pass — AI classify duplicate findings too
     const dupFindings = detectDuplicates(hashMap);
 
     if (dupFindings.length > 0) {
-      const dupRows = dupFindings.map((f) => ({
-        scanId,
-        type: f.type as "duplicate",
-        path: f.path,
-        name: f.name,
-        extension: f.extension,
-        sizeBytes: f.sizeBytes,
-        hash: f.hash,
-        duplicateGroupHash: f.duplicateGroupHash,
-        findingStatus: f.findingStatus as "duplicate",
-        reason: f.reason,
-      }));
+      const dupRows: (typeof findingsTable.$inferInsert)[] = [];
+
+      for (const f of dupFindings) {
+        const aiResult = await classifyWithAI({
+          path: f.path,
+          name: f.name,
+          extension: f.extension,
+          sizeBytes: f.sizeBytes,
+          findingType: f.type,
+        });
+
+        dupRows.push({
+          scanId,
+          type: f.type as "duplicate",
+          path: f.path,
+          name: f.name,
+          extension: f.extension,
+          sizeBytes: f.sizeBytes,
+          hash: f.hash,
+          duplicateGroupHash: f.duplicateGroupHash,
+          findingStatus: f.findingStatus as "duplicate",
+          reason: f.reason,
+          aiCategory: aiResult.category,
+          aiConfidence: aiResult.confidence,
+          aiExplanation: aiResult.explanation,
+          aiTags: aiResult.tags,
+          aiProvider: aiResult.provider,
+        });
+      }
 
       for (let i = 0; i < dupRows.length; i += BATCH_SIZE) {
         await db.insert(findingsTable).values(dupRows.slice(i, i + BATCH_SIZE));

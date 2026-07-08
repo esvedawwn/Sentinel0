@@ -7,29 +7,91 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.2.0-alpha] — 2026-07-08 — AI Intelligence Layer
+
+### Added
+
+#### AI Classification Module (`artifacts/api-server/src/ai/`)
+- **`AIClassificationInput`** interface — path, name, extension, sizeBytes, findingType
+- **`AIClassificationResult`** interface — category, confidence (0–100), explanation, tags, recommendation, provider
+- **`AIRecommendation`** interface — action, reason, safe flag (all destructive actions marked `safe: false`)
+- **`AISemanticTag`** interface — label + score
+- **`AIProvider`** interface — pluggable back-end abstraction
+- **`LocalRuleProvider`** — offline, deterministic rule engine; classifies by extension, filename keywords, path segments, finding type, and file size; always available without any API key
+- **`OpenAIProvider`** placeholder — structured stub for future GPT-4o integration; requires `OPENAI_API_KEY`
+- **`EmbeddingsProvider`** placeholder — structured stub for semantic similarity classification; requires `EMBEDDINGS_API_KEY`
+- **`classifyWithAI()`** — entry-point function; auto-selects provider by priority (Embeddings → OpenAI → LocalRule); falls back to LocalRule on any provider error
+- **`AI_PROVIDER`** env var — override provider selection (`local`, `openai`, `embeddings`)
+
+#### AI Categories (11 total)
+Legal · Banking · Design · Renovation · Medical · Personal Documents · Media · Software · Archives · Temporary / Junk · Unknown
+
+#### Database
+- `findings` table: 5 new columns — `ai_category`, `ai_confidence` (0–100), `ai_explanation`, `ai_tags` (JSON array), `ai_provider`
+
+#### Scanner Integration
+- `realScanner.ts` — calls `classifyWithAI()` for every finding (file findings, empty folder findings, duplicate findings)
+- AI classification fields written alongside every finding insert
+
+#### API
+- `GET /api/findings` — response now includes `aiCategory`, `aiConfidence`, `aiExplanation`, `aiTags`, `aiProvider` per finding
+- `Finding` OpenAPI schema updated with 5 new optional fields
+- `AIRecommendation` schema added to OpenAPI spec
+
+#### Findings UI
+- Table: new **AI CATEGORY** column with coloured dot indicator
+- Detail panel: **✦ AI Intelligence** section showing:
+  - Category badge (11 category-specific colours)
+  - Animated confidence bar (green ≥85 / yellow ≥65 / red <65)
+  - Human-readable explanation
+  - Semantic tags as chips
+  - Provider identifier
+
+#### Documentation
+- `docs/ARCHITECTURE.md` — AI layer architecture, provider selection, safety contract, updated data flow diagram
+- `docs/ROADMAP.md` — v0.2.0 AI items checked off; v0.3.0 refined
+- `docs/BACKLOG.md` — new AI backlog section
+
+### Safety
+- AI never deletes, moves, renames, or modifies files
+- All `AIRecommendation.action` values requiring file mutation have `safe: false`
+- Destructive actions remain stubbed (preview-only, require explicit confirmation)
+- LocalRuleProvider has zero network I/O — works fully offline
+
+---
+
+## [v0.1.2-alpha] — 2026-07-08 — SQLite Migration
+
+### Changed
+- **Database engine** — migrated from PostgreSQL to SQLite via `@libsql/client` + `drizzle-orm/libsql`
+- **DB path** — defaults to `~/.sentinel/sentinel.db`; override with `SENTINEL_DB_PATH` env var
+- All route handlers: removed PostgreSQL-specific SQL (`::int`, `::bigint` casts, `array_length()`, `interval` syntax, `ilike`) — replaced with SQLite equivalents
+- esbuild externals — added `@libsql/client`, `libsql`, and all `@libsql/*` platform packages
+
+### Added
+- Tauri desktop scaffold at `artifacts/desktop/`
+- Desktop build documentation at `docs/DESKTOP_BUILD.md`
+- `App.tsx` Tauri detection — calls `setBaseUrl('http://localhost:38080')` when `window.__TAURI__` is present
+
+---
+
 ## [v0.1.1-alpha] — 2026-07-07 — Sprint 1 Hardening
 
 ### Fixed
-- **Double-counting bug** — `totalFindings` in `realScanner.ts` was adding `dupFindings.length` twice (they were already pushed into `findings[]` at the dedup pass)
-- **OOM risk** — `computeHash` switched from `fs.readFile` (entire file loaded into memory) to `fs.createReadStream` (streaming MD5); safe for files up to 100 MB
-- **Archive type** — archives (`.zip`, `.rar`, `.7z`, `.tar`, `.gz`, `.tgz`, `.bz2`, `.xz`) were incorrectly classified as `type: "installer"`; now use distinct `type: "archive"`
-- **`formatBytes` duplication** — `Findings.tsx` defined its own copy; now imports canonical version from `@/lib/utils`
-- **Dead code** — `artifacts/sentinel/src/lib/formatters.ts` deleted (unused, duplicated `utils.ts` functions)
-- **Empty folder detection** — `countChildren` now excludes `.DS_Store` and `._*` macOS shadow files; previously a folder with only a `.DS_Store` would not be flagged as empty
-- **`simulateScan` separation** — moved from `routes/scans.ts` into `scanner/simulateScanner.ts` (single responsibility)
-- **`INSTALLER_EXTS`** — removed `.sh` (shell scripts are scripts, not installers)
+- **Double-counting bug** — `totalFindings` in `realScanner.ts` was adding `dupFindings.length` twice
+- **OOM risk** — `computeHash` switched from `fs.readFile` to streaming MD5
+- **Archive type** — archives were incorrectly classified as `type: "installer"`
+- **`formatBytes` duplication** — `Findings.tsx` now imports from `@/lib/utils`
+- **Dead code** — `artifacts/sentinel/src/lib/formatters.ts` deleted
+- **Empty folder detection** — excludes `.DS_Store` and `._*` macOS shadow files
+- **`simulateScan` separation** — moved into `scanner/simulateScanner.ts`
+- **`INSTALLER_EXTS`** — removed `.sh`
 
 ### Added
-- **`archive` finding type** — separate DB enum value, distinct badge colour (`#C084FC`), and dedicated "Archives" filter tab on Findings page
-- **Search on Findings** — `GET /api/findings?search=` parameter filters by name or path (`ilike`); UI has a search input (press Enter to commit, Escape to clear)
-- **Settings page** (⌘6) — scan configuration reference: detection toggles, large-file threshold input, skip-dir chip list, about panel
-- **`bytesRecoverable`** — new field on `GET /api/dashboard/summary`; sums `size_bytes` of all non-duplicate findings; shown on Dashboard as "Recoverable" metric card
-- Settings nav item pinned to sidebar bottom, above system status indicator
-
-### Schema
-- `finding_type` enum: added `"archive"` value (DB migration applied)
-- `GET /api/findings`: added `search?: string` query parameter
-- `DashboardSummary`: added `bytesRecoverable: integer`
+- `archive` finding type — distinct badge colour (`#C084FC`), dedicated filter tab
+- Search on Findings — `GET /api/findings?search=` with UI input
+- Settings page (⌘6) — scan configuration reference
+- `bytesRecoverable` — new `GET /api/dashboard/summary` field
 
 ---
 
@@ -46,71 +108,22 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 - esbuild bundler for API server
 
 #### Real Scan Engine
-- `fileWalker.ts` — async generator that walks the filesystem non-blocking
+- `fileWalker.ts` — async generator walks the filesystem non-blocking
 - `findingsEngine.ts` — pure classifier functions for all finding types
 - `realScanner.ts` — orchestrator with DB progress updates and activity events
-- Skips: `node_modules`, `.git`, `dist`, `build`, `.cache` and related dirs
 - MD5 hashing for duplicate detection (files < 100 MB)
 
 #### Findings Detection
-- **empty_folder** — directories with zero children
-- **zero_byte** — files with 0-byte size (status: safe_delete)
-- **idlk_file** — Adobe InDesign lock files (status: safe_delete)
-- **locked_file** — generic `.locked` files (status: review)
-- **installer** — `.dmg`, `.pkg`, `.exe`, `.msi`, `.deb`, `.rpm` (status: review)
-- **large_file** — files exceeding threshold (50 MB real, 1 MB sample)
-- **duplicate** — identical MD5 hash across multiple files
-
-#### Sample Data
-- `sample-data/` — representative test fixtures:
-  - InDesign lock files, generic lock files
-  - Duplicate file pairs (PSD, ZIP, JPG)
-  - Zero-byte files, empty folders
-  - Installer placeholders (DMG, PKG)
-  - Large file (1.5 MB binary)
-  - Legal, banking, design, media files
-
-#### API Routes
-- `GET /api/healthz` — health check
-- `GET/POST /api/scans` — list / start scans (modes: real, sample, simulate)
-- `GET /api/scans/:id` — scan details
-- `POST /api/scans/:id/cancel` — cancel running scan
-- `GET /api/findings` — list findings with filters
-- `GET /api/findings/summary` — counts by type and status
-- `DELETE /api/findings/clear` — clear findings (by scanId or all)
-- `GET /api/dashboard/*` — summary, activity, category breakdown, attention
-- `GET /api/files` + `PATCH /api/files/:id` — file browser + category update
-- `GET /api/duplicates` + `POST /api/duplicates/:id/resolve`
-- `GET /api/categories` — hardcoded category definitions
-- `GET /api/activity`
-- `GET /api/reports/overview` + `GET /api/reports/scan-history`
+- **empty_folder** · **zero_byte** · **idlk_file** · **locked_file** · **installer** · **large_file** · **duplicate**
 
 #### Frontend
 - Always-dark UI (#111111 bg, #1A1A1A panels, #222222 cards)
-- Inter font, monospaced data values
-- **Dashboard** — metrics, scan progress bar, activity feed, attention panels
-- **Analyse** — filterable file browser, inline detail panel, editable category
-- **Organise** — side-by-side duplicate resolution (Keep Left/Right/Ignore)
-- **Findings** — real findings table with type/status filters, summary ribbon
-- **Reports** — category bar chart, file type breakdown, scan history table
-- Keyboard shortcuts ⌘1–⌘5 for page navigation
-- "Scan Sample Data" quick action on Dashboard
+- **Dashboard** · **Analyse** · **Organise** · **Findings** · **Reports**
+- Keyboard shortcuts ⌘1–⌘5
 
 #### Documentation
-- `docs/VISION.md` — product vision and philosophy
-- `docs/ROADMAP.md` — versioned feature roadmap
-- `docs/ARCHITECTURE.md` — system design, data flow, library choices
-- `docs/BACKLOG.md` — prioritised future work
-- `docs/CHANGELOG.md` — this file
+- `docs/VISION.md` · `docs/ROADMAP.md` · `docs/ARCHITECTURE.md` · `docs/BACKLOG.md`
 
 ### Security
-- Scanner is read-only — no delete, move, or rename operations
-- All destructive actions are stubbed as "coming soon"
-- Scanner skips workspace internals (node_modules, .git, etc.)
-- No external network calls from scanner
-
-### Known Limitations
-- Real scans are scoped to the Replit workspace (no native macOS folder access)
-- `sizeBytes` stored as 32-bit integer (max ~2.1 GB per file)
-- No scan cancellation during hash computation phase
-- Findings page loads up to 200 findings at once (no infinite scroll yet)
+- Scanner is read-only — no delete, move, or rename
+- All destructive actions stubbed as "coming soon"

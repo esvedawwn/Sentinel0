@@ -51,6 +51,28 @@ const STATUS_COLORS: Record<string, string> = {
   ignored: "rgba(255,255,255,0.3)",
 };
 
+const AI_CATEGORY_COLORS: Record<string, string> = {
+  "Legal": "#60A5FA",
+  "Banking": "#34D399",
+  "Design": "#A78BFA",
+  "Renovation": "#F97316",
+  "Medical": "#F87171",
+  "Personal Documents": "#FBBF24",
+  "Media": "#22D3EE",
+  "Software": "#818CF8",
+  "Archives": "#9CA3AF",
+  "Temporary / Junk": "#6B7280",
+  "Unknown": "#374151",
+};
+
+const AI_RECOMMENDATION_COLORS: Record<string, string> = {
+  delete: "#F87171",
+  review: "#FBBF24",
+  archive: "#C084FC",
+  keep: "#34D399",
+  ignore: "rgba(255,255,255,0.3)",
+};
+
 function TypeBadge({ type }: { type: string }) {
   const label = TYPE_LABELS[type] ?? type;
   const color = TYPE_COLORS[type] ?? "#888";
@@ -87,6 +109,70 @@ function StatusBadge({ status }: { status: string }) {
     >
       {label}
     </span>
+  );
+}
+
+function AICategoryDot({ category }: { category: string | null | undefined }) {
+  if (!category) return <span style={{ color: "rgba(255,255,255,0.15)", fontSize: "0.7rem", fontFamily: "var(--app-font-mono)" }}>—</span>;
+  const color = AI_CATEGORY_COLORS[category] ?? "#888";
+  const short = category === "Temporary / Junk" ? "Junk"
+    : category === "Personal Documents" ? "Personal"
+    : category;
+  return (
+    <span className="flex items-center gap-1.5" style={{ minWidth: 0 }}>
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          background: color,
+          flexShrink: 0,
+          boxShadow: `0 0 4px ${color}88`,
+        }}
+      />
+      <span
+        className="truncate text-xs"
+        style={{ color: `${color}cc`, fontFamily: "var(--app-font-mono)", fontSize: "0.7rem" }}
+      >
+        {short}
+      </span>
+    </span>
+  );
+}
+
+function ConfidenceBar({ confidence }: { confidence: number | null | undefined }) {
+  if (confidence == null) return null;
+  const color = confidence >= 85 ? "#34D399" : confidence >= 65 ? "#FBBF24" : "#F87171";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div
+        style={{
+          flex: 1,
+          height: 4,
+          borderRadius: 2,
+          background: "rgba(255,255,255,0.08)",
+          overflow: "hidden",
+        }}
+      >
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${confidence}%` }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          style={{ height: "100%", background: color, borderRadius: 2 }}
+        />
+      </div>
+      <span
+        style={{
+          fontSize: "0.7rem",
+          color,
+          fontFamily: "var(--app-font-mono)",
+          minWidth: 32,
+          textAlign: "right",
+        }}
+      >
+        {confidence}%
+      </span>
+    </div>
   );
 }
 
@@ -350,13 +436,14 @@ export default function Findings() {
                     background: "#1A1A1A",
                     color: "rgba(255,255,255,0.3)",
                     fontFamily: "var(--app-font-mono)",
-                    gridTemplateColumns: "2fr 1fr 1fr 80px",
+                    gridTemplateColumns: "2fr 1fr 1fr 1fr 80px",
                     borderBottom: "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
                   <span>NAME</span>
                   <span>TYPE</span>
                   <span>STATUS</span>
+                  <span>AI CATEGORY</span>
                   <span className="text-right">SIZE</span>
                 </div>
 
@@ -371,7 +458,7 @@ export default function Findings() {
                         transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                         className="grid items-center px-4 py-3 cursor-pointer transition-colors duration-100"
                         style={{
-                          gridTemplateColumns: "2fr 1fr 1fr 80px",
+                          gridTemplateColumns: "2fr 1fr 1fr 1fr 80px",
                           background: isSelected
                             ? "rgba(52,211,153,0.06)"
                             : idx % 2 === 0
@@ -411,6 +498,7 @@ export default function Findings() {
                         </div>
                         <TypeBadge type={finding.type} />
                         <StatusBadge status={finding.findingStatus} />
+                        <AICategoryDot category={finding.aiCategory} />
                         <div
                           className="text-right text-xs font-mono"
                           style={{
@@ -454,7 +542,7 @@ export default function Findings() {
               initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.15 }}
-              className="w-72 shrink-0"
+              className="w-80 shrink-0"
               style={{
                 background: "#1A1A1A",
                 border: "1px solid rgba(255,255,255,0.08)",
@@ -482,63 +570,142 @@ export default function Findings() {
               </div>
 
               <div className="space-y-3">
+                {/* Finding basics */}
                 <div>
-                  <div
-                    className="text-xs tracking-widest uppercase mb-1"
-                    style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontFamily: "var(--app-font-mono)",
-                    }}
-                  >
-                    Finding Type
-                  </div>
+                  <div className="detail-label">Finding Type</div>
                   <TypeBadge type={selectedFinding.type} />
                 </div>
 
                 <div>
-                  <div
-                    className="text-xs tracking-widest uppercase mb-1"
-                    style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontFamily: "var(--app-font-mono)",
-                    }}
-                  >
-                    Status
-                  </div>
+                  <div className="detail-label">Status</div>
                   <StatusBadge status={selectedFinding.findingStatus} />
                 </div>
 
                 <div>
-                  <div
-                    className="text-xs tracking-widest uppercase mb-1"
-                    style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontFamily: "var(--app-font-mono)",
-                    }}
-                  >
-                    Reason
-                  </div>
-                  <p
-                    className="text-xs"
-                    style={{
-                      color: "rgba(255,255,255,0.6)",
-                      lineHeight: 1.5,
-                    }}
-                  >
+                  <div className="detail-label">Reason</div>
+                  <p className="detail-value" style={{ lineHeight: 1.5 }}>
                     {selectedFinding.reason}
                   </p>
                 </div>
 
-                <div>
+                {/* AI Intelligence section */}
+                {selectedFinding.aiCategory && (
                   <div
-                    className="text-xs tracking-widest uppercase mb-1"
+                    className="rounded-md p-3 space-y-3"
                     style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontFamily: "var(--app-font-mono)",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(255,255,255,0.07)",
+                      marginTop: "0.75rem",
                     }}
                   >
-                    Full Path
+                    {/* Section header */}
+                    <div className="flex items-center gap-2">
+                      <span style={{ color: "#34D399", fontSize: "0.7rem" }}>✦</span>
+                      <span
+                        className="text-xs font-mono tracking-widest uppercase"
+                        style={{ color: "#34D399", fontFamily: "var(--app-font-mono)" }}
+                      >
+                        AI Intelligence
+                      </span>
+                      {selectedFinding.aiProvider && (
+                        <span
+                          className="ml-auto text-xs"
+                          style={{
+                            color: "rgba(255,255,255,0.2)",
+                            fontFamily: "var(--app-font-mono)",
+                            fontSize: "0.6rem",
+                          }}
+                        >
+                          {selectedFinding.aiProvider}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <div className="detail-label" style={{ marginBottom: 6 }}>Category</div>
+                      {(() => {
+                        const cat = selectedFinding.aiCategory!;
+                        const color = AI_CATEGORY_COLORS[cat] ?? "#888";
+                        return (
+                          <span
+                            className="inline-flex items-center gap-2 px-2.5 py-1 rounded text-xs font-mono"
+                            style={{
+                              background: `${color}18`,
+                              color,
+                              border: `1px solid ${color}44`,
+                              fontFamily: "var(--app-font-mono)",
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                background: color,
+                                boxShadow: `0 0 4px ${color}88`,
+                                flexShrink: 0,
+                              }}
+                            />
+                            {cat}
+                          </span>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Confidence */}
+                    {selectedFinding.aiConfidence != null && (
+                      <div>
+                        <div className="detail-label" style={{ marginBottom: 6 }}>Confidence</div>
+                        <ConfidenceBar confidence={selectedFinding.aiConfidence} />
+                      </div>
+                    )}
+
+                    {/* Explanation */}
+                    {selectedFinding.aiExplanation && (
+                      <div>
+                        <div className="detail-label" style={{ marginBottom: 4 }}>Explanation</div>
+                        <p
+                          className="text-xs"
+                          style={{
+                            color: "rgba(255,255,255,0.55)",
+                            lineHeight: 1.55,
+                          }}
+                        >
+                          {selectedFinding.aiExplanation}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Tags */}
+                    {selectedFinding.aiTags && selectedFinding.aiTags.length > 0 && (
+                      <div>
+                        <div className="detail-label" style={{ marginBottom: 6 }}>Tags</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedFinding.aiTags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-2 py-0.5 rounded text-xs"
+                              style={{
+                                background: "rgba(52,211,153,0.08)",
+                                color: "rgba(52,211,153,0.7)",
+                                border: "1px solid rgba(52,211,153,0.15)",
+                                fontFamily: "var(--app-font-mono)",
+                                fontSize: "0.65rem",
+                              }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
+                )}
+
+                {/* File metadata */}
+                <div style={{ paddingTop: "0.25rem" }}>
+                  <div className="detail-label">Full Path</div>
                   <p
                     className="text-xs break-all"
                     style={{
@@ -552,15 +719,7 @@ export default function Findings() {
                 </div>
 
                 <div>
-                  <div
-                    className="text-xs tracking-widest uppercase mb-1"
-                    style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontFamily: "var(--app-font-mono)",
-                    }}
-                  >
-                    Size
-                  </div>
+                  <div className="detail-label">Size</div>
                   <p
                     className="text-sm font-mono"
                     style={{ color: "#ffffff", fontFamily: "var(--app-font-mono)" }}
@@ -573,15 +732,7 @@ export default function Findings() {
 
                 {selectedFinding.hash && (
                   <div>
-                    <div
-                      className="text-xs tracking-widest uppercase mb-1"
-                      style={{
-                        color: "rgba(255,255,255,0.3)",
-                        fontFamily: "var(--app-font-mono)",
-                      }}
-                    >
-                      MD5 Hash
-                    </div>
+                    <div className="detail-label">MD5 Hash</div>
                     <p
                       className="text-xs break-all"
                       style={{
@@ -605,7 +756,7 @@ export default function Findings() {
                       fontFamily: "var(--app-font-mono)",
                     }}
                   >
-                    ACTIONS (v0.2)
+                    ACTIONS (v0.3)
                   </div>
                   <div className="space-y-2">
                     <button
@@ -625,7 +776,7 @@ export default function Findings() {
                       disabled
                       className="w-full px-3 py-1.5 text-xs rounded text-left"
                       style={{
-                        background: "rgba(255,255,255,0.04)",
+                        background: "rgba(255,255,255,0.03)",
                         color: "rgba(255,255,255,0.2)",
                         border: "1px solid rgba(255,255,255,0.06)",
                         cursor: "not-allowed",
