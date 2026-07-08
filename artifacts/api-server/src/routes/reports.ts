@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, scansTable, filesTable, duplicateGroupsTable } from "@workspace/db";
-import { eq, desc, count, sum, sql } from "drizzle-orm";
+import { desc, count, sql } from "drizzle-orm";
 import { GetReportsScanHistoryQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -22,7 +22,7 @@ router.get("/reports/overview", async (_req, res): Promise<void> => {
   const [fileStats] = await db
     .select({
       total: count(),
-      totalSizeBytes: sql<number>`coalesce(sum(size_bytes), 0)::bigint`,
+      totalSizeBytes: sql<number>`coalesce(sum(size_bytes), 0)`,
     })
     .from(filesTable);
 
@@ -30,8 +30,8 @@ router.get("/reports/overview", async (_req, res): Promise<void> => {
 
   const [dupStats] = await db
     .select({
-      resolved: sql<number>`sum(case when status = 'resolved' then 1 else 0 end)::int`,
-      savedBytes: sql<number>`coalesce(sum(saved_bytes), 0)::bigint`,
+      resolved: sql<number>`sum(case when status = 'resolved' then 1 else 0 end)`,
+      savedBytes: sql<number>`coalesce(sum(saved_bytes), 0)`,
     })
     .from(duplicateGroupsTable);
 
@@ -47,7 +47,7 @@ router.get("/reports/overview", async (_req, res): Promise<void> => {
     .select({
       extension: filesTable.extension,
       count: count(),
-      sizeBytes: sql<number>`coalesce(sum(size_bytes), 0)::bigint`,
+      sizeBytes: sql<number>`coalesce(sum(size_bytes), 0)`,
     })
     .from(filesTable)
     .groupBy(filesTable.extension)
@@ -91,10 +91,11 @@ router.get("/reports/scan-history", async (req, res): Promise<void> => {
   const params = GetReportsScanHistoryQueryParams.safeParse(req.query);
   const days = params.success ? (params.data.days ?? 30) : 30;
 
+  // SQLite date arithmetic: datetime('now', '-N days')
   const scans = await db
     .select()
     .from(scansTable)
-    .where(sql`started_at >= now() - interval '${sql.raw(String(days))} days'`)
+    .where(sql`started_at >= strftime('%s', datetime('now', ${`-${days} days`}))`)
     .orderBy(desc(scansTable.startedAt));
 
   res.json(

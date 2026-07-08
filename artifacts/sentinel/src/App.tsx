@@ -1,5 +1,6 @@
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { setBaseUrl } from "@workspace/api-client-react";
 import Layout from "@/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import Analyse from "@/pages/Analyse";
@@ -8,6 +9,16 @@ import Reports from "@/pages/Reports";
 import Findings from "@/pages/Findings";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
+
+// When running inside Tauri the global __TAURI__ object is injected by the
+// shell. In that case there is no shared proxy — we talk directly to the
+// sidecar Express server on its fixed port.
+const isDesktop =
+  typeof window !== "undefined" && "__TAURI__" in window;
+
+if (isDesktop) {
+  setBaseUrl("http://localhost:38080");
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,9 +49,13 @@ function Router() {
 }
 
 function App() {
+  // In desktop mode the Tauri webview serves files from tauri://localhost with
+  // no path prefix, so we strip BASE_URL down to "" to avoid double-prefixing.
+  const base = isDesktop ? "" : import.meta.env.BASE_URL.replace(/\/$/, "");
+
   return (
     <QueryClientProvider client={queryClient}>
-      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+      <WouterRouter base={base}>
         <Router />
       </WouterRouter>
     </QueryClientProvider>

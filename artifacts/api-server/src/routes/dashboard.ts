@@ -8,8 +8,8 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
   const [fileCounts] = await db
     .select({
       total: count(),
-      ready: sql<number>`sum(case when status = 'ready' then 1 else 0 end)::int`,
-      corrupted: sql<number>`sum(case when status = 'corrupted' then 1 else 0 end)::int`,
+      ready: sql<number>`sum(case when status = 'ready' then 1 else 0 end)`,
+      corrupted: sql<number>`sum(case when status = 'corrupted' then 1 else 0 end)`,
     })
     .from(filesTable);
 
@@ -37,13 +37,12 @@ router.get("/dashboard/summary", async (req, res): Promise<void> => {
     .limit(1);
 
   const [resolvedDups] = await db
-    .select({ saved: sql<number>`coalesce(sum(saved_bytes), 0)::bigint` })
+    .select({ saved: sql<number>`coalesce(sum(saved_bytes), 0)` })
     .from(duplicateGroupsTable)
     .where(eq(duplicateGroupsTable.status, "resolved"));
 
-  // Sum of sizes of all non-duplicate findings (files that could be removed)
   const [recoverableResult] = await db
-    .select({ bytes: sql<number>`coalesce(sum(size_bytes), 0)::bigint` })
+    .select({ bytes: sql<number>`coalesce(sum(size_bytes), 0)` })
     .from(findingsTable)
     .where(sql`finding_status != 'duplicate'`);
 
@@ -130,10 +129,11 @@ router.get("/dashboard/needs-attention", async (req, res): Promise<void> => {
     .from(duplicateGroupsTable)
     .where(eq(duplicateGroupsTable.status, "pending"));
 
+  // In SQLite, tags is stored as JSON text; json_array_length returns 0 for empty arrays
   const [untagged] = await db
     .select({ count: count() })
     .from(filesTable)
-    .where(sql`array_length(tags, 1) IS NULL OR array_length(tags, 1) = 0`);
+    .where(sql`tags IS NULL OR json_array_length(tags) = 0`);
 
   res.json({
     corruptedFiles: Number(corrupted?.count ?? 0),

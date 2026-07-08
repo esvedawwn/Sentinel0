@@ -1,16 +1,24 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
+import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/libsql";
+import { mkdirSync } from "fs";
+import path from "path";
+import os from "os";
 import * as schema from "./schema";
 
-const { Pool } = pg;
-
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+function getDbPath(): string {
+  if (process.env.SENTINEL_DB_PATH) {
+    return process.env.SENTINEL_DB_PATH;
+  }
+  return path.join(os.homedir(), ".sentinel", "sentinel.db");
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+const dbPath = getDbPath();
+mkdirSync(path.dirname(dbPath), { recursive: true });
+
+const client = createClient({
+  url: `file:${dbPath}`,
+});
+
+export const db = drizzle({ client, schema });
 
 export * from "./schema";

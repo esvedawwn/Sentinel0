@@ -1,14 +1,14 @@
 import { defineConfig } from "drizzle-kit";
 import path from "path";
+import os from "os";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
-}
+const dbPath =
+  process.env.SENTINEL_DB_PATH ?? path.join(os.homedir(), ".sentinel", "sentinel.db");
 
 export default defineConfig({
   schema: path.join(__dirname, "./src/schema/index.ts"),
-  dialect: "postgresql",
+  dialect: "sqlite",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: `file:${dbPath}`,
   },
 });

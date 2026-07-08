@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, duplicateGroupsTable, duplicateGroupFilesTable, filesTable, activityTable } from "@workspace/db";
-import { eq, desc, count, sum, sql, inArray } from "drizzle-orm";
+import { eq, desc, count, sql, inArray } from "drizzle-orm";
 import { ResolveDuplicateParams, ResolveDuplicateBody, ListDuplicatesQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -55,7 +55,7 @@ router.get("/duplicates", async (req, res): Promise<void> => {
 
   const [totalRow] = await db.select({ total: count() }).from(duplicateGroupsTable);
   const [saveable] = await db
-    .select({ total: sql<number>`coalesce(sum(total_size_bytes - coalesce(saved_bytes, 0)), 0)::bigint` })
+    .select({ total: sql<number>`coalesce(sum(total_size_bytes - coalesce(saved_bytes, 0)), 0)` })
     .from(duplicateGroupsTable)
     .where(eq(duplicateGroupsTable.status, "pending"));
 

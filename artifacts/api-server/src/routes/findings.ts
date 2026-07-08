@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, findingsTable } from "@workspace/db";
-import { eq, and, count, ilike, or, sql } from "drizzle-orm";
+import { eq, and, count, like, or } from "drizzle-orm";
 import { ListFindingsQueryParams, GetFindingsSummaryQueryParams, ClearFindingsQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -37,9 +37,10 @@ router.get("/findings", async (req, res): Promise<void> => {
   if (findingStatus) conditions.push(eq(findingsTable.findingStatus, findingStatus));
   if (search?.trim()) {
     const term = `%${search.trim()}%`;
+    // SQLite LIKE is case-insensitive for ASCII by default
     conditions.push(or(
-      ilike(findingsTable.name, term),
-      ilike(findingsTable.path, term)
+      like(findingsTable.name, term),
+      like(findingsTable.path, term)
     ));
   }
 

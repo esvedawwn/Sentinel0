@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, filesTable } from "@workspace/db";
-import { eq, desc, ilike, and, count, sum, sql } from "drizzle-orm";
+import { eq, desc, like, and, count, sql } from "drizzle-orm";
 import { GetFileParams, UpdateFileParams, UpdateFileBody, ListFilesQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -26,11 +26,11 @@ router.get("/files/stats", async (_req, res): Promise<void> => {
   const [stats] = await db
     .select({
       total: count(),
-      totalSizeBytes: sql<number>`coalesce(sum(size_bytes), 0)::bigint`,
-      ready: sql<number>`sum(case when status = 'ready' then 1 else 0 end)::int`,
-      review: sql<number>`sum(case when status = 'review' then 1 else 0 end)::int`,
-      action_required: sql<number>`sum(case when status = 'action_required' then 1 else 0 end)::int`,
-      corrupted: sql<number>`sum(case when status = 'corrupted' then 1 else 0 end)::int`,
+      totalSizeBytes: sql<number>`coalesce(sum(size_bytes), 0)`,
+      ready: sql<number>`sum(case when status = 'ready' then 1 else 0 end)`,
+      review: sql<number>`sum(case when status = 'review' then 1 else 0 end)`,
+      action_required: sql<number>`sum(case when status = 'action_required' then 1 else 0 end)`,
+      corrupted: sql<number>`sum(case when status = 'corrupted' then 1 else 0 end)`,
     })
     .from(filesTable);
 
@@ -60,7 +60,8 @@ router.get("/files", async (req, res): Promise<void> => {
     conditions.push(eq(filesTable.status, params.data.status as "ready" | "review" | "action_required" | "corrupted"));
   }
   if (params.success && params.data.search) {
-    conditions.push(ilike(filesTable.name, `%${params.data.search}%`));
+    // SQLite LIKE is case-insensitive for ASCII by default
+    conditions.push(like(filesTable.name, `%${params.data.search}%`));
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
