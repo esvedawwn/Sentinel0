@@ -1,0 +1,801 @@
+You are the lead Swift/macOS engineer for Sentinel Organizer Lite.
+
+Your job is to add a safe, modular AI intelligence layer to this existing native SwiftUI macOS application.
+
+Do not rebuild the application from scratch.
+
+First inspect the complete repository, identify the existing architecture, and preserve working functionality including:
+
+- FileScanner.swift
+
+- FileClassifier.swift
+
+- SafetyEngine.swift
+
+- ScanModels.swift
+
+- DashboardView.swift
+
+- ResultsView.swift
+
+- CategoriesView.swift
+
+- SkippedItemsView.swift
+
+- SettingsView.swift
+
+- CSVExporter.swift
+
+- DemoLibraryGenerator.swift
+
+- SentinelOrganizerLite.xcodeproj
+
+IMPORTANT ENVIRONMENT LIMITATION
+
+Replit may not be able to compile or run a native macOS SwiftUI application because macOS frameworks and Xcode are required.
+
+Therefore:
+
+1. Make the source-code changes carefully.
+
+2. Keep all macOS-specific code valid for Xcode.
+
+3. Do not replace SwiftUI with a web framework.
+
+4. Do not convert the project into React, Electron, Tauri or a web app.
+
+5. Clearly identify anything that must ultimately be compiled or tested in Xcode on a Mac.
+
+6. Run any Swift syntax or package checks that are available, but do not pretend the native app was fully tested if the environment cannot build it.
+
+────────────────────────────────────────
+
+PRODUCT PURPOSE
+
+Sentinel Organizer Lite is a privacy-conscious native macOS file intelligence application.
+
+It scans files, classifies them, identifies clutter and risk, and presents recommendations.
+
+AI should improve:
+
+- file classification
+
+- document summaries
+
+- semantic tags
+
+- suggested destinations
+
+- cleanup explanations
+
+- natural-language search
+
+- project grouping
+
+- duplicate review
+
+- organisation recommendations
+
+AI must never directly delete, move, rename or modify files.
+
+AI may only:
+
+- classify
+
+- summarise
+
+- tag
+
+- explain
+
+- score confidence
+
+- suggest actions
+
+All file operations must remain controlled by the existing SafetyEngine and require explicit user confirmation.
+
+────────────────────────────────────────
+
+PRIMARY GOAL
+
+Implement AI integration in stages, beginning with an offline-capable intelligence layer.
+
+The application must continue to function without an internet connection or API key.
+
+────────────────────────────────────────
+
+PHASE 1 — AI ARCHITECTURE
+
+Create a modular AI layer with protocols and strongly typed models.
+
+Add files similar to:
+
+AI/
+
+    AIProvider.swift
+
+    AIModels.swift
+
+    AIService.swift
+
+    LocalRuleAIProvider.swift
+
+    OpenAIProvider.swift
+
+    AISettings.swift
+
+    PromptTemplates.swift
+
+Adapt the naming to the existing project architecture if another structure is more appropriate.
+
+Create types for:
+
+AIClassificationInput
+
+Fields may include:
+
+- file URL
+
+- filename
+
+- extension
+
+- path components
+
+- size
+
+- dates
+
+- existing classifier category
+
+- extracted text, when available
+
+- neighbouring filenames
+
+- scan finding type
+
+AIClassificationResult
+
+Fields:
+
+- category
+
+- subcategory
+
+- confidence from 0 to 1
+
+- semantic tags
+
+- suggested destination
+
+- suggested action
+
+- concise explanation
+
+- provider used
+
+- model used, if applicable
+
+- timestamp
+
+AIRecommendation
+
+Fields:
+
+- title
+
+- explanation
+
+- risk level
+
+- suggested action
+
+- confidence
+
+- reversible flag
+
+- requires confirmation
+
+AISemanticTag
+
+Fields:
+
+- label
+
+- confidence
+
+- source
+
+AISummary
+
+Fields:
+
+- title
+
+- summary
+
+- document type
+
+- important entities
+
+- dates
+
+- action items
+
+- confidence
+
+────────────────────────────────────────
+
+PHASE 2 — LOCAL OFFLINE CLASSIFIER
+
+Implement LocalRuleAIProvider.
+
+This is not fake placeholder logic.
+
+Build a practical deterministic classifier using:
+
+- filename keywords
+
+- path keywords
+
+- file extension
+
+- file size
+
+- existing category
+
+- date patterns
+
+- neighbouring files
+
+- scan findings
+
+Classify files into:
+
+- Legal
+
+- Banking
+
+- Tax
+
+- Receipts
+
+- Invoices
+
+- Design
+
+- Branding
+
+- Web Development
+
+- Photography
+
+- Video
+
+- Audio
+
+- Renovation
+
+- Property
+
+- Medical
+
+- Personal Documents
+
+- Identity Documents
+
+- Business
+
+- Software
+
+- Installers
+
+- Archives
+
+- Screenshots
+
+- Temporary Files
+
+- Lock Files
+
+- Duplicate Candidates
+
+- Unknown
+
+Return:
+
+- confidence score
+
+- human-readable explanation
+
+- semantic tags
+
+- suggested destination
+
+- suggested action
+
+Examples:
+
+“This file was classified as Legal because its filename contains ‘affidavit’ and it is a PDF.”
+
+“This appears to be an Adobe InDesign lock file and is probably removable after InDesign is closed.”
+
+“This ZIP archive appears related to a web project because it sits beside package.json and source folders.”
+
+────────────────────────────────────────
+
+PHASE 3 — CLOUD PROVIDER ABSTRACTION
+
+Implement an OpenAI-compatible provider without hardcoding credentials.
+
+Requirements:
+
+- use environment variables or Keychain-backed settings
+
+- never commit an API key
+
+- do not send files automatically
+
+- require explicit user consent before uploading file contents
+
+- allow metadata-only requests
+
+- allow extracted-text requests separately
+
+- show exactly what data will be sent
+
+- include timeout handling
+
+- include rate-limit handling
+
+- include retry limits
+
+- include cancellation
+
+- include structured JSON responses
+
+- validate every response before use
+
+- fall back to LocalRuleAIProvider if unavailable
+
+Recommended settings:
+
+AI enabled: false by default
+
+Provider:
+
+- Local only
+
+- OpenAI-compatible
+
+- Disabled
+
+Content sharing:
+
+- Metadata only
+
+- Extracted text
+
+- Never send content
+
+Model name:
+
+- configurable
+
+Base URL:
+
+- configurable for compatible providers
+
+API key:
+
+- stored securely, never displayed after saving
+
+Do not add any real key.
+
+────────────────────────────────────────
+
+PHASE 4 — DOCUMENT TEXT EXTRACTION
+
+Add a text extraction service appropriate for macOS.
+
+Support where practical:
+
+- PDF text
+
+- plain text
+
+- RTF
+
+- CSV
+
+- JSON
+
+- source code
+
+- common document metadata
+
+Use native frameworks where possible.
+
+For scanned PDFs and images, create an OCR abstraction that can later use Apple Vision.
+
+Do not require OCR for the first working implementation.
+
+Never send extracted content to a cloud provider without explicit user approval.
+
+Limit the amount of text sent to a provider.
+
+Redact or warn about potentially sensitive content, including:
+
+- financial information
+
+- legal documents
+
+- identity documents
+
+- medical records
+
+- passwords
+
+- API keys
+
+- private keys
+
+- recovery codes
+
+────────────────────────────────────────
+
+PHASE 5 — UI INTEGRATION
+
+Add AI information to the existing app without redesigning everything.
+
+In ResultsView, add columns or a detail panel for:
+
+- AI category
+
+- confidence
+
+- tags
+
+- explanation
+
+- suggested destination
+
+- suggested action
+
+Add actions:
+
+- Analyse selected file
+
+- Analyse selected findings
+
+- Re-run classification
+
+- Use local analysis only
+
+- Review AI recommendation
+
+- Accept recommendation
+
+- Reject recommendation
+
+Accepting a recommendation must not immediately modify files.
+
+It should create a proposed action that is then reviewed through the existing SafetyEngine.
+
+Add AI status indicators:
+
+- Local
+
+- Cloud
+
+- Offline
+
+- Analysing
+
+- Failed
+
+- Consent required
+
+Use the existing Sentinel visual language.
+
+Do not add flashy chat bubbles or decorative AI effects.
+
+────────────────────────────────────────
+
+PHASE 6 — NATURAL-LANGUAGE SEARCH
+
+Add an AI-ready search architecture.
+
+Initial version should work locally through keyword and semantic-tag matching.
+
+Example queries:
+
+- show legal PDFs from June
+
+- find old Adobe lock files
+
+- show renovation invoices
+
+- find large video files
+
+- show files likely related to the same project
+
+- find identity documents
+
+- show duplicate installers
+
+Create a SearchQueryInterpreter protocol.
+
+Implement:
+
+- LocalSearchQueryInterpreter
+
+- CloudSearchQueryInterpreter placeholder
+
+The local interpreter should convert common phrases into structured filters.
+
+Example structured output:
+
+{
+
+  "categories": ["Legal"],
+
+  "extensions": ["pdf"],
+
+  "dateRange": {
+
+    "start": "2026-06-01",
+
+    "end": "2026-06-30"
+
+  },
+
+  "minimumSize": null,
+
+  "maximumSize": null,
+
+  "tags": []
+
+}
+
+────────────────────────────────────────
+
+SAFETY REQUIREMENTS
+
+These are mandatory.
+
+1. AI never executes filesystem actions directly.
+
+2. AI cannot bypass SafetyEngine.
+
+3. AI recommendations must be reviewable.
+
+4. Every recommendation must explain why.
+
+5. Confidence must be displayed.
+
+6. Low-confidence results must be labelled clearly.
+
+7. Sensitive files must default to local-only processing.
+
+8. API keys must not be committed.
+
+9. File content must not be uploaded automatically.
+
+10. The app must remain functional when AI is disabled.
+
+11. Any destructive action must be explicit, reversible where possible, and confirmed.
+
+12. Add a visible privacy explanation in Settings.
+
+────────────────────────────────────────
+
+ARCHITECTURE REQUIREMENTS
+
+- Keep AI logic out of SwiftUI views.
+
+- Use protocols for providers.
+
+- Use dependency injection.
+
+- Keep models Codable where practical.
+
+- Make async operations cancellable.
+
+- Use async/await.
+
+- Update UI state on the main actor.
+
+- Add error types with useful user-facing messages.
+
+- Avoid singletons unless clearly justified.
+
+- Do not duplicate existing classifier logic.
+
+- Integrate with FileClassifier rather than replacing it recklessly.
+
+- Preserve SafetyEngine as the authority for file actions.
+
+Suggested flow:
+
+FileScanner
+
+    ↓
+
+FileClassifier
+
+    ↓
+
+AIService
+
+    ↓
+
+LocalRuleAIProvider or CloudProvider
+
+    ↓
+
+AIClassificationResult
+
+    ↓
+
+Review UI
+
+    ↓
+
+SafetyEngine
+
+    ↓
+
+User-confirmed action
+
+────────────────────────────────────────
+
+TESTING
+
+Add unit tests for:
+
+- local category classification
+
+- confidence scoring
+
+- semantic tags
+
+- suggested destinations
+
+- search query interpretation
+
+- provider fallback
+
+- malformed provider responses
+
+- no-key behaviour
+
+- AI-disabled behaviour
+
+- sensitive-file restrictions
+
+Use fixture filenames such as:
+
+- Affidavit_Supporting_Court.pdf
+
+- Westpac_Statement_June.pdf
+
+- Bathroom_Renovation_Invoice.pdf
+
+- Alpha_Hair_Logo_Final_v3.ai
+
+- Screenshot 2026-06-25.png
+
+- rejuve_labels.idlk
+
+- installer-copy.dmg
+
+- Medicare-card-scan.pdf
+
+- API_KEY_BACKUP.txt
+
+Ensure sensitive examples are classified locally and flagged against cloud transmission.
+
+────────────────────────────────────────
+
+DOCUMENTATION
+
+Create or update:
+
+docs/AI_ARCHITECTURE.md
+
+docs/AI_PRIVACY.md
+
+docs/AI_ROADMAP.md
+
+docs/CHANGELOG.md
+
+docs/BACKLOG.md
+
+Document:
+
+- data flow
+
+- provider abstraction
+
+- privacy model
+
+- local versus cloud processing
+
+- API-key storage
+
+- consent flow
+
+- failure modes
+
+- future embeddings and OCR
+
+- how AI recommendations pass through SafetyEngine
+
+────────────────────────────────────────
+
+DELIVERY ORDER
+
+Work in this order:
+
+1. Audit the existing Swift project.
+
+2. Document current architecture.
+
+3. Create AI types and provider protocols.
+
+4. Implement LocalRuleAIProvider.
+
+5. Integrate AIService with FileClassifier.
+
+6. Add AI results to the data models.
+
+7. Add Settings controls.
+
+8. Add AI findings UI.
+
+9. Add OpenAI-compatible provider behind a disabled-by-default setting.
+
+10. Add local natural-language search interpretation.
+
+11. Add tests.
+
+12. Update documentation.
+
+13. Report build limitations caused by Replit.
+
+14. Provide exact Xcode testing steps for macOS.
+
+Do not stop after creating empty placeholder files.
+
+Implement as much working local functionality as practical.
+
+────────────────────────────────────────
+
+FINAL OUTPUT
+
+When complete, provide:
+
+- architecture summary
+
+- files added
+
+- files modified
+
+- tests added
+
+- Xcode steps required
+
+- environment variables required
+
+- privacy decisions
+
+- known limitations
+
+- remaining AI roadmap
+
+- suggested commit message
+
+Suggested commit message:
+
+feat(ai): add local-first AI classification and provider architecture
