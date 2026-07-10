@@ -24,10 +24,15 @@ export interface Finding {
   reason: string;
   createdAt: string;
   /**
-     * High-level AI category (e.g. Legal, Media, Software)
+     * High-level AI category (e.g. Legal, Tax, Photography, Software)
      * @nullable
      */
   aiCategory?: string | null;
+  /**
+     * Optional finer-grained classification within the category
+     * @nullable
+     */
+  aiSubcategory?: string | null;
   /**
      * AI classification confidence 0–100
      * @minimum 0
@@ -45,6 +50,16 @@ export interface Finding {
      * @nullable
      */
   aiTags?: string[] | null;
+  /**
+     * Suggested folder/location for organisation (display-only; never applied automatically)
+     * @nullable
+     */
+  aiSuggestedDestination?: string | null;
+  /**
+     * Short human-readable description of the AI's suggested action
+     * @nullable
+     */
+  aiSuggestedAction?: string | null;
   /**
      * Identifier of the AI provider that produced this classification
      * @nullable

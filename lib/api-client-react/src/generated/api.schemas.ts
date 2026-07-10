@@ -279,6 +279,37 @@ export interface AIRecommendation {
   action: AIRecommendationAction;
   reason: string;
   safe: boolean;
+  reversible?: boolean;
+  requiresConfirmation?: boolean;
+}
+
+export type AIStatusResponseStatus = typeof AIStatusResponseStatus[keyof typeof AIStatusResponseStatus];
+
+
+export const AIStatusResponseStatus = {
+  local: 'local',
+  cloud: 'cloud',
+  offline: 'offline',
+  analysing: 'analysing',
+  failed: 'failed',
+  consent_required: 'consent_required',
+} as const;
+
+export interface AIStatusResponse {
+  status: AIStatusResponseStatus;
+  provider: string;
+  /** Whether a cloud provider (OpenAI/Embeddings) is configured and enabled */
+  cloudEnabled: boolean;
+}
+
+export interface AISearchInterpretation {
+  query: string;
+  categories: string[];
+  tags: string[];
+  statuses: string[];
+  /** @nullable */
+  minSizeBytes?: number | null;
+  explanation?: string;
 }
 
 export type FindingType = typeof FindingType[keyof typeof FindingType];
@@ -321,10 +352,15 @@ export interface Finding {
   reason: string;
   createdAt: string;
   /**
-     * High-level AI category (e.g. Legal, Media, Software)
+     * High-level AI category (e.g. Legal, Tax, Photography, Software)
      * @nullable
      */
   aiCategory?: string | null;
+  /**
+     * Optional finer-grained classification within the category
+     * @nullable
+     */
+  aiSubcategory?: string | null;
   /**
      * AI classification confidence 0–100
      * @minimum 0
@@ -342,6 +378,16 @@ export interface Finding {
      * @nullable
      */
   aiTags?: string[] | null;
+  /**
+     * Suggested folder/location for organisation (display-only; never applied automatically)
+     * @nullable
+     */
+  aiSuggestedDestination?: string | null;
+  /**
+     * Short human-readable description of the AI's suggested action
+     * @nullable
+     */
+  aiSuggestedAction?: string | null;
   /**
      * Identifier of the AI provider that produced this classification
      * @nullable
@@ -450,6 +496,10 @@ export const ListFindingsFindingStatus = {
 
 export type GetFindingsSummaryParams = {
 scanId?: number;
+};
+
+export type InterpretSearchParams = {
+q: string;
 };
 
 export type ClearFindingsParams = {

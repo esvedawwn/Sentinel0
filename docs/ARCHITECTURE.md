@@ -77,53 +77,16 @@ This separation means `findingsEngine` has no DB/IO dependencies and is triviall
 
 ## AI Intelligence Layer
 
-The AI layer lives at `artifacts/api-server/src/ai/` and is completely independent of the scanner — it is called by the scanner orchestrator, not by the classification engine itself.
+The AI layer lives at `artifacts/api-server/src/ai/` and is completely independent of the scanner — it is called by the scanner orchestrator, not by the classification engine itself. It classifies findings into one of 24 categories, plus an optional subcategory, suggested destination, and suggested action, using a pluggable local/cloud provider abstraction that defaults to fully offline operation.
 
-```
-src/ai/
-├── types.ts            — AIClassificationInput, AIClassificationResult,
-│                         AIRecommendation, AISemanticTag, AIProvider
-├── classifier.ts       — Provider factory + classifyWithAI() entry point
-├── index.ts            — Barrel exports
-└── providers/
-    ├── localRule.ts    — Offline rule-based classifier (always available)
-    ├── openai.ts       — OpenAI GPT placeholder (requires OPENAI_API_KEY)
-    └── embeddings.ts   — Semantic embeddings placeholder (requires EMBEDDINGS_API_KEY)
-```
-
-### Provider Selection
-
-`classifyWithAI()` auto-selects a provider based on available credentials:
-
-1. **EmbeddingsProvider** — if `EMBEDDINGS_API_KEY` is set
-2. **OpenAIProvider** — if `OPENAI_API_KEY` is set
-3. **LocalRuleProvider** — always available, no API key needed (offline)
-
-Override with `AI_PROVIDER=local|openai|embeddings` env var.
-
-### LocalRuleProvider Rules Engine
-
-Categories (ordered by rule priority):
-
-| Category | Primary Signals |
-|---|---|
-| Temporary / Junk | Finding type: `idlk_file`, `zero_byte`, `empty_folder`, `locked_file`; ext: `.tmp`, `.bak` |
-| Software | Finding type: `installer`; ext: code files (`.ts`, `.py`, `.js`, …) |
-| Archives | Finding type: `archive` |
-| Design | Ext: `.psd`, `.ai`, `.sketch`, `.fig`, `.xd`, `.indd`, `.svg`, … |
-| Media | Ext: image (`.jpg`, `.raw`, …), video (`.mp4`, `.mov`, …), audio (`.mp3`, …) |
-| Legal | Name/path keywords: contract, nda, deed, agreement, litigation, … |
-| Banking | Name/path keywords: invoice, receipt, tax, payroll, budget, … |
-| Medical | Name/path keywords: medical, prescription, diagnosis, lab, … |
-| Renovation | Name/path keywords: renovation, contractor, blueprint, permit, … |
-| Personal Documents | Name keywords: passport, resume, birth certificate, ssn, … |
-| Unknown | No rule matched |
+Full design detail — provider abstraction, the 24-category list, the local rule engine, natural-language search, and AI status reporting — lives in **`docs/AI_ARCHITECTURE.md`**. Data handling and privacy guarantees live in **`docs/AI_PRIVACY.md`**. Planned work lives in **`docs/AI_ROADMAP.md`**.
 
 ### Safety Contract
 
 > AI may **only recommend actions**. It never deletes, moves, renames, or modifies files.
-> All destructive suggestions have `safe: false` on `AIRecommendation` and must be
-> confirmed explicitly by the user before execution. The scanner is read-only.
+> Every `AIRecommendation` has `requiresConfirmation: true` unconditionally, and
+> destructive suggestions additionally have `safe: false`. The scanner remains the
+> only filesystem writer in the codebase and is itself read-only.
 
 ## OpenAPI-First
 

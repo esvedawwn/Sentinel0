@@ -14,14 +14,28 @@
 export type AICategory =
   | "Legal"
   | "Banking"
+  | "Tax"
+  | "Receipts"
+  | "Invoices"
   | "Design"
+  | "Branding"
+  | "Web Development"
+  | "Photography"
+  | "Video"
+  | "Audio"
   | "Renovation"
+  | "Property"
   | "Medical"
   | "Personal Documents"
-  | "Media"
+  | "Identity Documents"
+  | "Business"
   | "Software"
+  | "Installers"
   | "Archives"
-  | "Temporary / Junk"
+  | "Screenshots"
+  | "Temporary Files"
+  | "Lock Files"
+  | "Duplicate Candidates"
   | "Unknown";
 
 /** Input handed to a provider's classify() method. */
@@ -36,6 +50,8 @@ export interface AIClassificationInput {
   sizeBytes: number;
   /** Finding type from the scan engine (e.g. "installer", "archive", "zero_byte"). */
   findingType: string;
+  /** Filenames of sibling entries in the same directory, when available. */
+  neighbouringFilenames?: string[];
 }
 
 /**
@@ -46,6 +62,8 @@ export interface AISemanticTag {
   label: string;
   /** Provider confidence for this specific tag (0–1). */
   score: number;
+  /** Where the tag came from (e.g. "filename", "path", "extension", "finding-type"). */
+  source: string;
 }
 
 /**
@@ -62,23 +80,39 @@ export interface AIRecommendation {
    * explicit confirmation before execution. Never auto-execute unsafe actions.
    */
   safe: boolean;
+  /** Whether the suggested action, once confirmed, could be undone. */
+  reversible: boolean;
+  /** Always true today — every AI action must be reviewed before it runs. */
+  requiresConfirmation: boolean;
 }
 
 /** Classification result returned by every AIProvider. */
 export interface AIClassificationResult {
   /** High-level category. */
   category: AICategory;
+  /** Optional finer-grained classification within the category. */
+  subcategory: string | null;
   /** Confidence 0–100. */
   confidence: number;
   /** Human-readable explanation of why this category was chosen. */
   explanation: string;
   /** Semantic tags (flat string list for storage). */
   tags: string[];
+  /** Suggested folder/location for organisation (display-only; never applied automatically). */
+  suggestedDestination: string | null;
+  /** Short human-readable description of the suggested action. */
+  suggestedAction: string;
   /** Non-destructive recommendation. */
   recommendation: AIRecommendation;
   /** Identifies which provider produced this result. */
   provider: string;
 }
+
+/**
+ * Status of the AI subsystem, surfaced in the UI so users always know
+ * whether classification ran offline or against a cloud provider.
+ */
+export type AIStatus = "local" | "cloud" | "offline" | "analysing" | "failed" | "consent_required";
 
 /**
  * Provider interface.
@@ -87,6 +121,8 @@ export interface AIClassificationResult {
 export interface AIProvider {
   /** Unique provider identifier stored with each result. */
   readonly name: string;
+  /** Whether this provider runs locally (no network) or against the cloud. */
+  readonly kind: "local" | "cloud";
   /**
    * Classify a file and return a result.
    * Must never perform any filesystem writes.

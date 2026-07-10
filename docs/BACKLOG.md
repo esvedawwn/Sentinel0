@@ -12,6 +12,12 @@ Items are ordered by priority within each category.
 - [ ] User feedback loop — "Correct Category" button writes correction to DB for future training
 - [ ] AI reclassify button — re-run AI on existing findings without re-scanning
 - [ ] AI summary panel on Dashboard — breakdown of AI categories across all findings
+- [ ] Surface `GET /api/ai/status` as a persistent Local/Cloud/Offline badge in the UI header
+- [ ] Wire `GET /api/ai/search` into the Findings search box as an opt-in "smart search" toggle
+- [ ] Suggested destination "Apply" flow — confirmation dialog + a real (currently unimplemented) move operation
+- [ ] Per-category color legend / key on the Findings page for the full 24-category set
+
+See `docs/AI_ARCHITECTURE.md`, `docs/AI_PRIVACY.md`, and `docs/AI_ROADMAP.md` for the current AI layer design and constraints.
 
 ### Findings Actions (highest value)
 - [ ] Per-finding "Mark as Kept" — persist ignored status, hide from default view

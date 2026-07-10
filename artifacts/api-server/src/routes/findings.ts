@@ -21,9 +21,12 @@ function mapFinding(f: typeof findingsTable.$inferSelect) {
     createdAt: f.createdAt.toISOString(),
     // AI classification fields
     aiCategory: f.aiCategory ?? null,
+    aiSubcategory: f.aiSubcategory ?? null,
     aiConfidence: f.aiConfidence ?? null,
     aiExplanation: f.aiExplanation ?? null,
     aiTags: f.aiTags ?? null,
+    aiSuggestedDestination: f.aiSuggestedDestination ?? null,
+    aiSuggestedAction: f.aiSuggestedAction ?? null,
     aiProvider: f.aiProvider ?? null,
   };
 }

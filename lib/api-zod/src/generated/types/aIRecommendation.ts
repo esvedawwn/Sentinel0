@@ -11,4 +11,6 @@ export interface AIRecommendation {
   action: AIRecommendationAction;
   reason: string;
   safe: boolean;
+  reversible?: boolean;
+  requiresConfirmation?: boolean;
 }

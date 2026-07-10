@@ -480,10 +480,13 @@ export const ListFindingsResponse = zod.object({
   "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
   "reason": zod.string(),
   "createdAt": zod.string(),
-  "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Media, Software)'),
+  "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Tax, Photography, Software)'),
+  "aiSubcategory": zod.string().nullish().describe('Optional finer-grained classification within the category'),
   "aiConfidence": zod.number().min(listFindingsResponseFindingsItemAiConfidenceMin).max(listFindingsResponseFindingsItemAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
   "aiExplanation": zod.string().nullish().describe('Human-readable explanation of why this category was chosen'),
   "aiTags": zod.array(zod.string()).nullish().describe('Semantic tags assigned by the AI classifier'),
+  "aiSuggestedDestination": zod.string().nullish().describe('Suggested folder\/location for organisation (display-only; never applied automatically)'),
+  "aiSuggestedAction": zod.string().nullish().describe('Short human-readable description of the AI\'s suggested action'),
   "aiProvider": zod.string().nullish().describe('Identifier of the AI provider that produced this classification')
 })),
   "total": zod.number()
@@ -503,6 +506,33 @@ export const GetFindingsSummaryResponse = zod.object({
   "review": zod.number(),
   "duplicate": zod.number(),
   "byType": zod.record(zod.string(), zod.number())
+})
+
+
+/**
+ * @summary Current AI subsystem status (local/cloud/offline, active provider)
+ */
+export const GetAIStatusResponse = zod.object({
+  "status": zod.enum(['local', 'cloud', 'offline', 'analysing', 'failed', 'consent_required']),
+  "provider": zod.string(),
+  "cloudEnabled": zod.boolean().describe('Whether a cloud provider (OpenAI\/Embeddings) is configured and enabled')
+})
+
+
+/**
+ * @summary Interpret a natural-language search query into structured filters (local rules only)
+ */
+export const InterpretSearchQueryParams = zod.object({
+  "q": zod.coerce.string()
+})
+
+export const InterpretSearchResponse = zod.object({
+  "query": zod.string(),
+  "categories": zod.array(zod.string()),
+  "tags": zod.array(zod.string()),
+  "statuses": zod.array(zod.string()),
+  "minSizeBytes": zod.number().nullish(),
+  "explanation": zod.string().optional()
 })
 
 

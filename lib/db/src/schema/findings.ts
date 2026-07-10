@@ -31,9 +31,12 @@ export const findingsTable = sqliteTable("findings", {
   reason: text("reason").notNull().default(""),
   // AI classification fields (populated during scan by the AI service layer)
   aiCategory: text("ai_category"),
+  aiSubcategory: text("ai_subcategory"),
   aiConfidence: integer("ai_confidence"),
   aiExplanation: text("ai_explanation"),
   aiTags: text("ai_tags", { mode: "json" }).$type<string[]>(),
+  aiSuggestedDestination: text("ai_suggested_destination"),
+  aiSuggestedAction: text("ai_suggested_action"),
   aiProvider: text("ai_provider"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });

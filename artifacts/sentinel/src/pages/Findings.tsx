@@ -54,14 +54,28 @@ const STATUS_COLORS: Record<string, string> = {
 const AI_CATEGORY_COLORS: Record<string, string> = {
   "Legal": "#60A5FA",
   "Banking": "#34D399",
+  "Tax": "#10B981",
+  "Receipts": "#4ADE80",
+  "Invoices": "#2DD4BF",
   "Design": "#A78BFA",
+  "Branding": "#C084FC",
+  "Web Development": "#818CF8",
+  "Photography": "#F472B6",
+  "Video": "#FB7185",
+  "Audio": "#FBBF24",
   "Renovation": "#F97316",
+  "Property": "#FB923C",
   "Medical": "#F87171",
-  "Personal Documents": "#FBBF24",
-  "Media": "#22D3EE",
-  "Software": "#818CF8",
+  "Personal Documents": "#FACC15",
+  "Identity Documents": "#EAB308",
+  "Business": "#38BDF8",
+  "Software": "#6366F1",
+  "Installers": "#8B5CF6",
   "Archives": "#9CA3AF",
-  "Temporary / Junk": "#6B7280",
+  "Screenshots": "#22D3EE",
+  "Temporary Files": "#6B7280",
+  "Lock Files": "#EF4444",
+  "Duplicate Candidates": "#EC4899",
   "Unknown": "#374151",
 };
 
@@ -115,8 +129,11 @@ function StatusBadge({ status }: { status: string }) {
 function AICategoryDot({ category }: { category: string | null | undefined }) {
   if (!category) return <span style={{ color: "rgba(255,255,255,0.15)", fontSize: "0.7rem", fontFamily: "var(--app-font-mono)" }}>—</span>;
   const color = AI_CATEGORY_COLORS[category] ?? "#888";
-  const short = category === "Temporary / Junk" ? "Junk"
+  const short = category === "Temporary Files" ? "Temp"
     : category === "Personal Documents" ? "Personal"
+    : category === "Identity Documents" ? "ID Docs"
+    : category === "Duplicate Candidates" ? "Duplicates"
+    : category === "Web Development" ? "Web Dev"
     : category;
   return (
     <span className="flex items-center gap-1.5" style={{ minWidth: 0 }}>
@@ -651,6 +668,14 @@ export default function Findings() {
                           </span>
                         );
                       })()}
+                      {selectedFinding.aiSubcategory && (
+                        <div
+                          className="text-xs mt-1.5"
+                          style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)", fontSize: "0.7rem" }}
+                        >
+                          {selectedFinding.aiSubcategory}
+                        </div>
+                      )}
                     </div>
 
                     {/* Confidence */}
@@ -700,6 +725,47 @@ export default function Findings() {
                         </div>
                       </div>
                     )}
+
+                    {/* Suggested destination / action */}
+                    {(selectedFinding.aiSuggestedDestination || selectedFinding.aiSuggestedAction) && (
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedFinding.aiSuggestedDestination && (
+                          <div>
+                            <div className="detail-label" style={{ marginBottom: 4 }}>Suggested Destination</div>
+                            <p
+                              className="text-xs"
+                              style={{ color: "rgba(255,255,255,0.55)", fontFamily: "var(--app-font-mono)", fontSize: "0.7rem" }}
+                            >
+                              {selectedFinding.aiSuggestedDestination}
+                            </p>
+                          </div>
+                        )}
+                        {selectedFinding.aiSuggestedAction && (
+                          <div>
+                            <div className="detail-label" style={{ marginBottom: 4 }}>Suggested Action</div>
+                            <span
+                              className="inline-block px-2 py-0.5 rounded text-xs font-mono"
+                              style={{
+                                background: `${AI_RECOMMENDATION_COLORS[selectedFinding.aiSuggestedAction] ?? "#888"}18`,
+                                color: AI_RECOMMENDATION_COLORS[selectedFinding.aiSuggestedAction] ?? "#888",
+                                border: `1px solid ${AI_RECOMMENDATION_COLORS[selectedFinding.aiSuggestedAction] ?? "#888"}44`,
+                                fontFamily: "var(--app-font-mono)",
+                              }}
+                            >
+                              {selectedFinding.aiSuggestedAction}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Notice: preview only, requires confirmation */}
+                    <p
+                      className="text-xs"
+                      style={{ color: "rgba(255,255,255,0.25)", fontSize: "0.65rem", lineHeight: 1.5 }}
+                    >
+                      AI suggestions are advisory only — no files are moved, deleted, or modified automatically. Any action requires your confirmation.
+                    </p>
                   </div>
                 )}
 

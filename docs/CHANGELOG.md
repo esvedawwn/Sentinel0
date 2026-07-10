@@ -7,6 +7,55 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.3.0-alpha] — 2026-07-10 — AI Layer Expansion
+
+### Added
+
+#### AI Categories (24 total, up from 11)
+Legal · Banking · Tax · Receipts · Invoices · Design · Branding ·
+Web Development · Photography · Video · Audio · Renovation · Property ·
+Medical · Personal Documents · Identity Documents · Business · Software ·
+Installers · Archives · Screenshots · Temporary Files · Lock Files ·
+Duplicate Candidates · Unknown
+
+#### New Classification Fields
+- **`subcategory`** — optional free-text refinement (e.g. "RAW original")
+- **`suggestedDestination`** — optional suggested folder for organisation
+- **`suggestedAction`** — human-readable advisory action text
+- `AIRecommendation` gained `reversible` and `requiresConfirmation` (always `true`)
+- `AIProvider` interface gained `kind: "local" | "cloud"`
+
+#### API
+- `GET /api/ai/status` — reports active AI mode (`local` / `cloud` / `offline`)
+- `GET /api/ai/search` — local natural-language search interpretation (`interpretSearchQuery()`), returns matched categories/statuses/min size, no cloud call
+- `Finding` schema — added `aiSubcategory`, `aiSuggestedDestination`, `aiSuggestedAction`
+- New `AIStatusResponse` and `AISearchInterpretation` OpenAPI schemas
+
+#### Database
+- `findings` table: 3 new columns — `ai_subcategory`, `ai_suggested_destination`, `ai_suggested_action`
+
+#### Findings UI
+- Detail panel: subcategory line under category badge
+- Detail panel: Suggested Destination / Suggested Action fields
+- Detail panel: explicit "preview-only, no automatic file changes" notice
+- Category color palette expanded to cover all 24 categories
+
+#### Testing
+- `src/ai/__tests__/localRule.test.ts` — unit tests for local classification across finding types, filename keywords, and safety invariants
+- `src/ai/__tests__/search.test.ts` — unit tests for natural-language search interpretation
+- `vitest` added to `api-server` as a dev dependency; `pnpm --filter @workspace/api-server run test`
+
+#### Documentation
+- `docs/AI_ARCHITECTURE.md` — dedicated AI architecture reference
+- `docs/AI_PRIVACY.md` — data handling and privacy policy for the AI layer
+- `docs/AI_ROADMAP.md` — AI-specific roadmap, split out from the general roadmap
+
+### Safety
+- No change to the safety contract — AI remains recommendation-only; all
+  recommendations now explicitly assert `requiresConfirmation: true`
+
+---
+
 ## [v0.2.0-alpha] — 2026-07-08 — AI Intelligence Layer
 
 ### Added

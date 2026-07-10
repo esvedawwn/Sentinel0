@@ -20,6 +20,8 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AISearchInterpretation,
+  AIStatusResponse,
   ActivityEntry,
   AttentionSummary,
   Category,
@@ -40,6 +42,7 @@ import type {
   GetFindingsSummaryParams,
   GetReportsScanHistoryParams,
   HealthStatus,
+  InterpretSearchParams,
   ListActivityParams,
   ListDuplicatesParams,
   ListFilesParams,
@@ -1715,6 +1718,167 @@ export function useGetFindingsSummary<TData = Awaited<ReturnType<typeof getFindi
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetFindingsSummaryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAIStatusUrl = () => {
+
+
+
+
+  return `/api/ai/status`
+}
+
+/**
+ * @summary Current AI subsystem status (local/cloud/offline, active provider)
+ */
+export const getAIStatus = async ( options?: RequestInit): Promise<AIStatusResponse> => {
+
+  return customFetch<AIStatusResponse>(getGetAIStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAIStatusQueryKey = () => {
+    return [
+    `/api/ai/status`
+    ] as const;
+    }
+
+
+export const getGetAIStatusQueryOptions = <TData = Awaited<ReturnType<typeof getAIStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAIStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAIStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAIStatus>>> = ({ signal }) => getAIStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAIStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAIStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getAIStatus>>>
+export type GetAIStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current AI subsystem status (local/cloud/offline, active provider)
+ */
+
+export function useGetAIStatus<TData = Awaited<ReturnType<typeof getAIStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAIStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAIStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getInterpretSearchUrl = (params: InterpretSearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/ai/search?${stringifiedParams}` : `/api/ai/search`
+}
+
+/**
+ * @summary Interpret a natural-language search query into structured filters (local rules only)
+ */
+export const interpretSearch = async (params: InterpretSearchParams, options?: RequestInit): Promise<AISearchInterpretation> => {
+
+  return customFetch<AISearchInterpretation>(getInterpretSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getInterpretSearchQueryKey = (params?: InterpretSearchParams,) => {
+    return [
+    `/api/ai/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getInterpretSearchQueryOptions = <TData = Awaited<ReturnType<typeof interpretSearch>>, TError = ErrorType<unknown>>(params: InterpretSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof interpretSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getInterpretSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof interpretSearch>>> = ({ signal }) => interpretSearch(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof interpretSearch>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type InterpretSearchQueryResult = NonNullable<Awaited<ReturnType<typeof interpretSearch>>>
+export type InterpretSearchQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Interpret a natural-language search query into structured filters (local rules only)
+ */
+
+export function useInterpretSearch<TData = Awaited<ReturnType<typeof interpretSearch>>, TError = ErrorType<unknown>>(
+ params: InterpretSearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof interpretSearch>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getInterpretSearchQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

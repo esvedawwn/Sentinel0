@@ -79,9 +79,12 @@ export async function runRealScan(
             findingStatus: finding.findingStatus,
             reason: finding.reason,
             aiCategory: aiResult.category,
+            aiSubcategory: aiResult.subcategory,
             aiConfidence: aiResult.confidence,
             aiExplanation: aiResult.explanation,
             aiTags: aiResult.tags,
+            aiSuggestedDestination: aiResult.suggestedDestination,
+            aiSuggestedAction: aiResult.suggestedAction,
             aiProvider: aiResult.provider,
           });
         }
@@ -114,9 +117,12 @@ export async function runRealScan(
             findingStatus: finding.findingStatus,
             reason: finding.reason,
             aiCategory: aiResult.category,
+            aiSubcategory: aiResult.subcategory,
             aiConfidence: aiResult.confidence,
             aiExplanation: aiResult.explanation,
             aiTags: aiResult.tags,
+            aiSuggestedDestination: aiResult.suggestedDestination,
+            aiSuggestedAction: aiResult.suggestedAction,
             aiProvider: aiResult.provider,
           });
         }
@@ -170,9 +176,12 @@ export async function runRealScan(
           findingStatus: f.findingStatus as "duplicate",
           reason: f.reason,
           aiCategory: aiResult.category,
+          aiSubcategory: aiResult.subcategory,
           aiConfidence: aiResult.confidence,
           aiExplanation: aiResult.explanation,
           aiTags: aiResult.tags,
+          aiSuggestedDestination: aiResult.suggestedDestination,
+          aiSuggestedAction: aiResult.suggestedAction,
           aiProvider: aiResult.provider,
         });
       }

@@ -22,7 +22,7 @@
 
 ---
 
-## v0.2.0-alpha — Current
+## v0.2.0-alpha — Shipped
 
 **Goal:** AI-ready intelligence layer, desktop packaging.
 
@@ -39,7 +39,25 @@
 
 ---
 
-## v0.3.0 — AI Enrichment
+## v0.3.0-alpha — Current
+
+**Goal:** Expand the AI layer's category coverage and add natural-language search, all still fully offline by default.
+
+- [x] Categories expanded 11 → 24, plus optional subcategory field
+- [x] `suggestedDestination` / `suggestedAction` fields added to classification results
+- [x] `AIProvider.kind` (`local` | `cloud`) added to the provider abstraction
+- [x] `GET /api/ai/status` — local/cloud/offline reporting
+- [x] `GET /api/ai/search` — local natural-language search interpretation
+- [x] Findings UI updated with subcategory, destination, action, and a preview-only safety notice
+- [x] Unit tests for local classification and search interpretation
+- [x] Dedicated `docs/AI_ARCHITECTURE.md`, `docs/AI_PRIVACY.md`, `docs/AI_ROADMAP.md`
+
+See `docs/AI_ROADMAP.md` for the detailed AI-specific roadmap (live provider
+wiring, UI status badge, smart search toggle, and beyond).
+
+---
+
+## v0.4.0 — AI Enrichment
 
 **Goal:** Connect live AI providers and add natural language features.
 
@@ -54,7 +72,7 @@
 
 ---
 
-## v0.4.0 — Collaboration & Sharing
+## v0.5.0 — Collaboration & Sharing
 
 **Goal:** Teams and organisations.
 

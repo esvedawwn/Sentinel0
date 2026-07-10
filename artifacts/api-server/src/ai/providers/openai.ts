@@ -17,6 +17,7 @@ import type { AIClassificationInput, AIClassificationResult, AIProvider } from "
 
 export class OpenAIProvider implements AIProvider {
   readonly name = "openai";
+  readonly kind = "cloud" as const;
 
   isAvailable(): boolean {
     return typeof process.env.OPENAI_API_KEY === "string" && process.env.OPENAI_API_KEY.length > 0;

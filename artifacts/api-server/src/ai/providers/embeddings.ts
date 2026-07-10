@@ -26,6 +26,7 @@ import type { AIClassificationInput, AIClassificationResult, AIProvider } from "
 
 export class EmbeddingsProvider implements AIProvider {
   readonly name = "embeddings";
+  readonly kind = "cloud" as const;
 
   isAvailable(): boolean {
     return (

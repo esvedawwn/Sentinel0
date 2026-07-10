@@ -475,6 +475,38 @@ paths:
               schema:
                 $ref: "#/components/schemas/FindingsSummary"
 
+  /ai/status:
+    get:
+      operationId: getAIStatus
+      tags: [ai]
+      summary: Current AI subsystem status (local/cloud/offline, active provider)
+      responses:
+        "200":
+          description: AI status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AIStatusResponse"
+
+  /ai/search:
+    get:
+      operationId: interpretSearch
+      tags: [ai]
+      summary: Interpret a natural-language search query into structured filters (local rules only)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Interpreted query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AISearchInterpretation"
+
   /findings/clear:
     delete:
       operationId: clearFindings
@@ -839,6 +871,46 @@ components:
           type: string
         safe:
           type: boolean
+        reversible:
+          type: boolean
+        requiresConfirmation:
+          type: boolean
+
+    AIStatusResponse:
+      type: object
+      required: [status, provider, cloudEnabled]
+      properties:
+        status:
+          type: string
+          enum: [local, cloud, offline, analysing, failed, consent_required]
+        provider:
+          type: string
+        cloudEnabled:
+          type: boolean
+          description: "Whether a cloud provider (OpenAI/Embeddings) is configured and enabled"
+
+    AISearchInterpretation:
+      type: object
+      required: [query, categories, tags, statuses]
+      properties:
+        query:
+          type: string
+        categories:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        statuses:
+          type: array
+          items:
+            type: string
+        minSizeBytes:
+          type: ["integer", "null"]
+        explanation:
+          type: string
 
     Finding:
       type: object
@@ -872,7 +944,10 @@ components:
           type: string
         aiCategory:
           type: ["string", "null"]
-          description: "High-level AI category (e.g. Legal, Media, Software)"
+          description: "High-level AI category (e.g. Legal, Tax, Photography, Software)"
+        aiSubcategory:
+          type: ["string", "null"]
+          description: "Optional finer-grained classification within the category"
         aiConfidence:
           type: ["integer", "null"]
           minimum: 0
@@ -886,6 +961,12 @@ components:
           items:
             type: string
           description: "Semantic tags assigned by the AI classifier"
+        aiSuggestedDestination:
+          type: ["string", "null"]
+          description: "Suggested folder/location for organisation (display-only; never applied automatically)"
+        aiSuggestedAction:
+          type: ["string", "null"]
+          description: "Short human-readable description of the AI's suggested action"
         aiProvider:
           type: ["string", "null"]
           description: "Identifier of the AI provider that produced this classification"
