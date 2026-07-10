@@ -36,17 +36,20 @@ import type {
   FileListResponse,
   FileStats,
   FileUpdate,
+  Finding,
   FindingsListResponse,
   FindingsSummary,
   GetDashboardRecentActivityParams,
   GetFindingsSummaryParams,
   GetReportsScanHistoryParams,
   HealthStatus,
+  IgnoreFindingInput,
   InterpretSearchParams,
   ListActivityParams,
   ListDuplicatesParams,
   ListFilesParams,
   ListFindingsParams,
+  ListScanRoots200,
   ListScansParams,
   ReportsOverview,
   Scan,
@@ -1879,6 +1882,224 @@ export function useInterpretSearch<TData = Awaited<ReturnType<typeof interpretSe
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getInterpretSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getIgnoreFindingUrl = (id: number,) => {
+
+
+
+
+  return `/api/findings/${id}/ignore`
+}
+
+/**
+ * @summary Mark a finding as ignored (does not delete the finding or its scan history)
+ */
+export const ignoreFinding = async (id: number,
+    ignoreFindingInput?: IgnoreFindingInput, options?: RequestInit): Promise<Finding> => {
+
+  return customFetch<Finding>(getIgnoreFindingUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ignoreFindingInput)
+  }
+);}
+
+
+
+
+export const getIgnoreFindingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ignoreFinding>>, TError,{id: number;data?: BodyType<IgnoreFindingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof ignoreFinding>>, TError,{id: number;data?: BodyType<IgnoreFindingInput>}, TContext> => {
+
+const mutationKey = ['ignoreFinding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof ignoreFinding>>, {id: number;data?: BodyType<IgnoreFindingInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  ignoreFinding(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type IgnoreFindingMutationResult = NonNullable<Awaited<ReturnType<typeof ignoreFinding>>>
+    export type IgnoreFindingMutationBody = BodyType<IgnoreFindingInput> | undefined
+    export type IgnoreFindingMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark a finding as ignored (does not delete the finding or its scan history)
+ */
+export const useIgnoreFinding = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof ignoreFinding>>, TError,{id: number;data?: BodyType<IgnoreFindingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof ignoreFinding>>,
+        TError,
+        {id: number;data?: BodyType<IgnoreFindingInput>},
+        TContext
+      > => {
+      return useMutation(getIgnoreFindingMutationOptions(options));
+    }
+
+export const getUnignoreFindingUrl = (id: number,) => {
+
+
+
+
+  return `/api/findings/${id}/unignore`
+}
+
+/**
+ * @summary Clear a previous ignore decision for a finding
+ */
+export const unignoreFinding = async (id: number, options?: RequestInit): Promise<Finding> => {
+
+  return customFetch<Finding>(getUnignoreFindingUrl(id),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+export const getUnignoreFindingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unignoreFinding>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unignoreFinding>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['unignoreFinding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unignoreFinding>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  unignoreFinding(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnignoreFindingMutationResult = NonNullable<Awaited<ReturnType<typeof unignoreFinding>>>
+
+    export type UnignoreFindingMutationError = ErrorType<void>
+
+    /**
+ * @summary Clear a previous ignore decision for a finding
+ */
+export const useUnignoreFinding = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unignoreFinding>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unignoreFinding>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUnignoreFindingMutationOptions(options));
+    }
+
+export const getListScanRootsUrl = () => {
+
+
+
+
+  return `/api/scan-roots`
+}
+
+/**
+ * @summary List previously scanned directory roots, most recently scanned first
+ */
+export const listScanRoots = async ( options?: RequestInit): Promise<ListScanRoots200> => {
+
+  return customFetch<ListScanRoots200>(getListScanRootsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListScanRootsQueryKey = () => {
+    return [
+    `/api/scan-roots`
+    ] as const;
+    }
+
+
+export const getListScanRootsQueryOptions = <TData = Awaited<ReturnType<typeof listScanRoots>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listScanRoots>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListScanRootsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listScanRoots>>> = ({ signal }) => listScanRoots({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listScanRoots>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListScanRootsQueryResult = NonNullable<Awaited<ReturnType<typeof listScanRoots>>>
+export type ListScanRootsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List previously scanned directory roots, most recently scanned first
+ */
+
+export function useListScanRoots<TData = Awaited<ReturnType<typeof listScanRoots>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listScanRoots>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListScanRootsQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

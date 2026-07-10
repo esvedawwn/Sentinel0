@@ -4,3 +4,7 @@ export * from "./files";
 export * from "./duplicates";
 export * from "./activity";
 export * from "./findings";
+export * from "./scanRoots";
+export * from "./aiClassifications";
+export * from "./semanticTags";
+export * from "./ignoredFindings";

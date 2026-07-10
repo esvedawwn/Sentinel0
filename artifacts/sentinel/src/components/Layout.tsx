@@ -8,10 +8,11 @@ const NAV_ITEMS = [
   { key: "3", label: "Organise", path: "/organise", shortcut: "⌘3" },
   { key: "4", label: "Findings", path: "/findings", shortcut: "⌘4" },
   { key: "5", label: "Reports", path: "/reports", shortcut: "⌘5" },
+  { key: "6", label: "Scan History", path: "/scan-history", shortcut: "⌘6" },
 ];
 
 const NAV_BOTTOM = [
-  { key: "6", label: "Settings", path: "/settings", shortcut: "⌘6" },
+  { key: "7", label: "Settings", path: "/settings", shortcut: "⌘7" },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -28,7 +29,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         if (e.key === "3") { e.preventDefault(); navigate("/organise"); }
         if (e.key === "4") { e.preventDefault(); navigate("/findings"); }
         if (e.key === "5") { e.preventDefault(); navigate("/reports"); }
-        if (e.key === "6") { e.preventDefault(); navigate("/settings"); }
+        if (e.key === "6") { e.preventDefault(); navigate("/scan-history"); }
+        if (e.key === "7") { e.preventDefault(); navigate("/settings"); }
       }
     }
     window.addEventListener("keydown", handleKeyDown);

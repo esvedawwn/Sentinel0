@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FindingFindingStatus } from './findingFindingStatus';
+import type { FindingRiskLevel } from './findingRiskLevel';
 import type { FindingType } from './findingType';
 
 export interface Finding {
@@ -21,7 +22,19 @@ export interface Finding {
   /** @nullable */
   duplicateGroupHash?: string | null;
   findingStatus: FindingFindingStatus;
+  /** Heuristic risk level, display-only — never drives automatic action */
+  riskLevel: FindingRiskLevel;
   reason: string;
+  /**
+     * Filesystem creation timestamp captured at scan time
+     * @nullable
+     */
+  fileCreatedAt?: string | null;
+  /**
+     * Filesystem modification timestamp captured at scan time
+     * @nullable
+     */
+  fileModifiedAt?: string | null;
   createdAt: string;
   /**
      * High-level AI category (e.g. Legal, Tax, Photography, Software)

@@ -1,6 +1,15 @@
 import path from "path";
-import { db, scansTable, findingsTable, activityTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import {
+  db,
+  scansTable,
+  findingsTable,
+  activityTable,
+  scanRootsTable,
+  aiClassificationsTable,
+  semanticTagsTable,
+  type RiskLevel,
+} from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { walkDirectory, computeHash, countChildren } from "./fileWalker.js";
 import { classifyFile, classifyEmptyFolder, detectDuplicates } from "./findingsEngine.js";
 import { ScanFinding, LARGE_FILE_BYTES } from "./types.js";
@@ -10,6 +19,31 @@ const SAMPLE_LARGE_FILE_BYTES = 1024 * 1024;
 const BATCH_SIZE = 50;
 const PROGRESS_UPDATE_INTERVAL = 25;
 const CANCEL_CHECK_INTERVAL = 100;
+
+/**
+ * Heuristic risk level for a finding — surfaced in the UI so users can
+ * prioritise review. This never drives any automatic action.
+ */
+export function riskLevelFor(finding: Pick<ScanFinding, "type" | "findingStatus">): RiskLevel {
+  if (finding.type === "zero_byte" || finding.type === "empty_folder") return "low";
+  if (finding.findingStatus === "safe_delete") return "low";
+  if (finding.type === "large_file") return "medium";
+  if (finding.type === "duplicate") return "medium";
+  if (finding.type === "installer" || finding.type === "archive") return "medium";
+  if (finding.type === "locked_file" || finding.type === "idlk_file") return "high";
+  return "low";
+}
+
+/** Records/updates the scan root so it can be offered as a quick re-scan target. */
+async function upsertScanRoot(rootPath: string): Promise<void> {
+  await db
+    .insert(scanRootsTable)
+    .values({ path: rootPath, scanCount: 1 })
+    .onConflictDoUpdate({
+      target: scanRootsTable.path,
+      set: { scanCount: sql`${scanRootsTable.scanCount} + 1`, lastScannedAt: new Date() },
+    });
+}
 
 /**
  * Run a real filesystem scan against the given path.
@@ -31,11 +65,41 @@ export async function runRealScan(
   const typeFindings: ScanFinding[] = [];
   const hashMap = new Map<string, Array<{ path: string; name: string; extension: string; sizeBytes: number }>>();
   const findingBatch: (typeof findingsTable.$inferInsert)[] = [];
+  // Parallel array of per-finding classification metadata, used to seed
+  // ai_classifications/semantic_tags once we know the inserted finding ids.
+  const aiMetaBatch: { provider: string; category: string; subcategory: string | null; confidence: number; explanation: string; suggestedDestination: string | null; suggestedAction: string; tags: string[] }[] = [];
 
   async function flushFindings() {
     if (findingBatch.length === 0) return;
     const toFlush = findingBatch.splice(0);
-    await db.insert(findingsTable).values(toFlush);
+    const meta = aiMetaBatch.splice(0);
+    const inserted = await db.insert(findingsTable).values(toFlush).returning({ id: findingsTable.id });
+
+    const classificationRows: (typeof aiClassificationsTable.$inferInsert)[] = [];
+    const tagRows: (typeof semanticTagsTable.$inferInsert)[] = [];
+    inserted.forEach((row, i) => {
+      const m = meta[i];
+      if (!m) return;
+      classificationRows.push({
+        findingId: row.id,
+        provider: m.provider,
+        category: m.category,
+        subcategory: m.subcategory,
+        confidence: m.confidence,
+        explanation: m.explanation,
+        suggestedDestination: m.suggestedDestination,
+        suggestedAction: m.suggestedAction,
+      });
+      for (const tag of m.tags) {
+        tagRows.push({ findingId: row.id, tag });
+      }
+    });
+    if (classificationRows.length > 0) {
+      await db.insert(aiClassificationsTable).values(classificationRows);
+    }
+    if (tagRows.length > 0) {
+      await db.insert(semanticTagsTable).values(tagRows).onConflictDoNothing();
+    }
   }
 
   try {
@@ -77,7 +141,10 @@ export async function runRealScan(
             extension: finding.extension,
             sizeBytes: finding.sizeBytes,
             findingStatus: finding.findingStatus,
+            riskLevel: riskLevelFor(finding),
             reason: finding.reason,
+            fileCreatedAt: entry.createdAt,
+            fileModifiedAt: entry.modifiedAt,
             aiCategory: aiResult.category,
             aiSubcategory: aiResult.subcategory,
             aiConfidence: aiResult.confidence,
@@ -86,6 +153,16 @@ export async function runRealScan(
             aiSuggestedDestination: aiResult.suggestedDestination,
             aiSuggestedAction: aiResult.suggestedAction,
             aiProvider: aiResult.provider,
+          });
+          aiMetaBatch.push({
+            provider: aiResult.provider,
+            category: aiResult.category,
+            subcategory: aiResult.subcategory,
+            confidence: aiResult.confidence,
+            explanation: aiResult.explanation,
+            suggestedDestination: aiResult.suggestedDestination,
+            suggestedAction: aiResult.suggestedAction,
+            tags: aiResult.tags,
           });
         }
       } else {
@@ -115,7 +192,10 @@ export async function runRealScan(
             extension: finding.extension,
             sizeBytes: finding.sizeBytes,
             findingStatus: finding.findingStatus,
+            riskLevel: riskLevelFor(finding),
             reason: finding.reason,
+            fileCreatedAt: entry.createdAt,
+            fileModifiedAt: entry.modifiedAt,
             aiCategory: aiResult.category,
             aiSubcategory: aiResult.subcategory,
             aiConfidence: aiResult.confidence,
@@ -124,6 +204,16 @@ export async function runRealScan(
             aiSuggestedDestination: aiResult.suggestedDestination,
             aiSuggestedAction: aiResult.suggestedAction,
             aiProvider: aiResult.provider,
+          });
+          aiMetaBatch.push({
+            provider: aiResult.provider,
+            category: aiResult.category,
+            subcategory: aiResult.subcategory,
+            confidence: aiResult.confidence,
+            explanation: aiResult.explanation,
+            suggestedDestination: aiResult.suggestedDestination,
+            suggestedAction: aiResult.suggestedAction,
+            tags: aiResult.tags,
           });
         }
 
@@ -154,6 +244,7 @@ export async function runRealScan(
 
     if (dupFindings.length > 0) {
       const dupRows: (typeof findingsTable.$inferInsert)[] = [];
+      const dupMeta: typeof aiMetaBatch = [];
 
       for (const f of dupFindings) {
         const aiResult = await classifyWithAI({
@@ -174,6 +265,7 @@ export async function runRealScan(
           hash: f.hash,
           duplicateGroupHash: f.duplicateGroupHash,
           findingStatus: f.findingStatus as "duplicate",
+          riskLevel: riskLevelFor(f),
           reason: f.reason,
           aiCategory: aiResult.category,
           aiSubcategory: aiResult.subcategory,
@@ -184,12 +276,46 @@ export async function runRealScan(
           aiSuggestedAction: aiResult.suggestedAction,
           aiProvider: aiResult.provider,
         });
+        dupMeta.push({
+          provider: aiResult.provider,
+          category: aiResult.category,
+          subcategory: aiResult.subcategory,
+          confidence: aiResult.confidence,
+          explanation: aiResult.explanation,
+          suggestedDestination: aiResult.suggestedDestination,
+          suggestedAction: aiResult.suggestedAction,
+          tags: aiResult.tags,
+        });
       }
 
       for (let i = 0; i < dupRows.length; i += BATCH_SIZE) {
-        await db.insert(findingsTable).values(dupRows.slice(i, i + BATCH_SIZE));
+        const rowsSlice = dupRows.slice(i, i + BATCH_SIZE);
+        const metaSlice = dupMeta.slice(i, i + BATCH_SIZE);
+        const inserted = await db.insert(findingsTable).values(rowsSlice).returning({ id: findingsTable.id });
+
+        const classificationRows: (typeof aiClassificationsTable.$inferInsert)[] = [];
+        const tagRows: (typeof semanticTagsTable.$inferInsert)[] = [];
+        inserted.forEach((row, idx) => {
+          const m = metaSlice[idx];
+          if (!m) return;
+          classificationRows.push({
+            findingId: row.id,
+            provider: m.provider,
+            category: m.category,
+            subcategory: m.subcategory,
+            confidence: m.confidence,
+            explanation: m.explanation,
+            suggestedDestination: m.suggestedDestination,
+            suggestedAction: m.suggestedAction,
+          });
+          for (const tag of m.tags) tagRows.push({ findingId: row.id, tag });
+        });
+        if (classificationRows.length > 0) await db.insert(aiClassificationsTable).values(classificationRows);
+        if (tagRows.length > 0) await db.insert(semanticTagsTable).values(tagRows).onConflictDoNothing();
       }
     }
+
+    await upsertScanRoot(rootPath);
 
     const totalFindings = typeFindings.length + dupFindings.length;
     const dupGroups = new Set(dupFindings.map((f) => f.duplicateGroupHash)).size;
@@ -207,16 +333,19 @@ export async function runRealScan(
 
     await db.insert(activityTable).values([
       {
+        scanId,
         type: "classification_complete" as const,
         message: `Classification complete — ${filesScanned.toLocaleString()} files scanned`,
         status: "success" as const,
       },
       ...(dupGroups > 0 ? [{
+        scanId,
         type: "duplicate_found" as const,
         message: `${dupGroups} duplicate group${dupGroups > 1 ? "s" : ""} detected (${dupFindings.length} files)`,
         status: "warning" as const,
       }] : []),
       {
+        scanId,
         type: "scan_complete" as const,
         message: `Scan complete — ${filesScanned.toLocaleString()} files, ${totalFindings} findings`,
         status: "success" as const,

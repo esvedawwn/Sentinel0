@@ -9,6 +9,7 @@ import activityRouter from "./activity";
 import reportsRouter from "./reports";
 import findingsRouter from "./findings";
 import aiRouter from "./ai";
+import scanRootsRouter from "./scanRoots";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(activityRouter);
 router.use(reportsRouter);
 router.use(findingsRouter);
 router.use(aiRouter);
+router.use(scanRootsRouter);
 
 export default router;

@@ -26,6 +26,8 @@ tags:
     description: Reports and analytics
   - name: findings
     description: Real scan findings (empty folders, zero-byte, lock files, duplicates, etc.)
+  - name: scan-roots
+    description: Previously scanned directory roots, for quick re-scanning
 
 paths:
   /healthz:
@@ -507,6 +509,72 @@ paths:
               schema:
                 $ref: "#/components/schemas/AISearchInterpretation"
 
+  /findings/{id}/ignore:
+    patch:
+      operationId: ignoreFinding
+      tags: [findings]
+      summary: Mark a finding as ignored (does not delete the finding or its scan history)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IgnoreFindingInput"
+      responses:
+        "200":
+          description: Ignored finding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "404":
+          description: Finding not found
+
+  /findings/{id}/unignore:
+    patch:
+      operationId: unignoreFinding
+      tags: [findings]
+      summary: Clear a previous ignore decision for a finding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Un-ignored finding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "404":
+          description: Finding not found
+
+  /scan-roots:
+    get:
+      operationId: listScanRoots
+      tags: [scan-roots]
+      summary: List previously scanned directory roots, most recently scanned first
+      responses:
+        "200":
+          description: Scan roots list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [roots]
+                properties:
+                  roots:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScanRoot"
+
   /findings/clear:
     delete:
       operationId: clearFindings
@@ -640,6 +708,27 @@ components:
           type: integer
         corruptedFound:
           type: integer
+
+    IgnoreFindingInput:
+      type: object
+      properties:
+        reason:
+          type: ["string", "null"]
+
+    ScanRoot:
+      type: object
+      required: [id, path, scanCount, lastScannedAt]
+      properties:
+        id:
+          type: integer
+        path:
+          type: string
+        label:
+          type: ["string", "null"]
+        scanCount:
+          type: integer
+        lastScannedAt:
+          type: string
 
     ScanInput:
       type: object
@@ -925,7 +1014,7 @@ components:
 
     Finding:
       type: object
-      required: [id, scanId, type, path, name, extension, sizeBytes, findingStatus, reason, createdAt]
+      required: [id, scanId, type, path, name, extension, sizeBytes, findingStatus, riskLevel, reason, createdAt]
       properties:
         id:
           type: integer
@@ -949,8 +1038,18 @@ components:
         findingStatus:
           type: string
           enum: [safe_delete, review, duplicate, ignored]
+        riskLevel:
+          type: string
+          enum: [low, medium, high, critical]
+          description: "Heuristic risk level, display-only — never drives automatic action"
         reason:
           type: string
+        fileCreatedAt:
+          type: ["string", "null"]
+          description: "Filesystem creation timestamp captured at scan time"
+        fileModifiedAt:
+          type: ["string", "null"]
+          description: "Filesystem modification timestamp captured at scan time"
         createdAt:
           type: string
         aiCategory:

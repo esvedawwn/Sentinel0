@@ -1,18 +1,24 @@
-import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, index } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { filesTable } from "./files";
+import { scansTable } from "./scans";
 
 export type DuplicateStatus = "pending" | "resolved" | "ignored";
 
-export const duplicateGroupsTable = sqliteTable("duplicate_groups", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  status: text("status").$type<DuplicateStatus>().notNull().default("pending"),
-  totalSizeBytes: integer("total_size_bytes").notNull().default(0),
-  savedBytes: integer("saved_bytes").notNull().default(0),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  resolvedAt: integer("resolved_at", { mode: "timestamp" }),
-});
+export const duplicateGroupsTable = sqliteTable(
+  "duplicate_groups",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    scanId: integer("scan_id").references(() => scansTable.id, { onDelete: "set null" }),
+    status: text("status").$type<DuplicateStatus>().notNull().default("pending"),
+    totalSizeBytes: integer("total_size_bytes").notNull().default(0),
+    savedBytes: integer("saved_bytes").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+  },
+  (table) => [index("duplicate_groups_scan_id_idx").on(table.scanId)]
+);
 
 export const duplicateGroupFilesTable = sqliteTable("duplicate_group_files", {
   id: integer("id").primaryKey({ autoIncrement: true }),

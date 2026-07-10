@@ -24,6 +24,8 @@ export interface WalkEntry {
   name: string;
   sizeBytes: number;
   isDir: boolean;
+  createdAt?: Date;
+  modifiedAt?: Date;
 }
 
 /**
@@ -62,7 +64,14 @@ export async function* walkDirectory(
         continue;
       }
 
-      yield { path: fullPath, name: entry.name, sizeBytes: stat.size, isDir: false };
+      yield {
+        path: fullPath,
+        name: entry.name,
+        sizeBytes: stat.size,
+        isDir: false,
+        createdAt: stat.birthtime,
+        modifiedAt: stat.mtime,
+      };
     }
   }
 }

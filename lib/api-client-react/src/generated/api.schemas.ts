@@ -89,6 +89,20 @@ export interface Scan {
   corruptedFound?: number;
 }
 
+export interface IgnoreFindingInput {
+  /** @nullable */
+  reason?: string | null;
+}
+
+export interface ScanRoot {
+  id: number;
+  path: string;
+  /** @nullable */
+  label?: string | null;
+  scanCount: number;
+  lastScannedAt: string;
+}
+
 export type ScanInputMode = typeof ScanInputMode[keyof typeof ScanInputMode];
 
 
@@ -353,6 +367,19 @@ export const FindingFindingStatus = {
   ignored: 'ignored',
 } as const;
 
+/**
+ * Heuristic risk level, display-only — never drives automatic action
+ */
+export type FindingRiskLevel = typeof FindingRiskLevel[keyof typeof FindingRiskLevel];
+
+
+export const FindingRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
 export interface Finding {
   id: number;
   scanId: number;
@@ -366,7 +393,19 @@ export interface Finding {
   /** @nullable */
   duplicateGroupHash?: string | null;
   findingStatus: FindingFindingStatus;
+  /** Heuristic risk level, display-only — never drives automatic action */
+  riskLevel: FindingRiskLevel;
   reason: string;
+  /**
+     * Filesystem creation timestamp captured at scan time
+     * @nullable
+     */
+  fileCreatedAt?: string | null;
+  /**
+     * Filesystem modification timestamp captured at scan time
+     * @nullable
+     */
+  fileModifiedAt?: string | null;
   createdAt: string;
   /**
      * High-level AI category (e.g. Legal, Tax, Photography, Software)
@@ -517,6 +556,10 @@ scanId?: number;
 
 export type InterpretSearchParams = {
 q: string;
+};
+
+export type ListScanRoots200 = {
+  roots: ScanRoot[];
 };
 
 export type ClearFindingsParams = {

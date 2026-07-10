@@ -7,6 +7,7 @@ import Analyse from "@/pages/Analyse";
 import Organise from "@/pages/Organise";
 import Reports from "@/pages/Reports";
 import Findings from "@/pages/Findings";
+import ScanHistory from "@/pages/ScanHistory";
 import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
@@ -40,6 +41,7 @@ function Router() {
         <Route path="/analyse" component={Analyse} />
         <Route path="/organise" component={Organise} />
         <Route path="/findings" component={Findings} />
+        <Route path="/scan-history" component={ScanHistory} />
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={Settings} />
         <Route component={NotFound} />

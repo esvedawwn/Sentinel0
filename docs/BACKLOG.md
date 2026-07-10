@@ -99,11 +99,32 @@ See `docs/AI_ARCHITECTURE.md`, `docs/AI_PRIVACY.md`, and `docs/AI_ROADMAP.md` fo
 
 - [ ] Unit tests for `findingsEngine` (pure functions, no I/O)
 - [ ] Unit tests for `LocalRuleProvider` (pure function — trivially testable)
-- [ ] Integration tests for scan API routes
+- [x] Integration tests for scan API routes — ignore/unignore route tests added with an
+      isolated SQLite DB per test run (2026-07-10)
 - [ ] E2E tests with Playwright
 - [ ] CI pipeline (GitHub Actions)
 - [ ] Docker image for self-hosting
 - [ ] Health check endpoint with DB connectivity check
+- [ ] Confirmation prompt before `DELETE /findings/clear` — currently deletes findings
+      immediately with no confirmation step (see Safety note in ARCHITECTURE.md)
+
+## Persistent Indexing (Sprint — Scan History)
+
+- [x] Extended schema: `scanRoots`, `aiClassifications`, `semanticTags`,
+      `ignoredFindings` tables; `findings`/`files`/`duplicates`/`activity` gained
+      `scanId` FKs, filesystem timestamps, and `riskLevel` (2026-07-10)
+- [x] Scanner populates AI classification history + semantic tags per finding, and
+      upserts scan roots on every run (2026-07-10)
+- [x] `PATCH /findings/:id/ignore` / `/unignore` — additive-only, never deletes the
+      finding row (2026-07-10)
+- [x] `GET /scan-roots` endpoint (2026-07-10)
+- [x] Scan History page (`/scan-history`) with reopen-in-Findings deep link via
+      `?scanId=` query param (2026-07-10)
+- [x] Demo seed script (`pnpm --filter @workspace/scripts run seed`) populates scans,
+      findings, duplicates, AI classifications, and activity (2026-07-10)
+- [ ] Paginate `GET /scans` with a `total` count in the response (currently returns a
+      bare array; Scan History page infers "has more" from page fullness)
+- [ ] Scan comparison view — diff findings between two scans of the same root
 
 ## Desktop / Platform
 

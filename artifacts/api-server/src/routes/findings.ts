@@ -1,7 +1,13 @@
 import { Router, type IRouter } from "express";
-import { db, findingsTable } from "@workspace/db";
+import { db, findingsTable, ignoredFindingsTable } from "@workspace/db";
 import { eq, and, count, like, or } from "drizzle-orm";
-import { ListFindingsQueryParams, GetFindingsSummaryQueryParams, ClearFindingsQueryParams } from "@workspace/api-zod";
+import {
+  ListFindingsQueryParams,
+  GetFindingsSummaryQueryParams,
+  ClearFindingsQueryParams,
+  IgnoreFindingParams,
+  IgnoreFindingBody,
+} from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
@@ -17,7 +23,10 @@ function mapFinding(f: typeof findingsTable.$inferSelect) {
     hash: f.hash ?? null,
     duplicateGroupHash: f.duplicateGroupHash ?? null,
     findingStatus: f.findingStatus,
+    riskLevel: f.riskLevel,
     reason: f.reason,
+    fileCreatedAt: f.fileCreatedAt?.toISOString() ?? null,
+    fileModifiedAt: f.fileModifiedAt?.toISOString() ?? null,
     createdAt: f.createdAt.toISOString(),
     // AI classification fields
     aiCategory: f.aiCategory ?? null,
@@ -97,6 +106,64 @@ router.get("/findings/summary", async (req, res): Promise<void> => {
   }
 
   res.json({ total, safeDelete, review, duplicate, byType });
+});
+
+router.patch("/findings/:id/ignore", async (req, res): Promise<void> => {
+  const params = IgnoreFindingParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid finding ID" });
+    return;
+  }
+  const body = IgnoreFindingBody.safeParse(req.body ?? {});
+  const reason = body.success ? (body.data.reason ?? null) : null;
+
+  const [finding] = await db.select().from(findingsTable).where(eq(findingsTable.id, params.data.id));
+  if (!finding) {
+    res.status(404).json({ error: "Finding not found" });
+    return;
+  }
+
+  // Ignoring never deletes the finding row or its scan history — only marks it dismissed.
+  await db
+    .insert(ignoredFindingsTable)
+    .values({ findingId: finding.id, reason })
+    .onConflictDoUpdate({
+      target: ignoredFindingsTable.findingId,
+      set: { reason, ignoredAt: new Date() },
+    });
+
+  const [updated] = await db
+    .update(findingsTable)
+    .set({ findingStatus: "ignored" })
+    .where(eq(findingsTable.id, finding.id))
+    .returning();
+
+  res.json(mapFinding(updated));
+});
+
+router.patch("/findings/:id/unignore", async (req, res): Promise<void> => {
+  const params = IgnoreFindingParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid finding ID" });
+    return;
+  }
+
+  const [finding] = await db.select().from(findingsTable).where(eq(findingsTable.id, params.data.id));
+  if (!finding) {
+    res.status(404).json({ error: "Finding not found" });
+    return;
+  }
+
+  await db.delete(ignoredFindingsTable).where(eq(ignoredFindingsTable.findingId, finding.id));
+
+  const restoredStatus = finding.type === "duplicate" ? "duplicate" : "review";
+  const [updated] = await db
+    .update(findingsTable)
+    .set({ findingStatus: restoredStatus })
+    .where(eq(findingsTable.id, finding.id))
+    .returning();
+
+  res.json(mapFinding(updated));
 });
 
 router.delete("/findings/clear", async (req, res): Promise<void> => {

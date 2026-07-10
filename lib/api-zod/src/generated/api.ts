@@ -478,7 +478,10 @@ export const ListFindingsResponse = zod.object({
   "hash": zod.string().nullish(),
   "duplicateGroupHash": zod.string().nullish(),
   "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
   "reason": zod.string(),
+  "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
+  "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
   "createdAt": zod.string(),
   "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Tax, Photography, Software)'),
   "aiSubcategory": zod.string().nullish().describe('Optional finer-grained classification within the category'),
@@ -536,6 +539,102 @@ export const InterpretSearchResponse = zod.object({
   "statuses": zod.array(zod.string()),
   "minSizeBytes": zod.number().nullish(),
   "explanation": zod.string().optional()
+})
+
+
+/**
+ * @summary Mark a finding as ignored (does not delete the finding or its scan history)
+ */
+export const IgnoreFindingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const IgnoreFindingBody = zod.object({
+  "reason": zod.string().nullish()
+})
+
+export const ignoreFindingResponseAiConfidenceMin = 0;
+export const ignoreFindingResponseAiConfidenceMax = 100;
+
+
+
+export const IgnoreFindingResponse = zod.object({
+  "id": zod.number(),
+  "scanId": zod.number(),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'archive', 'large_file', 'duplicate']),
+  "path": zod.string(),
+  "name": zod.string(),
+  "extension": zod.string(),
+  "sizeBytes": zod.number(),
+  "hash": zod.string().nullish(),
+  "duplicateGroupHash": zod.string().nullish(),
+  "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
+  "reason": zod.string(),
+  "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
+  "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
+  "createdAt": zod.string(),
+  "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Tax, Photography, Software)'),
+  "aiSubcategory": zod.string().nullish().describe('Optional finer-grained classification within the category'),
+  "aiConfidence": zod.number().min(ignoreFindingResponseAiConfidenceMin).max(ignoreFindingResponseAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
+  "aiExplanation": zod.string().nullish().describe('Human-readable explanation of why this category was chosen'),
+  "aiTags": zod.array(zod.string()).nullish().describe('Semantic tags assigned by the AI classifier'),
+  "aiSuggestedDestination": zod.string().nullish().describe('Suggested folder\/location for organisation (display-only; never applied automatically)'),
+  "aiSuggestedAction": zod.string().nullish().describe('Short human-readable description of the AI\'s suggested action'),
+  "aiProvider": zod.string().nullish().describe('Identifier of the AI provider that produced this classification')
+})
+
+
+/**
+ * @summary Clear a previous ignore decision for a finding
+ */
+export const UnignoreFindingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const unignoreFindingResponseAiConfidenceMin = 0;
+export const unignoreFindingResponseAiConfidenceMax = 100;
+
+
+
+export const UnignoreFindingResponse = zod.object({
+  "id": zod.number(),
+  "scanId": zod.number(),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'archive', 'large_file', 'duplicate']),
+  "path": zod.string(),
+  "name": zod.string(),
+  "extension": zod.string(),
+  "sizeBytes": zod.number(),
+  "hash": zod.string().nullish(),
+  "duplicateGroupHash": zod.string().nullish(),
+  "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
+  "reason": zod.string(),
+  "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
+  "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
+  "createdAt": zod.string(),
+  "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Tax, Photography, Software)'),
+  "aiSubcategory": zod.string().nullish().describe('Optional finer-grained classification within the category'),
+  "aiConfidence": zod.number().min(unignoreFindingResponseAiConfidenceMin).max(unignoreFindingResponseAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
+  "aiExplanation": zod.string().nullish().describe('Human-readable explanation of why this category was chosen'),
+  "aiTags": zod.array(zod.string()).nullish().describe('Semantic tags assigned by the AI classifier'),
+  "aiSuggestedDestination": zod.string().nullish().describe('Suggested folder\/location for organisation (display-only; never applied automatically)'),
+  "aiSuggestedAction": zod.string().nullish().describe('Short human-readable description of the AI\'s suggested action'),
+  "aiProvider": zod.string().nullish().describe('Identifier of the AI provider that produced this classification')
+})
+
+
+/**
+ * @summary List previously scanned directory roots, most recently scanned first
+ */
+export const ListScanRootsResponse = zod.object({
+  "roots": zod.array(zod.object({
+  "id": zod.number(),
+  "path": zod.string(),
+  "label": zod.string().nullish(),
+  "scanCount": zod.number(),
+  "lastScannedAt": zod.string()
+}))
 })
 
 

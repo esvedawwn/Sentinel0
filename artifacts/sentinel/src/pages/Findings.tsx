@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useSearchParams, Link } from "wouter";
 import {
   useListFindings,
   useGetFindingsSummary,
   useClearFindings,
+  useGetScan,
   getListFindingsQueryKey,
   getGetFindingsSummaryQueryKey,
 } from "@workspace/api-client-react";
@@ -209,11 +211,25 @@ const FILTER_TABS: { key: TabKey; label: string }[] = [
 ];
 
 export default function Findings() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const scanIdParam = searchParams.get("scanId");
+  const scanId = scanIdParam ? Number(scanIdParam) : undefined;
+
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
   const queryClient = useQueryClient();
+
+  const { data: scopedScan } = useGetScan(scanId ?? 0, {
+    query: { queryKey: ["scan", scanId], enabled: !!scanId },
+  });
+
+  function clearScanFilter() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("scanId");
+    setSearchParams(next);
+  }
 
   const isStatusFilter = STATUS_FILTER_KEYS.has(activeTab);
   const isDuplicateTab = activeTab === "duplicate";
@@ -229,6 +245,7 @@ export default function Findings() {
       : undefined;
 
   const findingsParams = {
+    ...(scanId ? { scanId } : {}),
     ...(typeParam ? { type: typeParam } : {}),
     ...(statusParam ? { findingStatus: statusParam } : {}),
     ...(committedSearch ? { search: committedSearch } : {}),
@@ -278,6 +295,32 @@ export default function Findings() {
           >
             REAL SCAN RESULTS · {(summary?.total ?? 0).toLocaleString()} TOTAL FINDINGS
           </p>
+          {scanId && (
+            <div className="flex items-center gap-2 mt-2">
+              <span
+                className="text-xs px-2 py-0.5 rounded"
+                style={{
+                  background: "rgba(52,211,153,0.1)",
+                  color: "#34D399",
+                  fontFamily: "var(--app-font-mono)",
+                }}
+              >
+                Scan #{scanId}{scopedScan ? ` · ${scopedScan.path}` : ""}
+              </span>
+              <button
+                onClick={clearScanFilter}
+                className="text-xs"
+                style={{ color: "rgba(255,255,255,0.4)" }}
+              >
+                Clear scan filter ×
+              </button>
+              <Link href="/scan-history">
+                <span className="text-xs cursor-pointer" style={{ color: "rgba(255,255,255,0.4)" }}>
+                  ← Scan History
+                </span>
+              </Link>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {/* Search */}

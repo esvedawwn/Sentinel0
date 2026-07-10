@@ -7,6 +7,54 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.4.0-alpha] — 2026-07-10 — Persistent Indexing & Scan History
+
+### Added
+
+#### Schema
+- New tables: `scanRoots` (quick re-scan targets, upserted on every scan), `aiClassifications`
+  (append-only history of every AI classification run per finding), `semanticTags`
+  (normalized tag rows derived from `findings.aiTags`), `ignoredFindings` (additive-only —
+  never deletes the underlying finding)
+- `findings`, `files`, `duplicateGroups`, and `activity` gained a `scanId` foreign key so
+  every record can be traced back to the scan that produced it
+- `findings` gained `fileCreatedAt` / `fileModifiedAt` (filesystem timestamps, distinct from
+  `createdAt` which is row-insert time) and `riskLevel` (display-only heuristic — never
+  drives automatic action)
+- New indexes on `findings` (`path`, `name`, `extension`, `aiCategory`, `fileModifiedAt`,
+  `hash`, `scanId`) to keep the Findings/Analyse filters fast as scan history grows
+
+#### API
+- `PATCH /findings/:id/ignore` and `/unignore` — dismiss/restore a finding without ever
+  deleting its row or scan history
+- `GET /scan-roots` — previously-scanned paths with scan counts, for quick re-scan
+- `GET /scans`, `GET /scans/:id`, and `GET /findings?scanId=` now form the full scan
+  history + reopen data path
+
+#### UI
+- New **Scan History** page (`/scan-history`, ⌘6) — every completed scan with status,
+  file/byte counts, findings count, duration, and a **Reopen** action
+- Reopening a scan deep-links to `/findings?scanId=<id>`, which scopes the Findings page
+  to that scan and shows a "Scan #N" badge with a way to clear the filter
+
+#### Tooling
+- `pnpm --filter @workspace/scripts run seed` — seeds three demo scans with findings
+  across every type/status, a duplicate group, AI classifications, semantic tags, and
+  activity events. Never touches file contents or secrets — structural metadata only
+
+#### Testing
+- `riskLevelFor.test.ts` — heuristic risk classification for every finding type/status
+  combination
+- `routes/__tests__/findings.test.ts` — ignore/unignore against an isolated per-test-run
+  SQLite database (via `drizzle-kit push`), asserting the finding row is never deleted
+
+### Safety
+- Ignoring a finding is additive (`ignoredFindings` insert + status flip) — the finding
+  row and its scan history are preserved, satisfying "no deleting historical scans without
+  confirmation"
+- `DELETE /findings/clear` remains a pre-existing, unconfirmed bulk-delete endpoint — noted
+  in the Backlog as needing a confirmation step; left unchanged in this pass
+
 ## [v0.3.1-alpha] — 2026-07-10 — AI Review Pass
 
 ### Added
