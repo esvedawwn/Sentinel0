@@ -8,7 +8,10 @@ Sentinel is a full-stack TypeScript monorepo built on pnpm workspaces.
 workspace root/
 ├── artifacts/
 │   ├── api-server/     — Express 5 API (builds to dist/, runs on port 8080)
-│   │   └── src/ai/     — AI intelligence layer (classifier, providers)
+│   │   ├── src/ai/     — AI intelligence layer (classifier, providers)
+│   │   ├── src/search/ — Unified search service (NL interpretation + editable filters)
+│   │   └── src/extraction/ — Document extractors, OCR abstraction, sensitive-content
+│   │                    and entity detection (per-file, on-demand only)
 │   └── sentinel/       — React + Vite frontend (runs on PORT env var)
 ├── lib/
 │   ├── api-spec/       — Source-of-truth OpenAPI YAML + Orval codegen config

@@ -481,6 +481,8 @@ export const ListFindingsResponse = zod.object({
   "duplicateGroupHash": zod.string().nullish(),
   "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
   "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
+  "reviewStatus": zod.enum(['new', 'reviewed', 'accepted', 'rejected', 'ignored', 'quarantined']).describe('Findings review workflow state — independent of findingStatus'),
+  "reviewedAt": zod.string().nullish(),
   "reason": zod.string(),
   "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
   "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
@@ -572,6 +574,8 @@ export const IgnoreFindingResponse = zod.object({
   "duplicateGroupHash": zod.string().nullish(),
   "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
   "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
+  "reviewStatus": zod.enum(['new', 'reviewed', 'accepted', 'rejected', 'ignored', 'quarantined']).describe('Findings review workflow state — independent of findingStatus'),
+  "reviewedAt": zod.string().nullish(),
   "reason": zod.string(),
   "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
   "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
@@ -611,6 +615,8 @@ export const UnignoreFindingResponse = zod.object({
   "duplicateGroupHash": zod.string().nullish(),
   "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
   "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
+  "reviewStatus": zod.enum(['new', 'reviewed', 'accepted', 'rejected', 'ignored', 'quarantined']).describe('Findings review workflow state — independent of findingStatus'),
+  "reviewedAt": zod.string().nullish(),
   "reason": zod.string(),
   "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
   "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
@@ -649,6 +655,473 @@ export const ClearFindingsQueryParams = zod.object({
 
 export const ClearFindingsResponse = zod.object({
   "cleared": zod.number()
+})
+
+
+/**
+ * `q` (if present) is run through the local NL interpreter first; any explicit filter params override/extend the interpreted ones. Every call is recorded in search history.
+ * @summary Unified search across findings — combines a natural-language query with explicit, editable filters
+ */
+export const searchQueryLimitDefault = 100;
+export const searchQueryOffsetDefault = 0;
+export const searchQueryRecordHistoryDefault = true;
+
+export const SearchQueryParams = zod.object({
+  "q": zod.coerce.string().optional(),
+  "path": zod.coerce.string().optional(),
+  "extension": zod.coerce.string().optional(),
+  "category": zod.coerce.string().optional(),
+  "aiCategory": zod.coerce.string().optional(),
+  "tag": zod.coerce.string().optional(),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).optional(),
+  "minSizeBytes": zod.coerce.number().optional(),
+  "maxSizeBytes": zod.coerce.number().optional(),
+  "dateFrom": zod.coerce.string().optional(),
+  "dateTo": zod.coerce.string().optional(),
+  "scanId": zod.coerce.number().optional(),
+  "duplicatesOnly": zod.coerce.boolean().optional(),
+  "limit": zod.coerce.number().default(searchQueryLimitDefault),
+  "offset": zod.coerce.number().default(searchQueryOffsetDefault),
+  "recordHistory": zod.coerce.boolean().default(searchQueryRecordHistoryDefault)
+})
+
+export const searchResponseFindingsItemAiConfidenceMin = 0;
+export const searchResponseFindingsItemAiConfidenceMax = 100;
+
+
+
+export const SearchResponse = zod.object({
+  "query": zod.string(),
+  "filters": zod.object({
+  "path": zod.string().nullish(),
+  "extension": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "aiCategory": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "minSizeBytes": zod.number().nullish(),
+  "maxSizeBytes": zod.number().nullish(),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
+  "scanId": zod.number().nullish(),
+  "duplicatesOnly": zod.boolean().optional()
+}),
+  "explanation": zod.string().describe('Human-readable description of how the query was interpreted.'),
+  "findings": zod.array(zod.object({
+  "id": zod.number(),
+  "scanId": zod.number(),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'archive', 'large_file', 'duplicate']),
+  "path": zod.string(),
+  "name": zod.string(),
+  "extension": zod.string(),
+  "sizeBytes": zod.number(),
+  "hash": zod.string().nullish(),
+  "duplicateGroupHash": zod.string().nullish(),
+  "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
+  "reviewStatus": zod.enum(['new', 'reviewed', 'accepted', 'rejected', 'ignored', 'quarantined']).describe('Findings review workflow state — independent of findingStatus'),
+  "reviewedAt": zod.string().nullish(),
+  "reason": zod.string(),
+  "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
+  "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
+  "createdAt": zod.string(),
+  "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Tax, Photography, Software)'),
+  "aiSubcategory": zod.string().nullish().describe('Optional finer-grained classification within the category'),
+  "aiConfidence": zod.number().min(searchResponseFindingsItemAiConfidenceMin).max(searchResponseFindingsItemAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
+  "aiExplanation": zod.string().nullish().describe('Human-readable explanation of why this category was chosen'),
+  "aiTags": zod.array(zod.string()).nullish().describe('Semantic tags assigned by the AI classifier'),
+  "aiSuggestedDestination": zod.string().nullish().describe('Suggested folder\/location for organisation (display-only; never applied automatically)'),
+  "aiSuggestedAction": zod.string().nullish().describe('Short human-readable description of the AI\'s suggested action'),
+  "aiProvider": zod.string().nullish().describe('Identifier of the AI provider that produced this classification')
+})),
+  "total": zod.number()
+})
+
+
+/**
+ * @summary Recent search history, most recent first
+ */
+export const listSearchHistoryQueryLimitDefault = 20;
+
+export const ListSearchHistoryQueryParams = zod.object({
+  "limit": zod.coerce.number().default(listSearchHistoryQueryLimitDefault)
+})
+
+export const ListSearchHistoryResponse = zod.object({
+  "history": zod.array(zod.object({
+  "id": zod.number(),
+  "query": zod.string(),
+  "filters": zod.object({
+  "path": zod.string().nullish(),
+  "extension": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "aiCategory": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "minSizeBytes": zod.number().nullish(),
+  "maxSizeBytes": zod.number().nullish(),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
+  "scanId": zod.number().nullish(),
+  "duplicatesOnly": zod.boolean().optional()
+}),
+  "resultCount": zod.number(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Clear all search history
+ */
+export const ClearSearchHistoryResponse = zod.object({
+  "cleared": zod.number()
+})
+
+
+/**
+ * @summary List saved searches
+ */
+export const ListSavedSearchesResponse = zod.object({
+  "savedSearches": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "query": zod.string(),
+  "filters": zod.object({
+  "path": zod.string().nullish(),
+  "extension": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "aiCategory": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "minSizeBytes": zod.number().nullish(),
+  "maxSizeBytes": zod.number().nullish(),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
+  "scanId": zod.number().nullish(),
+  "duplicatesOnly": zod.boolean().optional()
+}),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Save the current query + filters under a name
+ */
+export const CreateSavedSearchBody = zod.object({
+  "name": zod.string(),
+  "query": zod.string().optional(),
+  "filters": zod.object({
+  "path": zod.string().nullish(),
+  "extension": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "aiCategory": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "minSizeBytes": zod.number().nullish(),
+  "maxSizeBytes": zod.number().nullish(),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
+  "scanId": zod.number().nullish(),
+  "duplicatesOnly": zod.boolean().optional()
+})
+})
+
+export const CreateSavedSearchResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "query": zod.string(),
+  "filters": zod.object({
+  "path": zod.string().nullish(),
+  "extension": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "aiCategory": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "minSizeBytes": zod.number().nullish(),
+  "maxSizeBytes": zod.number().nullish(),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
+  "scanId": zod.number().nullish(),
+  "duplicatesOnly": zod.boolean().optional()
+}),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Rename or update the filters of a saved search
+ */
+export const UpdateSavedSearchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSavedSearchBody = zod.object({
+  "name": zod.string(),
+  "query": zod.string().optional(),
+  "filters": zod.object({
+  "path": zod.string().nullish(),
+  "extension": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "aiCategory": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "minSizeBytes": zod.number().nullish(),
+  "maxSizeBytes": zod.number().nullish(),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
+  "scanId": zod.number().nullish(),
+  "duplicatesOnly": zod.boolean().optional()
+})
+})
+
+export const UpdateSavedSearchResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "query": zod.string(),
+  "filters": zod.object({
+  "path": zod.string().nullish(),
+  "extension": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "aiCategory": zod.string().nullish(),
+  "tags": zod.array(zod.string()).optional(),
+  "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
+  "minSizeBytes": zod.number().nullish(),
+  "maxSizeBytes": zod.number().nullish(),
+  "dateFrom": zod.string().nullish(),
+  "dateTo": zod.string().nullish(),
+  "scanId": zod.number().nullish(),
+  "duplicatesOnly": zod.boolean().optional()
+}),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a saved search
+ */
+export const DeleteSavedSearchParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteSavedSearchResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
+ * @summary Apply a review decision to a single finding (never modifies the underlying file)
+ */
+export const ReviewFindingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReviewFindingBody = zod.object({
+  "action": zod.enum(['mark_reviewed', 'accept_recommendation', 'reject_recommendation', 'ignore_once', 'ignore_permanently', 'create_rule']),
+  "note": zod.string().optional()
+})
+
+export const reviewFindingResponseAiConfidenceMin = 0;
+export const reviewFindingResponseAiConfidenceMax = 100;
+
+
+
+export const ReviewFindingResponse = zod.object({
+  "id": zod.number(),
+  "scanId": zod.number(),
+  "type": zod.enum(['empty_folder', 'zero_byte', 'idlk_file', 'locked_file', 'installer', 'archive', 'large_file', 'duplicate']),
+  "path": zod.string(),
+  "name": zod.string(),
+  "extension": zod.string(),
+  "sizeBytes": zod.number(),
+  "hash": zod.string().nullish(),
+  "duplicateGroupHash": zod.string().nullish(),
+  "findingStatus": zod.enum(['safe_delete', 'review', 'duplicate', 'ignored']),
+  "riskLevel": zod.enum(['low', 'medium', 'high', 'critical']).describe('Heuristic risk level, display-only — never drives automatic action'),
+  "reviewStatus": zod.enum(['new', 'reviewed', 'accepted', 'rejected', 'ignored', 'quarantined']).describe('Findings review workflow state — independent of findingStatus'),
+  "reviewedAt": zod.string().nullish(),
+  "reason": zod.string(),
+  "fileCreatedAt": zod.string().nullish().describe('Filesystem creation timestamp captured at scan time'),
+  "fileModifiedAt": zod.string().nullish().describe('Filesystem modification timestamp captured at scan time'),
+  "createdAt": zod.string(),
+  "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Tax, Photography, Software)'),
+  "aiSubcategory": zod.string().nullish().describe('Optional finer-grained classification within the category'),
+  "aiConfidence": zod.number().min(reviewFindingResponseAiConfidenceMin).max(reviewFindingResponseAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
+  "aiExplanation": zod.string().nullish().describe('Human-readable explanation of why this category was chosen'),
+  "aiTags": zod.array(zod.string()).nullish().describe('Semantic tags assigned by the AI classifier'),
+  "aiSuggestedDestination": zod.string().nullish().describe('Suggested folder\/location for organisation (display-only; never applied automatically)'),
+  "aiSuggestedAction": zod.string().nullish().describe('Short human-readable description of the AI\'s suggested action'),
+  "aiProvider": zod.string().nullish().describe('Identifier of the AI provider that produced this classification')
+})
+
+
+/**
+ * @summary Apply a review decision to multiple findings at once (never modifies underlying files)
+ */
+export const BulkReviewFindingsBody = zod.object({
+  "ids": zod.array(zod.number()),
+  "action": zod.enum(['mark_reviewed', 'accept_recommendation', 'reject_recommendation', 'ignore_once', 'ignore_permanently', 'create_rule']),
+  "note": zod.string().optional()
+})
+
+export const BulkReviewFindingsResponse = zod.object({
+  "updated": zod.number()
+})
+
+
+/**
+ * @summary Full audit trail of review decisions for one finding
+ */
+export const GetFindingAuditParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFindingAuditResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.number(),
+  "findingId": zod.number(),
+  "action": zod.string(),
+  "previousReviewStatus": zod.string().nullish(),
+  "newReviewStatus": zod.string(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary List proposed (never-executed) file operations awaiting a future explicit trigger
+ */
+export const ListActionQueueQueryParams = zod.object({
+  "status": zod.enum(['pending', 'dismissed']).optional()
+})
+
+export const ListActionQueueResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "findingId": zod.number(),
+  "actionType": zod.enum(['move', 'delete', 'archive', 'rename']),
+  "proposedDestination": zod.string().nullish(),
+  "description": zod.string(),
+  "status": zod.enum(['pending', 'dismissed']),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Dismiss a queued action without ever performing it
+ */
+export const DismissActionQueueItemParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DismissActionQueueItemResponse = zod.object({
+  "id": zod.number(),
+  "findingId": zod.number(),
+  "actionType": zod.enum(['move', 'delete', 'archive', 'rename']),
+  "proposedDestination": zod.string().nullish(),
+  "description": zod.string(),
+  "status": zod.enum(['pending', 'dismissed']),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Current privacy / extraction / OCR settings
+ */
+export const GetSettingsResponse = zod.object({
+  "textExtractionEnabled": zod.boolean(),
+  "ocrEnabled": zod.boolean(),
+  "localOnlyProcessing": zod.boolean(),
+  "cloudConsent": zod.boolean(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Update privacy / extraction / OCR settings
+ */
+export const UpdateSettingsBody = zod.object({
+  "textExtractionEnabled": zod.boolean().optional(),
+  "ocrEnabled": zod.boolean().optional(),
+  "localOnlyProcessing": zod.boolean().optional(),
+  "cloudConsent": zod.boolean().optional()
+})
+
+export const UpdateSettingsResponse = zod.object({
+  "textExtractionEnabled": zod.boolean(),
+  "ocrEnabled": zod.boolean(),
+  "localOnlyProcessing": zod.boolean(),
+  "cloudConsent": zod.boolean(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * Extraction is always per-file and on demand — there is no bulk/automatic mode. Fails with 409 if extraction is disabled in Settings for the required mode (OCR / cloud consent).
+ * @summary Run text extraction (and OCR if applicable/enabled) for one finding, on demand
+ */
+export const ExtractFindingTextParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ExtractFindingTextResponse = zod.object({
+  "id": zod.number(),
+  "findingId": zod.number(),
+  "extractor": zod.enum(['pdf', 'txt', 'csv', 'json', 'markdown', 'source_code', 'ocr']),
+  "text": zod.string(),
+  "truncated": zod.boolean(),
+  "sensitiveCategories": zod.array(zod.enum(['legal', 'banking', 'medical', 'identity', 'api_key', 'password', 'private_key'])),
+  "ocrProvider": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Latest extracted text + detected entities + sensitive-content flags for a finding
+ */
+export const GetFindingExtractionParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetFindingExtractionResponse = zod.object({
+  "extraction": zod.object({
+  "id": zod.number(),
+  "findingId": zod.number(),
+  "extractor": zod.enum(['pdf', 'txt', 'csv', 'json', 'markdown', 'source_code', 'ocr']),
+  "text": zod.string(),
+  "truncated": zod.boolean(),
+  "sensitiveCategories": zod.array(zod.enum(['legal', 'banking', 'medical', 'identity', 'api_key', 'password', 'private_key'])),
+  "ocrProvider": zod.string().nullish(),
+  "createdAt": zod.string()
+}),
+  "entities": zod.array(zod.object({
+  "id": zod.number(),
+  "findingId": zod.number(),
+  "type": zod.enum(['person', 'organization', 'date', 'invoice_number', 'case_reference', 'amount']),
+  "value": zod.string(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Generate an AI summary for one explicitly selected document (requires cloud consent if a cloud provider is used)
+ */
+export const SummarizeFindingParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SummarizeFindingResponse = zod.object({
+  "findingId": zod.number(),
+  "summary": zod.string(),
+  "provider": zod.string(),
+  "requiresCloudConsent": zod.boolean()
 })
 
 

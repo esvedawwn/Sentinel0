@@ -1,12 +1,16 @@
 import { Router, type IRouter } from "express";
-import { db, findingsTable, ignoredFindingsTable } from "@workspace/db";
-import { eq, and, count, like, or } from "drizzle-orm";
+import { db, findingsTable, ignoredFindingsTable, findingAuditTable, actionQueueTable, type FindingAuditAction } from "@workspace/db";
+import { eq, and, count, like, or, inArray } from "drizzle-orm";
 import {
   ListFindingsQueryParams,
   GetFindingsSummaryQueryParams,
   ClearFindingsQueryParams,
   IgnoreFindingParams,
   IgnoreFindingBody,
+  ReviewFindingParams,
+  ReviewFindingBody,
+  BulkReviewFindingsBody,
+  GetFindingAuditParams,
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
@@ -24,6 +28,8 @@ function mapFinding(f: typeof findingsTable.$inferSelect) {
     duplicateGroupHash: f.duplicateGroupHash ?? null,
     findingStatus: f.findingStatus,
     riskLevel: f.riskLevel,
+    reviewStatus: f.reviewStatus,
+    reviewedAt: f.reviewedAt?.toISOString() ?? null,
     reason: f.reason,
     fileCreatedAt: f.fileCreatedAt?.toISOString() ?? null,
     fileModifiedAt: f.fileModifiedAt?.toISOString() ?? null,
@@ -164,6 +170,129 @@ router.patch("/findings/:id/unignore", async (req, res): Promise<void> => {
     .returning();
 
   res.json(mapFinding(updated));
+});
+
+/**
+ * Map a review action to the resulting reviewStatus and, when the action
+ * implies a proposed file operation (accept_recommendation), the action
+ * queue entry to create. This never performs any filesystem operation —
+ * `accept_recommendation` only records intent in `action_queue`.
+ */
+function reviewStatusForAction(action: FindingAuditAction): typeof findingsTable.$inferSelect["reviewStatus"] {
+  switch (action) {
+    case "mark_reviewed":
+      return "reviewed";
+    case "accept_recommendation":
+      return "accepted";
+    case "reject_recommendation":
+      return "rejected";
+    case "ignore_once":
+    case "ignore_permanently":
+      return "ignored";
+    case "create_rule":
+      return "reviewed";
+    default:
+      return "reviewed";
+  }
+}
+
+async function applyReview(
+  finding: typeof findingsTable.$inferSelect,
+  action: FindingAuditAction,
+  note: string | null
+) {
+  const newReviewStatus = reviewStatusForAction(action);
+
+  const [updated] = await db
+    .update(findingsTable)
+    .set({ reviewStatus: newReviewStatus, reviewedAt: new Date() })
+    .where(eq(findingsTable.id, finding.id))
+    .returning();
+
+  await db.insert(findingAuditTable).values({
+    findingId: finding.id,
+    action,
+    previousReviewStatus: finding.reviewStatus,
+    newReviewStatus,
+    note,
+  });
+
+  // accept_recommendation only ever creates a *proposed* action-queue entry —
+  // it never touches the filesystem.
+  if (action === "accept_recommendation" && finding.aiSuggestedAction) {
+    await db.insert(actionQueueTable).values({
+      findingId: finding.id,
+      actionType: finding.aiSuggestedDestination ? "move" : "archive",
+      proposedDestination: finding.aiSuggestedDestination ?? null,
+      description: finding.aiSuggestedAction,
+      status: "pending",
+    });
+  }
+
+  return updated;
+}
+
+router.patch("/findings/:id/review", async (req, res): Promise<void> => {
+  const params = ReviewFindingParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid finding ID" });
+    return;
+  }
+  const body = ReviewFindingBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const [finding] = await db.select().from(findingsTable).where(eq(findingsTable.id, params.data.id));
+  if (!finding) {
+    res.status(404).json({ error: "Finding not found" });
+    return;
+  }
+
+  const updated = await applyReview(finding, body.data.action, body.data.note ?? null);
+  res.json(mapFinding(updated));
+});
+
+router.post("/findings/bulk-review", async (req, res): Promise<void> => {
+  const body = BulkReviewFindingsBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+
+  const findings = await db.select().from(findingsTable).where(inArray(findingsTable.id, body.data.ids));
+  for (const finding of findings) {
+    await applyReview(finding, body.data.action, body.data.note ?? null);
+  }
+
+  res.json({ updated: findings.length });
+});
+
+router.get("/findings/:id/audit", async (req, res): Promise<void> => {
+  const params = GetFindingAuditParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid finding ID" });
+    return;
+  }
+
+  const entries = await db
+    .select()
+    .from(findingAuditTable)
+    .where(eq(findingAuditTable.findingId, params.data.id))
+    .orderBy(findingAuditTable.createdAt);
+
+  res.json({
+    entries: entries.map((e) => ({
+      id: e.id,
+      findingId: e.findingId,
+      action: e.action,
+      previousReviewStatus: e.previousReviewStatus ?? null,
+      newReviewStatus: e.newReviewStatus,
+      note: e.note ?? null,
+      createdAt: e.createdAt.toISOString(),
+    })),
+  });
 });
 
 router.delete("/findings/clear", async (req, res): Promise<void> => {

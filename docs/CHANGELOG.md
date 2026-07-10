@@ -7,6 +7,60 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.6.0-alpha] — 2026-07-10 — Unified Search, Findings Review Workflow, Document Extraction
+
+### Added
+
+#### Schema
+- `searchHistory` — every executed search query (raw text + resolved filters), most recent first
+- `savedSearches` — user-named, re-runnable searches with the same filter shape as history
+- `findings.reviewStatus` (`new` / `reviewed` / `accepted` / `rejected` / `ignored` / `quarantined`) —
+  additive alongside the pre-existing `findingStatus` (safe_delete/review/duplicate/ignored), which is
+  unchanged and still drives dedupe/backward-compat display
+- `findingAudit` — append-only log of every review-state transition (who/what/when/from/to)
+- `actionQueue` — proposed-only action rows (`move`/`archive`/`delete`/`keep`) created when a finding is
+  "accepted"; never auto-executed, only ever dismissed or left pending
+- `extractedText` — per-finding extracted text/OCR output, kept separate from `findings`
+- `entities` — heuristic entity extraction results (people/orgs/dates/invoice#/case ref/amounts) linked
+  to an `extractedText` row
+- `userSettings` — singleton row (id=1) with extraction/OCR/local-only/cloud-consent toggles; disabling
+  `localOnlyProcessing` requires `cloudConsent: true` (409 otherwise)
+
+#### Unified Search
+- `searchService.ts` — pure filter-building + query execution, wraps the existing NL interpreter
+  (`interpretSearchQuery`) and layers on editable filters (path/extension/category/aiCategory/tags/risk/
+  size/date range/scanId)
+- `GET /search`, `GET|POST /search/history`, `GET|POST|DELETE /search/saved` routes
+- `/search` page — NL query box with an editable, explainable filter breakdown, recent history, and
+  saved searches
+- Global command palette (⌘/Ctrl+K) — navigate to any page, jump to duplicates or findings review, or
+  start a sample scan. No destructive commands are exposed (no clear-findings, no delete)
+
+#### Findings Review Workflow
+- Review-state transition endpoints on the findings route: mark reviewed / accept / reject / ignore-once
+  / ignore-permanently, individually and in bulk. Every transition writes a `findingAudit` row; `accept`
+  additionally queues an `actionQueue` row (never executes the action)
+- Findings page gained per-row + "select all" checkboxes, a bulk action bar, per-finding review action
+  buttons, and a collapsible audit log viewer per finding
+- New `/action-queue` page — lists proposed actions with a "Dismiss" control; dismissing only removes the
+  row from the queue and never touches the filesystem
+
+#### Document Extraction / OCR Architecture
+- `extraction/` module: extractor interface with trivial-read implementations (txt/csv/json/md/source),
+  a lightweight PDF text extractor, and an OCR provider abstraction (offline/local default; a cloud path
+  exists but stays disabled unless `cloudConsent` is explicitly set)
+- Sensitive-content detectors (legal/banking/medical/identity/API keys/passwords/private keys) using the
+  same regex/keyword heuristic style as `LocalRuleProvider`
+- Heuristic entity extraction (people/orgs/dates/invoice#/case ref/amounts)
+- Extraction is strictly per-file, on-demand — there is no bulk or background extraction/OCR path
+- AI summaries over extracted text are opt-in per document ID and require cloud consent
+
+### Notes
+- No new destructive or automatic file operations were introduced anywhere in this release. `accept`
+  only ever queues a proposal; `dismiss` only ever removes a queue row.
+
+---
+
 ## [v0.5.0-alpha] — 2026-07-10 — Staged Duplicate Detection
 
 ### Added

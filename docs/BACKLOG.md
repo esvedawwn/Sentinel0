@@ -2,6 +2,23 @@
 
 Items are ordered by priority within each category.
 
+## Unified Search / Command Palette / Findings Review / Extraction
+
+- [x] Unified search service + `/search` page + saved searches + history (2026-07-10)
+- [x] Global ⌘/Ctrl+K command palette, non-destructive commands only (2026-07-10)
+- [x] Findings review workflow: states, bulk actions, per-finding audit log (2026-07-10)
+- [x] Action queue (`/action-queue`) for proposed-only accept actions (2026-07-10)
+- [x] Extraction/OCR architecture: extractors, OCR abstraction, sensitive-content + entity
+      detection, privacy settings (2026-07-10)
+- [ ] Settings UI page for `userSettings` (extraction/OCR/local-only/cloud-consent toggles) —
+      backend + schema exist, no dedicated settings section built yet
+- [ ] Frontend UI for viewing extracted text / entities / sensitive-content flags per finding
+      (extraction is currently backend-only, triggered on demand, no results viewer)
+- [ ] Action queue: allow marking an item `completed` from the UI once a user has manually
+      performed the proposed action outside Sentinel (currently only `pending`→`dismissed`)
+- [ ] Command palette: fuzzy/scored matching instead of simple substring filter
+- [ ] Saved searches: allow editing an existing saved search's filters, not just re-running it
+
 ## Sprint 3 Candidates
 
 ### AI Intelligence

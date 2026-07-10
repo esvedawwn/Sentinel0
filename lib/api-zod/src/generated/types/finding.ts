@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { FindingFindingStatus } from './findingFindingStatus';
+import type { FindingReviewStatus } from './findingReviewStatus';
 import type { FindingRiskLevel } from './findingRiskLevel';
 import type { FindingType } from './findingType';
 
@@ -24,6 +25,10 @@ export interface Finding {
   findingStatus: FindingFindingStatus;
   /** Heuristic risk level, display-only — never drives automatic action */
   riskLevel: FindingRiskLevel;
+  /** Findings review workflow state — independent of findingStatus */
+  reviewStatus: FindingReviewStatus;
+  /** @nullable */
+  reviewedAt?: string | null;
   reason: string;
   /**
      * Filesystem creation timestamp captured at scan time

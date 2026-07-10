@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useGetDashboardSummary, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import CommandPalette from "@/components/CommandPalette";
 
 const NAV_ITEMS = [
   { key: "1", label: "Home", path: "/dashboard", shortcut: "⌘1" },
@@ -9,6 +10,8 @@ const NAV_ITEMS = [
   { key: "4", label: "Findings", path: "/findings", shortcut: "⌘4" },
   { key: "5", label: "Reports", path: "/reports", shortcut: "⌘5" },
   { key: "6", label: "Scan History", path: "/scan-history", shortcut: "⌘6" },
+  { key: "8", label: "Search", path: "/search", shortcut: "⌘K" },
+  { key: "9", label: "Action Queue", path: "/action-queue", shortcut: "⌘9" },
 ];
 
 const NAV_BOTTOM = [
@@ -31,6 +34,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         if (e.key === "5") { e.preventDefault(); navigate("/reports"); }
         if (e.key === "6") { e.preventDefault(); navigate("/scan-history"); }
         if (e.key === "7") { e.preventDefault(); navigate("/settings"); }
+        if (e.key === "8") { e.preventDefault(); navigate("/search"); }
+        if (e.key === "9") { e.preventDefault(); navigate("/action-queue"); }
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -164,6 +169,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-y-auto" style={{ background: "#111111" }}>
         {children}
       </main>
+      <CommandPalette />
     </div>
   );
 }

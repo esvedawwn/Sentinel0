@@ -25,12 +25,15 @@ A dark-themed file intelligence web app that scans, classifies, deduplicates, an
 ## Where things live
 
 - `lib/api-spec/openapi.yaml` — source-of-truth API contract
-- `lib/db/src/schema/` — Drizzle schema (scans, files, findings, duplicates, fileHashes, activity, scanRoots, aiClassifications, semanticTags, ignoredFindings)
-- `artifacts/api-server/src/routes/` — Express route handlers (dashboard, scans, files, findings, duplicates, categories, activity, reports, scanRoots)
+- `lib/db/src/schema/` — Drizzle schema (scans, files, findings, duplicates, fileHashes, activity, scanRoots, aiClassifications, semanticTags, ignoredFindings, searchHistory, savedSearches, findingAudit, actionQueue, extractedText, entities, userSettings)
+- `artifacts/api-server/src/routes/` — Express route handlers (dashboard, scans, files, findings, duplicates, categories, activity, reports, scanRoots, search, actionQueue, settings, extraction)
 - `artifacts/api-server/src/scanner/realScanner.ts` — real filesystem scan; populates findings, AI classification history, semantic tags, upserts scan roots, and persists duplicate groups
 - `artifacts/api-server/src/scanner/duplicateDetector.ts` — staged duplicate detection: size → extension → SHA-256 hash, with path+size+mtime hash cache reuse and cooperative cancellation/progress
-- `artifacts/sentinel/src/pages/` — Dashboard, Analyse, Organise, Findings, Reports, ScanHistory
-- `artifacts/sentinel/src/components/Layout.tsx` — sidebar nav with ⌘1–7 shortcuts
+- `artifacts/api-server/src/search/searchService.ts` — unified search: wraps the local NL interpreter (`ai/search.ts`) and layers on editable filters (path/extension/category/aiCategory/tags/risk/size/date range/scanId)
+- `artifacts/api-server/src/extraction/` — extractor interface (txt/csv/json/md/source/PDF), OCR provider abstraction (local default, gated cloud path), sensitive-content detectors, heuristic entity extraction — all strictly per-file, on-demand
+- `artifacts/sentinel/src/pages/` — Dashboard, Analyse, Organise, Findings, Search, ActionQueue, Reports, ScanHistory
+- `artifacts/sentinel/src/components/Layout.tsx` — sidebar nav with ⌘1–9 shortcuts
+- `artifacts/sentinel/src/components/CommandPalette.tsx` — global ⌘/Ctrl+K palette (navigation + non-destructive actions only)
 - `artifacts/sentinel/src/index.css` — full dark theme (CSS vars for #111111 bg, #1A1A1A panel, #222222 card, #34D399 green)
 - `scripts/src/seed.ts` — demo data seed script (`@workspace/scripts`)
 
@@ -47,6 +50,12 @@ A dark-themed file intelligence web app that scans, classifies, deduplicates, an
 - Ignoring a finding is additive: `ignoredFindings` gets a row and `findings.findingStatus` flips to `ignored`, but the finding row itself is never deleted — `unignore` reverses it. This is the mechanism satisfying "no deleting historical data without confirmation" for findings.
 - `aiClassifications` is an append-only history table; `findings.ai_*` columns are a denormalized copy of the latest classification, kept for fast reads.
 - No file contents, file bytes, or API keys are ever stored in the DB — only path/name/extension/size/timestamps/classification metadata.
+- Unified search is local-only: `searchService.ts` wraps the existing local NL interpreter and never calls a cloud provider, regardless of AI classification settings.
+- Findings review actions never touch the filesystem: `accept` only ever inserts a proposed `actionQueue` row (move/archive/delete/keep); dismissing a queue row only deletes that row. Every state transition (reviewed/accepted/rejected/ignored/quarantined) writes an append-only `findingAudit` row.
+- `findings.reviewStatus` is independent of `findings.findingStatus` — the former tracks human review workflow, the latter is the original dedupe/backward-compat status. Both are shown separately in the UI.
+- Document extraction/OCR is strictly per-file and on-demand — there is no bulk or background extraction endpoint by design, so no UI batch-triggers it either.
+- `userSettings` is a singleton row (id=1); flipping `localOnlyProcessing` off requires `cloudConsent: true` already set, else the API returns 409 — this prevents silently enabling cloud processing.
+- The command palette (⌘/Ctrl+K) intentionally exposes no destructive commands (no clear-findings, no delete) — only navigation and safe actions like starting a sample scan.
 
 ## Product
 
@@ -56,7 +65,11 @@ A dark-themed file intelligence web app that scans, classifies, deduplicates, an
 - **Findings** — filterable findings browser (type/status/AI category/search), per-finding detail with AI intelligence panel; supports `?scanId=` to scope to one scan (used by Scan History's Reopen action).
 - **Scan History** — every completed scan with status, file/byte counts, findings count, duration, and a Reopen action that deep-links into Findings scoped to that scan.
 - **Reports** — summary stats, category breakdown bar chart, file type breakdown, scan history table.
-- Keyboard shortcuts ⌘1–⌘7 navigate between pages (⌘6 Scan History, ⌘7 Settings).
+- **Search** — natural-language query box with an editable, explainable filter breakdown, recent search history, and saved searches. A global ⌘/Ctrl+K command palette navigates anywhere and triggers safe actions (no destructive commands).
+- **Findings review workflow** — per-finding and bulk review actions (mark reviewed / accept / reject / ignore-once / ignore-permanently), each writing an audit-log row; accepting queues a proposed action rather than executing it.
+- **Action Queue** — lists proposed actions (move/archive/delete/keep) awaiting human confirmation; dismissing removes a proposal without ever touching a file.
+- Document extraction/OCR architecture exists on the backend (extractors, OCR abstraction, sensitive-content + entity detection, privacy settings) but has no dedicated results-viewer UI yet — see `docs/BACKLOG.md`.
+- Keyboard shortcuts ⌘1–⌘9 navigate between pages (⌘6 Scan History, ⌘7 Settings, ⌘K Search, ⌘9 Action Queue).
 
 ## Gotchas
 

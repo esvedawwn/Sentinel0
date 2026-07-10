@@ -15,6 +15,7 @@ export type FindingType =
 
 export type FindingStatus = "safe_delete" | "review" | "duplicate" | "ignored";
 export type RiskLevel = "low" | "medium" | "high" | "critical";
+export type ReviewStatus = "new" | "reviewed" | "accepted" | "rejected" | "ignored" | "quarantined";
 
 export const findingsTable = sqliteTable(
   "findings",
@@ -33,6 +34,8 @@ export const findingsTable = sqliteTable(
     duplicateGroupId: integer("duplicate_group_id"),
     findingStatus: text("finding_status").$type<FindingStatus>().notNull(),
     riskLevel: text("risk_level").$type<RiskLevel>().notNull().default("low"),
+    reviewStatus: text("review_status").$type<ReviewStatus>().notNull().default("new"),
+    reviewedAt: integer("reviewed_at", { mode: "timestamp" }),
     reason: text("reason").notNull().default(""),
     // Filesystem timestamps captured at scan time (distinct from createdAt, which is when the row was inserted)
     fileCreatedAt: integer("file_created_at", { mode: "timestamp" }),
@@ -73,6 +76,7 @@ export const insertFindingSchema = createInsertSchema(findingsTable, {
   ]),
   findingStatus: z.enum(["safe_delete", "review", "duplicate", "ignored"]),
   riskLevel: z.enum(["low", "medium", "high", "critical"]),
+  reviewStatus: z.enum(["new", "reviewed", "accepted", "rejected", "ignored", "quarantined"]),
   aiTags: z.array(z.string()).optional(),
 }).omit({ id: true });
 export type InsertFinding = z.infer<typeof insertFindingSchema>;

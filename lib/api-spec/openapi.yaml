@@ -28,6 +28,14 @@ tags:
     description: Real scan findings (empty folders, zero-byte, lock files, duplicates, etc.)
   - name: scan-roots
     description: Previously scanned directory roots, for quick re-scanning
+  - name: search
+    description: Unified search across findings (structured filters + natural-language interpretation)
+  - name: review
+    description: Findings review workflow (status transitions, bulk actions, audit log, action queue)
+  - name: extraction
+    description: Document text extraction, OCR, sensitive-content detection, and entity extraction
+  - name: settings
+    description: User privacy and processing settings
 
 paths:
   /healthz:
@@ -603,6 +611,432 @@ paths:
                   cleared:
                     type: integer
 
+  /search:
+    get:
+      operationId: search
+      tags: [search]
+      summary: Unified search across findings — combines a natural-language query with explicit, editable filters
+      description: >
+        `q` (if present) is run through the local NL interpreter first; any explicit filter
+        params override/extend the interpreted ones. Every call is recorded in search history.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: path
+          in: query
+          schema:
+            type: string
+        - name: extension
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: aiCategory
+          in: query
+          schema:
+            type: string
+        - name: tag
+          in: query
+          schema:
+            type: string
+        - name: riskLevel
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: minSizeBytes
+          in: query
+          schema:
+            type: integer
+        - name: maxSizeBytes
+          in: query
+          schema:
+            type: integer
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: scanId
+          in: query
+          schema:
+            type: integer
+        - name: duplicatesOnly
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: recordHistory
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResults"
+
+  /search/history:
+    get:
+      operationId: listSearchHistory
+      tags: [search]
+      summary: Recent search history, most recent first
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Search history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [history]
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SearchHistoryEntry"
+    delete:
+      operationId: clearSearchHistory
+      tags: [search]
+      summary: Clear all search history
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [cleared]
+                properties:
+                  cleared:
+                    type: integer
+
+  /search/saved:
+    get:
+      operationId: listSavedSearches
+      tags: [search]
+      summary: List saved searches
+      responses:
+        "200":
+          description: Saved searches
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [savedSearches]
+                properties:
+                  savedSearches:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SavedSearch"
+    post:
+      operationId: createSavedSearch
+      tags: [search]
+      summary: Save the current query + filters under a name
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveSearchInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedSearch"
+
+  /search/saved/{id}:
+    patch:
+      operationId: updateSavedSearch
+      tags: [search]
+      summary: Rename or update the filters of a saved search
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveSearchInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedSearch"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSavedSearch
+      tags: [search]
+      summary: Delete a saved search
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: boolean
+
+  /findings/{id}/review:
+    post:
+      operationId: reviewFinding
+      tags: [review]
+      summary: Apply a review decision to a single finding (never modifies the underlying file)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewFindingInput"
+      responses:
+        "200":
+          description: Updated finding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Finding"
+        "404":
+          description: Finding not found
+
+  /findings/bulk-review:
+    post:
+      operationId: bulkReviewFindings
+      tags: [review]
+      summary: Apply a review decision to multiple findings at once (never modifies underlying files)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkReviewFindingsInput"
+      responses:
+        "200":
+          description: Bulk review result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [updated]
+                properties:
+                  updated:
+                    type: integer
+
+  /findings/{id}/audit:
+    get:
+      operationId: getFindingAudit
+      tags: [review]
+      summary: Full audit trail of review decisions for one finding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FindingAuditEntry"
+
+  /action-queue:
+    get:
+      operationId: listActionQueue
+      tags: [review]
+      summary: List proposed (never-executed) file operations awaiting a future explicit trigger
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, dismissed]
+      responses:
+        "200":
+          description: Action queue
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ActionQueueEntry"
+
+  /action-queue/{id}/dismiss:
+    patch:
+      operationId: dismissActionQueueItem
+      tags: [review]
+      summary: Dismiss a queued action without ever performing it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dismissed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionQueueEntry"
+        "404":
+          description: Not found
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Current privacy / extraction / OCR settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettingsResponse"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update privacy / extraction / OCR settings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettingsResponse"
+
+  /findings/{id}/extract:
+    post:
+      operationId: extractFindingText
+      tags: [extraction]
+      summary: Run text extraction (and OCR if applicable/enabled) for one finding, on demand
+      description: >
+        Extraction is always per-file and on demand — there is no bulk/automatic mode.
+        Fails with 409 if extraction is disabled in Settings for the required mode
+        (OCR / cloud consent).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Extraction result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractedTextEntry"
+        "404":
+          description: Finding not found
+        "409":
+          description: Extraction/OCR disabled in settings
+
+  /findings/{id}/extraction:
+    get:
+      operationId: getFindingExtraction
+      tags: [extraction]
+      summary: Latest extracted text + detected entities + sensitive-content flags for a finding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Extraction detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractionDetailResponse"
+        "404":
+          description: No extraction on file for this finding
+
+  /findings/{id}/summarize:
+    post:
+      operationId: summarizeFinding
+      tags: [extraction]
+      summary: Generate an AI summary for one explicitly selected document (requires cloud consent if a cloud provider is used)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SummaryResponse"
+        "404":
+          description: No extracted text to summarize
+        "409":
+          description: Cloud consent required
+
 components:
   schemas:
     HealthStatus:
@@ -1052,7 +1486,7 @@ components:
 
     Finding:
       type: object
-      required: [id, scanId, type, path, name, extension, sizeBytes, findingStatus, riskLevel, reason, createdAt]
+      required: [id, scanId, type, path, name, extension, sizeBytes, findingStatus, riskLevel, reviewStatus, reason, createdAt]
       properties:
         id:
           type: integer
@@ -1080,6 +1514,12 @@ components:
           type: string
           enum: [low, medium, high, critical]
           description: "Heuristic risk level, display-only — never drives automatic action"
+        reviewStatus:
+          type: string
+          enum: [new, reviewed, accepted, rejected, ignored, quarantined]
+          description: "Findings review workflow state — independent of findingStatus"
+        reviewedAt:
+          type: ["string", "null"]
         reason:
           type: string
         fileCreatedAt:
@@ -1146,3 +1586,251 @@ components:
           type: object
           additionalProperties:
             type: integer
+
+    SearchFilters:
+      type: object
+      properties:
+        path:
+          type: ["string", "null"]
+        extension:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        aiCategory:
+          type: ["string", "null"]
+        tags:
+          type: array
+          items:
+            type: string
+        riskLevel:
+          type: ["string", "null"]
+          enum: [low, medium, high, critical, null]
+        minSizeBytes:
+          type: ["integer", "null"]
+        maxSizeBytes:
+          type: ["integer", "null"]
+        dateFrom:
+          type: ["string", "null"]
+        dateTo:
+          type: ["string", "null"]
+        scanId:
+          type: ["integer", "null"]
+        duplicatesOnly:
+          type: boolean
+
+    SearchResults:
+      type: object
+      required: [query, filters, explanation, findings, total]
+      properties:
+        query:
+          type: string
+        filters:
+          $ref: "#/components/schemas/SearchFilters"
+        explanation:
+          type: string
+          description: Human-readable description of how the query was interpreted.
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+        total:
+          type: integer
+
+    SearchHistoryEntry:
+      type: object
+      required: [id, query, filters, resultCount, createdAt]
+      properties:
+        id:
+          type: integer
+        query:
+          type: string
+        filters:
+          $ref: "#/components/schemas/SearchFilters"
+        resultCount:
+          type: integer
+        createdAt:
+          type: string
+
+    SavedSearch:
+      type: object
+      required: [id, name, query, filters, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        query:
+          type: string
+        filters:
+          $ref: "#/components/schemas/SearchFilters"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    SaveSearchInput:
+      type: object
+      required: [name, filters]
+      properties:
+        name:
+          type: string
+        query:
+          type: string
+        filters:
+          $ref: "#/components/schemas/SearchFilters"
+
+    ReviewFindingInput:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [mark_reviewed, accept_recommendation, reject_recommendation, ignore_once, ignore_permanently, create_rule]
+        note:
+          type: string
+
+    BulkReviewFindingsInput:
+      type: object
+      required: [ids, action]
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+        action:
+          type: string
+          enum: [mark_reviewed, accept_recommendation, reject_recommendation, ignore_once, ignore_permanently, create_rule]
+        note:
+          type: string
+
+    FindingAuditEntry:
+      type: object
+      required: [id, findingId, action, newReviewStatus, createdAt]
+      properties:
+        id:
+          type: integer
+        findingId:
+          type: integer
+        action:
+          type: string
+        previousReviewStatus:
+          type: ["string", "null"]
+        newReviewStatus:
+          type: string
+        note:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    ActionQueueEntry:
+      type: object
+      required: [id, findingId, actionType, description, status, createdAt]
+      properties:
+        id:
+          type: integer
+        findingId:
+          type: integer
+        actionType:
+          type: string
+          enum: [move, delete, archive, rename]
+        proposedDestination:
+          type: ["string", "null"]
+        description:
+          type: string
+        status:
+          type: string
+          enum: [pending, dismissed]
+        createdAt:
+          type: string
+
+    UserSettingsResponse:
+      type: object
+      required: [textExtractionEnabled, ocrEnabled, localOnlyProcessing, cloudConsent, updatedAt]
+      properties:
+        textExtractionEnabled:
+          type: boolean
+        ocrEnabled:
+          type: boolean
+        localOnlyProcessing:
+          type: boolean
+        cloudConsent:
+          type: boolean
+        updatedAt:
+          type: string
+
+    UpdateSettingsInput:
+      type: object
+      properties:
+        textExtractionEnabled:
+          type: boolean
+        ocrEnabled:
+          type: boolean
+        localOnlyProcessing:
+          type: boolean
+        cloudConsent:
+          type: boolean
+
+    ExtractedTextEntry:
+      type: object
+      required: [id, findingId, extractor, text, truncated, sensitiveCategories, createdAt]
+      properties:
+        id:
+          type: integer
+        findingId:
+          type: integer
+        extractor:
+          type: string
+          enum: [pdf, txt, csv, json, markdown, source_code, ocr]
+        text:
+          type: string
+        truncated:
+          type: boolean
+        sensitiveCategories:
+          type: array
+          items:
+            type: string
+            enum: [legal, banking, medical, identity, api_key, password, private_key]
+        ocrProvider:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    EntityEntry:
+      type: object
+      required: [id, findingId, type, value, createdAt]
+      properties:
+        id:
+          type: integer
+        findingId:
+          type: integer
+        type:
+          type: string
+          enum: [person, organization, date, invoice_number, case_reference, amount]
+        value:
+          type: string
+        createdAt:
+          type: string
+
+    ExtractionDetailResponse:
+      type: object
+      required: [extraction, entities]
+      properties:
+        extraction:
+          $ref: "#/components/schemas/ExtractedTextEntry"
+        entities:
+          type: array
+          items:
+            $ref: "#/components/schemas/EntityEntry"
+
+    SummaryResponse:
+      type: object
+      required: [findingId, summary, provider, requiresCloudConsent]
+      properties:
+        findingId:
+          type: integer
+        summary:
+          type: string
+        provider:
+          type: string
+        requiresCloudConsent:
+          type: boolean

@@ -10,6 +10,10 @@ import reportsRouter from "./reports";
 import findingsRouter from "./findings";
 import aiRouter from "./ai";
 import scanRootsRouter from "./scanRoots";
+import searchRouter from "./search";
+import actionQueueRouter from "./actionQueue";
+import settingsRouter from "./settings";
+import extractionRouter from "./extraction";
 
 const router: IRouter = Router();
 
@@ -24,5 +28,9 @@ router.use(reportsRouter);
 router.use(findingsRouter);
 router.use(aiRouter);
 router.use(scanRootsRouter);
+router.use(searchRouter);
+router.use(actionQueueRouter);
+router.use(settingsRouter);
+router.use(extractionRouter);
 
 export default router;

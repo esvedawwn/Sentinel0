@@ -6,8 +6,12 @@ import {
   useGetFindingsSummary,
   useClearFindings,
   useGetScan,
+  useReviewFinding,
+  useBulkReviewFindings,
+  useGetFindingAudit,
   getListFindingsQueryKey,
   getGetFindingsSummaryQueryKey,
+  getGetFindingAuditQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatBytes } from "@/lib/utils";
@@ -52,6 +56,36 @@ const STATUS_COLORS: Record<string, string> = {
   duplicate: "#EC4899",
   ignored: "rgba(255,255,255,0.3)",
 };
+
+const REVIEW_STATUS_COLORS: Record<string, string> = {
+  new: "rgba(255,255,255,0.35)",
+  reviewed: "#60A5FA",
+  accepted: "#34D399",
+  rejected: "#F87171",
+  ignored: "rgba(255,255,255,0.3)",
+  quarantined: "#FBBF24",
+};
+
+const REVIEW_ACTIONS: { action: "mark_reviewed" | "accept_recommendation" | "reject_recommendation" | "ignore_once" | "ignore_permanently" | "create_rule"; label: string; color: string }[] = [
+  { action: "mark_reviewed", label: "Mark Reviewed", color: "#60A5FA" },
+  { action: "accept_recommendation", label: "Accept Recommendation", color: "#34D399" },
+  { action: "reject_recommendation", label: "Reject Recommendation", color: "#F87171" },
+  { action: "ignore_once", label: "Ignore Once", color: "rgba(255,255,255,0.5)" },
+  { action: "ignore_permanently", label: "Ignore Permanently", color: "rgba(255,255,255,0.5)" },
+  { action: "create_rule", label: "Create Rule", color: "#A78BFA" },
+];
+
+function ReviewStatusBadge({ status }: { status: string }) {
+  const color = REVIEW_STATUS_COLORS[status] ?? "#888";
+  return (
+    <span
+      className="inline-block px-2 py-0.5 rounded text-xs font-mono"
+      style={{ background: `${color}22`, color, fontFamily: "var(--app-font-mono)" }}
+    >
+      {status}
+    </span>
+  );
+}
 
 const AI_CATEGORY_COLORS: Record<string, string> = {
   "Legal": "#60A5FA",
@@ -219,6 +253,8 @@ export default function Findings() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [committedSearch, setCommittedSearch] = useState("");
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [showAudit, setShowAudit] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: scopedScan } = useGetScan(scanId ?? 0, {
@@ -274,9 +310,47 @@ export default function Findings() {
     },
   });
 
+  function invalidateReview() {
+    queryClient.invalidateQueries({ queryKey: getListFindingsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetFindingsSummaryQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetFindingAuditQueryKey(selectedId ?? 0) });
+  }
+
+  const reviewFinding = useReviewFinding({
+    mutation: { onSuccess: invalidateReview },
+  });
+
+  const bulkReviewFindings = useBulkReviewFindings({
+    mutation: {
+      onSuccess: () => {
+        invalidateReview();
+        setCheckedIds(new Set());
+      },
+    },
+  });
+
+  const { data: auditData } = useGetFindingAudit(selectedId ?? 0, {
+    query: { queryKey: getGetFindingAuditQueryKey(selectedId ?? 0), enabled: !!selectedId && showAudit },
+  });
+
   const findings = findingsData?.findings ?? [];
   const total = findingsData?.total ?? 0;
   const selectedFinding = findings.find((f) => f.id === selectedId) ?? null;
+
+  function toggleChecked(id: number) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllChecked() {
+    setCheckedIds((prev) =>
+      prev.size === findings.length ? new Set() : new Set(findings.map((f) => f.id))
+    );
+  }
 
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") setCommittedSearch(search);
@@ -470,6 +544,45 @@ export default function Findings() {
               })}
             </div>
 
+            {/* Bulk action bar */}
+            {checkedIds.size > 0 && (
+              <div
+                className="flex items-center gap-3 mb-3 px-4 py-2 rounded"
+                style={{ background: "rgba(52,211,153,0.08)", border: "1px solid rgba(52,211,153,0.2)" }}
+              >
+                <span className="text-xs font-mono" style={{ color: "#34D399", fontFamily: "var(--app-font-mono)" }}>
+                  {checkedIds.size} selected
+                </span>
+                <div className="flex gap-1.5 ml-auto flex-wrap">
+                  {REVIEW_ACTIONS.map((ra) => (
+                    <button
+                      key={ra.action}
+                      disabled={bulkReviewFindings.isPending}
+                      onClick={() =>
+                        bulkReviewFindings.mutate({ data: { ids: Array.from(checkedIds), action: ra.action } })
+                      }
+                      className="px-2.5 py-1 text-xs rounded"
+                      style={{
+                        background: `${ra.color}18`,
+                        color: ra.color,
+                        border: `1px solid ${ra.color}44`,
+                        fontFamily: "var(--app-font-mono)",
+                      }}
+                    >
+                      {ra.label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => setCheckedIds(new Set())}
+                  className="text-xs"
+                  style={{ color: "rgba(255,255,255,0.4)" }}
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
             {/* Table */}
             {isLoading ? (
               <div
@@ -491,18 +604,24 @@ export default function Findings() {
                 style={{ border: "1px solid rgba(255,255,255,0.06)" }}
               >
                 <div
-                  className="grid text-xs font-mono px-4 py-2.5"
+                  className="grid text-xs font-mono px-4 py-2.5 items-center"
                   style={{
                     background: "#1A1A1A",
                     color: "rgba(255,255,255,0.3)",
                     fontFamily: "var(--app-font-mono)",
-                    gridTemplateColumns: "2fr 1fr 1fr 1fr 80px",
+                    gridTemplateColumns: "24px 2fr 1fr 1fr 1fr 1fr 80px",
                     borderBottom: "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
+                  <input
+                    type="checkbox"
+                    checked={checkedIds.size > 0 && checkedIds.size === findings.length}
+                    onChange={toggleAllChecked}
+                  />
                   <span>NAME</span>
                   <span>TYPE</span>
                   <span>STATUS</span>
+                  <span>REVIEW</span>
                   <span>AI CATEGORY</span>
                   <span className="text-right">SIZE</span>
                 </div>
@@ -518,7 +637,7 @@ export default function Findings() {
                         transition={{ delay: Math.min(idx * 0.02, 0.3) }}
                         className="grid items-center px-4 py-3 cursor-pointer transition-colors duration-100"
                         style={{
-                          gridTemplateColumns: "2fr 1fr 1fr 1fr 80px",
+                          gridTemplateColumns: "24px 2fr 1fr 1fr 1fr 1fr 80px",
                           background: isSelected
                             ? "rgba(52,211,153,0.06)"
                             : idx % 2 === 0
@@ -533,6 +652,12 @@ export default function Findings() {
                           setSelectedId(isSelected ? null : finding.id)
                         }
                       >
+                        <input
+                          type="checkbox"
+                          checked={checkedIds.has(finding.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleChecked(finding.id)}
+                        />
                         <div className="min-w-0 pr-4">
                           <div
                             className="text-sm font-medium truncate"
@@ -558,6 +683,7 @@ export default function Findings() {
                         </div>
                         <TypeBadge type={finding.type} />
                         <StatusBadge status={finding.findingStatus} />
+                        <ReviewStatusBadge status={finding.reviewStatus ?? "new"} />
                         <AICategoryDot category={finding.aiCategory} />
                         <div
                           className="text-right text-xs font-mono"
@@ -854,6 +980,11 @@ export default function Findings() {
                   </div>
                 )}
 
+                <div>
+                  <div className="detail-label" style={{ marginBottom: 6 }}>Review Status</div>
+                  <ReviewStatusBadge status={selectedFinding.reviewStatus ?? "new"} />
+                </div>
+
                 <div
                   className="pt-3 mt-3"
                   style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
@@ -865,7 +996,86 @@ export default function Findings() {
                       fontFamily: "var(--app-font-mono)",
                     }}
                   >
-                    ACTIONS (v0.3)
+                    REVIEW ACTIONS
+                  </div>
+                  <div className="space-y-2">
+                    {REVIEW_ACTIONS.map((ra) => (
+                      <button
+                        key={ra.action}
+                        disabled={reviewFinding.isPending}
+                        onClick={() =>
+                          reviewFinding.mutate({ id: selectedFinding.id, data: { action: ra.action } })
+                        }
+                        className="w-full px-3 py-1.5 text-xs rounded text-left"
+                        style={{
+                          background: `${ra.color}12`,
+                          color: ra.color,
+                          border: `1px solid ${ra.color}33`,
+                          fontFamily: "var(--app-font-mono)",
+                        }}
+                      >
+                        {ra.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p
+                    className="text-xs mt-2"
+                    style={{ color: "rgba(255,255,255,0.25)", fontSize: "0.65rem", lineHeight: 1.5 }}
+                  >
+                    Accepting a recommendation only queues a proposed action for later confirmation — nothing is moved or deleted automatically.
+                  </p>
+
+                  <button
+                    onClick={() => setShowAudit((v) => !v)}
+                    className="text-xs mt-3"
+                    style={{ color: "#60A5FA", fontFamily: "var(--app-font-mono)" }}
+                  >
+                    {showAudit ? "Hide audit log ▲" : "Show audit log ▼"}
+                  </button>
+
+                  {showAudit && (
+                    <div className="mt-2 space-y-2 max-h-56 overflow-y-auto">
+                      {(auditData?.entries ?? []).length === 0 && (
+                        <div className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
+                          No audit entries yet.
+                        </div>
+                      )}
+                      {(auditData?.entries ?? []).map((entry) => (
+                        <div
+                          key={entry.id}
+                          className="text-xs rounded p-2"
+                          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                        >
+                          <div className="flex justify-between" style={{ fontFamily: "var(--app-font-mono)" }}>
+                            <span style={{ color: "#60A5FA" }}>{entry.action}</span>
+                            <span style={{ color: "rgba(255,255,255,0.3)" }}>
+                              {new Date(entry.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <div style={{ color: "rgba(255,255,255,0.5)" }}>
+                            {entry.previousReviewStatus} → {entry.newReviewStatus}
+                          </div>
+                          {entry.note && (
+                            <div style={{ color: "rgba(255,255,255,0.4)" }}>{entry.note}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="pt-3 mt-3"
+                  style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  <div
+                    className="text-xs mb-2"
+                    style={{
+                      color: "rgba(255,255,255,0.25)",
+                      fontFamily: "var(--app-font-mono)",
+                    }}
+                  >
+                    FILE ACTIONS (v0.3)
                   </div>
                   <div className="space-y-2">
                     <button

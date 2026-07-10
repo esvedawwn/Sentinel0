@@ -22,16 +22,23 @@ import type {
 import type {
   AISearchInterpretation,
   AIStatusResponse,
+  ActionQueueEntry,
   ActivityEntry,
   AttentionSummary,
+  BulkReviewFindings200,
+  BulkReviewFindingsInput,
   Category,
   CategoryCount,
   ClearFindings200,
   ClearFindingsParams,
+  ClearSearchHistory200,
   DashboardSummary,
+  DeleteSavedSearch200,
   DuplicateGroup,
   DuplicateListResponse,
   DuplicateResolveInput,
+  ExtractedTextEntry,
+  ExtractionDetailResponse,
   File,
   FileListResponse,
   FileStats,
@@ -40,21 +47,35 @@ import type {
   FindingsListResponse,
   FindingsSummary,
   GetDashboardRecentActivityParams,
+  GetFindingAudit200,
   GetFindingsSummaryParams,
   GetReportsScanHistoryParams,
   HealthStatus,
   IgnoreFindingInput,
   InterpretSearchParams,
+  ListActionQueue200,
+  ListActionQueueParams,
   ListActivityParams,
   ListDuplicatesParams,
   ListFilesParams,
   ListFindingsParams,
+  ListSavedSearches200,
   ListScanRoots200,
   ListScansParams,
+  ListSearchHistory200,
+  ListSearchHistoryParams,
   ReportsOverview,
+  ReviewFindingInput,
+  SaveSearchInput,
+  SavedSearch,
   Scan,
   ScanHistoryEntry,
-  ScanInput
+  ScanInput,
+  SearchParams,
+  SearchResults,
+  SummaryResponse,
+  UpdateSettingsInput,
+  UserSettingsResponse
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -2187,5 +2208,1269 @@ export const useClearFindings = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getClearFindingsMutationOptions(options));
+    }
+
+export const getSearchUrl = (params?: SearchParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/search?${stringifiedParams}` : `/api/search`
+}
+
+/**
+ * `q` (if present) is run through the local NL interpreter first; any explicit filter params override/extend the interpreted ones. Every call is recorded in search history.
+ * @summary Unified search across findings — combines a natural-language query with explicit, editable filters
+ */
+export const search = async (params?: SearchParams, options?: RequestInit): Promise<SearchResults> => {
+
+  return customFetch<SearchResults>(getSearchUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchQueryKey = (params?: SearchParams,) => {
+    return [
+    `/api/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchQueryOptions = <TData = Awaited<ReturnType<typeof search>>, TError = ErrorType<unknown>>(params?: SearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof search>>> = ({ signal }) => search(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchQueryResult = NonNullable<Awaited<ReturnType<typeof search>>>
+export type SearchQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Unified search across findings — combines a natural-language query with explicit, editable filters
+ */
+
+export function useSearch<TData = Awaited<ReturnType<typeof search>>, TError = ErrorType<unknown>>(
+ params?: SearchParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof search>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListSearchHistoryUrl = (params?: ListSearchHistoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/search/history?${stringifiedParams}` : `/api/search/history`
+}
+
+/**
+ * @summary Recent search history, most recent first
+ */
+export const listSearchHistory = async (params?: ListSearchHistoryParams, options?: RequestInit): Promise<ListSearchHistory200> => {
+
+  return customFetch<ListSearchHistory200>(getListSearchHistoryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSearchHistoryQueryKey = (params?: ListSearchHistoryParams,) => {
+    return [
+    `/api/search/history`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSearchHistoryQueryOptions = <TData = Awaited<ReturnType<typeof listSearchHistory>>, TError = ErrorType<unknown>>(params?: ListSearchHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSearchHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSearchHistoryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSearchHistory>>> = ({ signal }) => listSearchHistory(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSearchHistory>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSearchHistoryQueryResult = NonNullable<Awaited<ReturnType<typeof listSearchHistory>>>
+export type ListSearchHistoryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Recent search history, most recent first
+ */
+
+export function useListSearchHistory<TData = Awaited<ReturnType<typeof listSearchHistory>>, TError = ErrorType<unknown>>(
+ params?: ListSearchHistoryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSearchHistory>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSearchHistoryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getClearSearchHistoryUrl = () => {
+
+
+
+
+  return `/api/search/history`
+}
+
+/**
+ * @summary Clear all search history
+ */
+export const clearSearchHistory = async ( options?: RequestInit): Promise<ClearSearchHistory200> => {
+
+  return customFetch<ClearSearchHistory200>(getClearSearchHistoryUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getClearSearchHistoryMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearSearchHistory>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearSearchHistory>>, TError,void, TContext> => {
+
+const mutationKey = ['clearSearchHistory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearSearchHistory>>, void> = () => {
+
+
+          return  clearSearchHistory(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearSearchHistoryMutationResult = NonNullable<Awaited<ReturnType<typeof clearSearchHistory>>>
+
+    export type ClearSearchHistoryMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clear all search history
+ */
+export const useClearSearchHistory = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearSearchHistory>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearSearchHistory>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClearSearchHistoryMutationOptions(options));
+    }
+
+export const getListSavedSearchesUrl = () => {
+
+
+
+
+  return `/api/search/saved`
+}
+
+/**
+ * @summary List saved searches
+ */
+export const listSavedSearches = async ( options?: RequestInit): Promise<ListSavedSearches200> => {
+
+  return customFetch<ListSavedSearches200>(getListSavedSearchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSavedSearchesQueryKey = () => {
+    return [
+    `/api/search/saved`
+    ] as const;
+    }
+
+
+export const getListSavedSearchesQueryOptions = <TData = Awaited<ReturnType<typeof listSavedSearches>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSavedSearches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSavedSearchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSavedSearches>>> = ({ signal }) => listSavedSearches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSavedSearches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSavedSearchesQueryResult = NonNullable<Awaited<ReturnType<typeof listSavedSearches>>>
+export type ListSavedSearchesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List saved searches
+ */
+
+export function useListSavedSearches<TData = Awaited<ReturnType<typeof listSavedSearches>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSavedSearches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSavedSearchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateSavedSearchUrl = () => {
+
+
+
+
+  return `/api/search/saved`
+}
+
+/**
+ * @summary Save the current query + filters under a name
+ */
+export const createSavedSearch = async (saveSearchInput?: SaveSearchInput, options?: RequestInit): Promise<SavedSearch> => {
+
+  return customFetch<SavedSearch>(getCreateSavedSearchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(saveSearchInput)
+  }
+);}
+
+
+
+
+export const getCreateSavedSearchMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSavedSearch>>, TError,{data?: BodyType<SaveSearchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSavedSearch>>, TError,{data?: BodyType<SaveSearchInput>}, TContext> => {
+
+const mutationKey = ['createSavedSearch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSavedSearch>>, {data?: BodyType<SaveSearchInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSavedSearch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSavedSearchMutationResult = NonNullable<Awaited<ReturnType<typeof createSavedSearch>>>
+    export type CreateSavedSearchMutationBody = BodyType<SaveSearchInput> | undefined
+    export type CreateSavedSearchMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save the current query + filters under a name
+ */
+export const useCreateSavedSearch = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSavedSearch>>, TError,{data?: BodyType<SaveSearchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSavedSearch>>,
+        TError,
+        {data?: BodyType<SaveSearchInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSavedSearchMutationOptions(options));
+    }
+
+export const getUpdateSavedSearchUrl = (id: number,) => {
+
+
+
+
+  return `/api/search/saved/${id}`
+}
+
+/**
+ * @summary Rename or update the filters of a saved search
+ */
+export const updateSavedSearch = async (id: number,
+    saveSearchInput?: SaveSearchInput, options?: RequestInit): Promise<SavedSearch> => {
+
+  return customFetch<SavedSearch>(getUpdateSavedSearchUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(saveSearchInput)
+  }
+);}
+
+
+
+
+export const getUpdateSavedSearchMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSavedSearch>>, TError,{id: number;data?: BodyType<SaveSearchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSavedSearch>>, TError,{id: number;data?: BodyType<SaveSearchInput>}, TContext> => {
+
+const mutationKey = ['updateSavedSearch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSavedSearch>>, {id: number;data?: BodyType<SaveSearchInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSavedSearch(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSavedSearchMutationResult = NonNullable<Awaited<ReturnType<typeof updateSavedSearch>>>
+    export type UpdateSavedSearchMutationBody = BodyType<SaveSearchInput> | undefined
+    export type UpdateSavedSearchMutationError = ErrorType<void>
+
+    /**
+ * @summary Rename or update the filters of a saved search
+ */
+export const useUpdateSavedSearch = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSavedSearch>>, TError,{id: number;data?: BodyType<SaveSearchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSavedSearch>>,
+        TError,
+        {id: number;data?: BodyType<SaveSearchInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateSavedSearchMutationOptions(options));
+    }
+
+export const getDeleteSavedSearchUrl = (id: number,) => {
+
+
+
+
+  return `/api/search/saved/${id}`
+}
+
+/**
+ * @summary Delete a saved search
+ */
+export const deleteSavedSearch = async (id: number, options?: RequestInit): Promise<DeleteSavedSearch200> => {
+
+  return customFetch<DeleteSavedSearch200>(getDeleteSavedSearchUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSavedSearchMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSavedSearch>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSavedSearch>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSavedSearch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSavedSearch>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSavedSearch(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSavedSearchMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSavedSearch>>>
+
+    export type DeleteSavedSearchMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a saved search
+ */
+export const useDeleteSavedSearch = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSavedSearch>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSavedSearch>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSavedSearchMutationOptions(options));
+    }
+
+export const getReviewFindingUrl = (id: number,) => {
+
+
+
+
+  return `/api/findings/${id}/review`
+}
+
+/**
+ * @summary Apply a review decision to a single finding (never modifies the underlying file)
+ */
+export const reviewFinding = async (id: number,
+    reviewFindingInput?: ReviewFindingInput, options?: RequestInit): Promise<Finding> => {
+
+  return customFetch<Finding>(getReviewFindingUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(reviewFindingInput)
+  }
+);}
+
+
+
+
+export const getReviewFindingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewFinding>>, TError,{id: number;data?: BodyType<ReviewFindingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reviewFinding>>, TError,{id: number;data?: BodyType<ReviewFindingInput>}, TContext> => {
+
+const mutationKey = ['reviewFinding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reviewFinding>>, {id: number;data?: BodyType<ReviewFindingInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  reviewFinding(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReviewFindingMutationResult = NonNullable<Awaited<ReturnType<typeof reviewFinding>>>
+    export type ReviewFindingMutationBody = BodyType<ReviewFindingInput> | undefined
+    export type ReviewFindingMutationError = ErrorType<void>
+
+    /**
+ * @summary Apply a review decision to a single finding (never modifies the underlying file)
+ */
+export const useReviewFinding = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reviewFinding>>, TError,{id: number;data?: BodyType<ReviewFindingInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reviewFinding>>,
+        TError,
+        {id: number;data?: BodyType<ReviewFindingInput>},
+        TContext
+      > => {
+      return useMutation(getReviewFindingMutationOptions(options));
+    }
+
+export const getBulkReviewFindingsUrl = () => {
+
+
+
+
+  return `/api/findings/bulk-review`
+}
+
+/**
+ * @summary Apply a review decision to multiple findings at once (never modifies underlying files)
+ */
+export const bulkReviewFindings = async (bulkReviewFindingsInput?: BulkReviewFindingsInput, options?: RequestInit): Promise<BulkReviewFindings200> => {
+
+  return customFetch<BulkReviewFindings200>(getBulkReviewFindingsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(bulkReviewFindingsInput)
+  }
+);}
+
+
+
+
+export const getBulkReviewFindingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkReviewFindings>>, TError,{data?: BodyType<BulkReviewFindingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof bulkReviewFindings>>, TError,{data?: BodyType<BulkReviewFindingsInput>}, TContext> => {
+
+const mutationKey = ['bulkReviewFindings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bulkReviewFindings>>, {data?: BodyType<BulkReviewFindingsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  bulkReviewFindings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BulkReviewFindingsMutationResult = NonNullable<Awaited<ReturnType<typeof bulkReviewFindings>>>
+    export type BulkReviewFindingsMutationBody = BodyType<BulkReviewFindingsInput> | undefined
+    export type BulkReviewFindingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Apply a review decision to multiple findings at once (never modifies underlying files)
+ */
+export const useBulkReviewFindings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bulkReviewFindings>>, TError,{data?: BodyType<BulkReviewFindingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof bulkReviewFindings>>,
+        TError,
+        {data?: BodyType<BulkReviewFindingsInput>},
+        TContext
+      > => {
+      return useMutation(getBulkReviewFindingsMutationOptions(options));
+    }
+
+export const getGetFindingAuditUrl = (id: number,) => {
+
+
+
+
+  return `/api/findings/${id}/audit`
+}
+
+/**
+ * @summary Full audit trail of review decisions for one finding
+ */
+export const getFindingAudit = async (id: number, options?: RequestInit): Promise<GetFindingAudit200> => {
+
+  return customFetch<GetFindingAudit200>(getGetFindingAuditUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFindingAuditQueryKey = (id: number,) => {
+    return [
+    `/api/findings/${id}/audit`
+    ] as const;
+    }
+
+
+export const getGetFindingAuditQueryOptions = <TData = Awaited<ReturnType<typeof getFindingAudit>>, TError = ErrorType<unknown>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFindingAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFindingAuditQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFindingAudit>>> = ({ signal }) => getFindingAudit(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFindingAudit>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFindingAuditQueryResult = NonNullable<Awaited<ReturnType<typeof getFindingAudit>>>
+export type GetFindingAuditQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Full audit trail of review decisions for one finding
+ */
+
+export function useGetFindingAudit<TData = Awaited<ReturnType<typeof getFindingAudit>>, TError = ErrorType<unknown>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFindingAudit>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFindingAuditQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListActionQueueUrl = (params?: ListActionQueueParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/action-queue?${stringifiedParams}` : `/api/action-queue`
+}
+
+/**
+ * @summary List proposed (never-executed) file operations awaiting a future explicit trigger
+ */
+export const listActionQueue = async (params?: ListActionQueueParams, options?: RequestInit): Promise<ListActionQueue200> => {
+
+  return customFetch<ListActionQueue200>(getListActionQueueUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListActionQueueQueryKey = (params?: ListActionQueueParams,) => {
+    return [
+    `/api/action-queue`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListActionQueueQueryOptions = <TData = Awaited<ReturnType<typeof listActionQueue>>, TError = ErrorType<unknown>>(params?: ListActionQueueParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listActionQueue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListActionQueueQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listActionQueue>>> = ({ signal }) => listActionQueue(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listActionQueue>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListActionQueueQueryResult = NonNullable<Awaited<ReturnType<typeof listActionQueue>>>
+export type ListActionQueueQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List proposed (never-executed) file operations awaiting a future explicit trigger
+ */
+
+export function useListActionQueue<TData = Awaited<ReturnType<typeof listActionQueue>>, TError = ErrorType<unknown>>(
+ params?: ListActionQueueParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listActionQueue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListActionQueueQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDismissActionQueueItemUrl = (id: number,) => {
+
+
+
+
+  return `/api/action-queue/${id}/dismiss`
+}
+
+/**
+ * @summary Dismiss a queued action without ever performing it
+ */
+export const dismissActionQueueItem = async (id: number, options?: RequestInit): Promise<ActionQueueEntry> => {
+
+  return customFetch<ActionQueueEntry>(getDismissActionQueueItemUrl(id),
+  {
+    ...options,
+    method: 'PATCH'
+
+
+  }
+);}
+
+
+
+
+export const getDismissActionQueueItemMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissActionQueueItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof dismissActionQueueItem>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['dismissActionQueueItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof dismissActionQueueItem>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  dismissActionQueueItem(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DismissActionQueueItemMutationResult = NonNullable<Awaited<ReturnType<typeof dismissActionQueueItem>>>
+
+    export type DismissActionQueueItemMutationError = ErrorType<void>
+
+    /**
+ * @summary Dismiss a queued action without ever performing it
+ */
+export const useDismissActionQueueItem = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof dismissActionQueueItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof dismissActionQueueItem>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDismissActionQueueItemMutationOptions(options));
+    }
+
+export const getGetSettingsUrl = () => {
+
+
+
+
+  return `/api/settings`
+}
+
+/**
+ * @summary Current privacy / extraction / OCR settings
+ */
+export const getSettings = async ( options?: RequestInit): Promise<UserSettingsResponse> => {
+
+  return customFetch<UserSettingsResponse>(getGetSettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSettingsQueryKey = () => {
+    return [
+    `/api/settings`
+    ] as const;
+    }
+
+
+export const getGetSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSettings>>> = ({ signal }) => getSettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getSettings>>>
+export type GetSettingsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Current privacy / extraction / OCR settings
+ */
+
+export function useGetSettings<TData = Awaited<ReturnType<typeof getSettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateSettingsUrl = () => {
+
+
+
+
+  return `/api/settings`
+}
+
+/**
+ * @summary Update privacy / extraction / OCR settings
+ */
+export const updateSettings = async (updateSettingsInput?: UpdateSettingsInput, options?: RequestInit): Promise<UserSettingsResponse> => {
+
+  return customFetch<UserSettingsResponse>(getUpdateSettingsUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateSettingsInput)
+  }
+);}
+
+
+
+
+export const getUpdateSettingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSettings>>, TError,{data?: BodyType<UpdateSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSettings>>, TError,{data?: BodyType<UpdateSettingsInput>}, TContext> => {
+
+const mutationKey = ['updateSettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSettings>>, {data?: BodyType<UpdateSettingsInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateSettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateSettings>>>
+    export type UpdateSettingsMutationBody = BodyType<UpdateSettingsInput> | undefined
+    export type UpdateSettingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update privacy / extraction / OCR settings
+ */
+export const useUpdateSettings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSettings>>, TError,{data?: BodyType<UpdateSettingsInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSettings>>,
+        TError,
+        {data?: BodyType<UpdateSettingsInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateSettingsMutationOptions(options));
+    }
+
+export const getExtractFindingTextUrl = (id: number,) => {
+
+
+
+
+  return `/api/findings/${id}/extract`
+}
+
+/**
+ * Extraction is always per-file and on demand — there is no bulk/automatic mode. Fails with 409 if extraction is disabled in Settings for the required mode (OCR / cloud consent).
+ * @summary Run text extraction (and OCR if applicable/enabled) for one finding, on demand
+ */
+export const extractFindingText = async (id: number, options?: RequestInit): Promise<ExtractedTextEntry> => {
+
+  return customFetch<ExtractedTextEntry>(getExtractFindingTextUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getExtractFindingTextMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractFindingText>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof extractFindingText>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['extractFindingText'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof extractFindingText>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  extractFindingText(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExtractFindingTextMutationResult = NonNullable<Awaited<ReturnType<typeof extractFindingText>>>
+
+    export type ExtractFindingTextMutationError = ErrorType<void>
+
+    /**
+ * @summary Run text extraction (and OCR if applicable/enabled) for one finding, on demand
+ */
+export const useExtractFindingText = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof extractFindingText>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof extractFindingText>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getExtractFindingTextMutationOptions(options));
+    }
+
+export const getGetFindingExtractionUrl = (id: number,) => {
+
+
+
+
+  return `/api/findings/${id}/extraction`
+}
+
+/**
+ * @summary Latest extracted text + detected entities + sensitive-content flags for a finding
+ */
+export const getFindingExtraction = async (id: number, options?: RequestInit): Promise<ExtractionDetailResponse> => {
+
+  return customFetch<ExtractionDetailResponse>(getGetFindingExtractionUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetFindingExtractionQueryKey = (id: number,) => {
+    return [
+    `/api/findings/${id}/extraction`
+    ] as const;
+    }
+
+
+export const getGetFindingExtractionQueryOptions = <TData = Awaited<ReturnType<typeof getFindingExtraction>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFindingExtraction>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetFindingExtractionQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getFindingExtraction>>> = ({ signal }) => getFindingExtraction(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getFindingExtraction>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetFindingExtractionQueryResult = NonNullable<Awaited<ReturnType<typeof getFindingExtraction>>>
+export type GetFindingExtractionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Latest extracted text + detected entities + sensitive-content flags for a finding
+ */
+
+export function useGetFindingExtraction<TData = Awaited<ReturnType<typeof getFindingExtraction>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getFindingExtraction>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetFindingExtractionQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSummarizeFindingUrl = (id: number,) => {
+
+
+
+
+  return `/api/findings/${id}/summarize`
+}
+
+/**
+ * @summary Generate an AI summary for one explicitly selected document (requires cloud consent if a cloud provider is used)
+ */
+export const summarizeFinding = async (id: number, options?: RequestInit): Promise<SummaryResponse> => {
+
+  return customFetch<SummaryResponse>(getSummarizeFindingUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getSummarizeFindingMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof summarizeFinding>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof summarizeFinding>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['summarizeFinding'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof summarizeFinding>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  summarizeFinding(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SummarizeFindingMutationResult = NonNullable<Awaited<ReturnType<typeof summarizeFinding>>>
+
+    export type SummarizeFindingMutationError = ErrorType<void>
+
+    /**
+ * @summary Generate an AI summary for one explicitly selected document (requires cloud consent if a cloud provider is used)
+ */
+export const useSummarizeFinding = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof summarizeFinding>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof summarizeFinding>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getSummarizeFindingMutationOptions(options));
     }
 

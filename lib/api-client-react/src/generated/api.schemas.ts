@@ -405,6 +405,21 @@ export const FindingRiskLevel = {
   critical: 'critical',
 } as const;
 
+/**
+ * Findings review workflow state — independent of findingStatus
+ */
+export type FindingReviewStatus = typeof FindingReviewStatus[keyof typeof FindingReviewStatus];
+
+
+export const FindingReviewStatus = {
+  new: 'new',
+  reviewed: 'reviewed',
+  accepted: 'accepted',
+  rejected: 'rejected',
+  ignored: 'ignored',
+  quarantined: 'quarantined',
+} as const;
+
 export interface Finding {
   id: number;
   scanId: number;
@@ -420,6 +435,10 @@ export interface Finding {
   findingStatus: FindingFindingStatus;
   /** Heuristic risk level, display-only — never drives automatic action */
   riskLevel: FindingRiskLevel;
+  /** Findings review workflow state — independent of findingStatus */
+  reviewStatus: FindingReviewStatus;
+  /** @nullable */
+  reviewedAt?: string | null;
   reason: string;
   /**
      * Filesystem creation timestamp captured at scan time
@@ -489,6 +508,237 @@ export interface FindingsSummary {
   review: number;
   duplicate: number;
   byType: FindingsSummaryByType;
+}
+
+/**
+ * @nullable
+ */
+export type SearchFiltersRiskLevel = typeof SearchFiltersRiskLevel[keyof typeof SearchFiltersRiskLevel] | null;
+
+
+export const SearchFiltersRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export interface SearchFilters {
+  /** @nullable */
+  path?: string | null;
+  /** @nullable */
+  extension?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  aiCategory?: string | null;
+  tags?: string[];
+  /** @nullable */
+  riskLevel?: SearchFiltersRiskLevel;
+  /** @nullable */
+  minSizeBytes?: number | null;
+  /** @nullable */
+  maxSizeBytes?: number | null;
+  /** @nullable */
+  dateFrom?: string | null;
+  /** @nullable */
+  dateTo?: string | null;
+  /** @nullable */
+  scanId?: number | null;
+  duplicatesOnly?: boolean;
+}
+
+export interface SearchResults {
+  query: string;
+  filters: SearchFilters;
+  /** Human-readable description of how the query was interpreted. */
+  explanation: string;
+  findings: Finding[];
+  total: number;
+}
+
+export interface SearchHistoryEntry {
+  id: number;
+  query: string;
+  filters: SearchFilters;
+  resultCount: number;
+  createdAt: string;
+}
+
+export interface SavedSearch {
+  id: number;
+  name: string;
+  query: string;
+  filters: SearchFilters;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveSearchInput {
+  name: string;
+  query?: string;
+  filters: SearchFilters;
+}
+
+export type ReviewFindingInputAction = typeof ReviewFindingInputAction[keyof typeof ReviewFindingInputAction];
+
+
+export const ReviewFindingInputAction = {
+  mark_reviewed: 'mark_reviewed',
+  accept_recommendation: 'accept_recommendation',
+  reject_recommendation: 'reject_recommendation',
+  ignore_once: 'ignore_once',
+  ignore_permanently: 'ignore_permanently',
+  create_rule: 'create_rule',
+} as const;
+
+export interface ReviewFindingInput {
+  action: ReviewFindingInputAction;
+  note?: string;
+}
+
+export type BulkReviewFindingsInputAction = typeof BulkReviewFindingsInputAction[keyof typeof BulkReviewFindingsInputAction];
+
+
+export const BulkReviewFindingsInputAction = {
+  mark_reviewed: 'mark_reviewed',
+  accept_recommendation: 'accept_recommendation',
+  reject_recommendation: 'reject_recommendation',
+  ignore_once: 'ignore_once',
+  ignore_permanently: 'ignore_permanently',
+  create_rule: 'create_rule',
+} as const;
+
+export interface BulkReviewFindingsInput {
+  ids: number[];
+  action: BulkReviewFindingsInputAction;
+  note?: string;
+}
+
+export interface FindingAuditEntry {
+  id: number;
+  findingId: number;
+  action: string;
+  /** @nullable */
+  previousReviewStatus?: string | null;
+  newReviewStatus: string;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+}
+
+export type ActionQueueEntryActionType = typeof ActionQueueEntryActionType[keyof typeof ActionQueueEntryActionType];
+
+
+export const ActionQueueEntryActionType = {
+  move: 'move',
+  delete: 'delete',
+  archive: 'archive',
+  rename: 'rename',
+} as const;
+
+export type ActionQueueEntryStatus = typeof ActionQueueEntryStatus[keyof typeof ActionQueueEntryStatus];
+
+
+export const ActionQueueEntryStatus = {
+  pending: 'pending',
+  dismissed: 'dismissed',
+} as const;
+
+export interface ActionQueueEntry {
+  id: number;
+  findingId: number;
+  actionType: ActionQueueEntryActionType;
+  /** @nullable */
+  proposedDestination?: string | null;
+  description: string;
+  status: ActionQueueEntryStatus;
+  createdAt: string;
+}
+
+export interface UserSettingsResponse {
+  textExtractionEnabled: boolean;
+  ocrEnabled: boolean;
+  localOnlyProcessing: boolean;
+  cloudConsent: boolean;
+  updatedAt: string;
+}
+
+export interface UpdateSettingsInput {
+  textExtractionEnabled?: boolean;
+  ocrEnabled?: boolean;
+  localOnlyProcessing?: boolean;
+  cloudConsent?: boolean;
+}
+
+export type ExtractedTextEntryExtractor = typeof ExtractedTextEntryExtractor[keyof typeof ExtractedTextEntryExtractor];
+
+
+export const ExtractedTextEntryExtractor = {
+  pdf: 'pdf',
+  txt: 'txt',
+  csv: 'csv',
+  json: 'json',
+  markdown: 'markdown',
+  source_code: 'source_code',
+  ocr: 'ocr',
+} as const;
+
+export type ExtractedTextEntrySensitiveCategoriesItem = typeof ExtractedTextEntrySensitiveCategoriesItem[keyof typeof ExtractedTextEntrySensitiveCategoriesItem];
+
+
+export const ExtractedTextEntrySensitiveCategoriesItem = {
+  legal: 'legal',
+  banking: 'banking',
+  medical: 'medical',
+  identity: 'identity',
+  api_key: 'api_key',
+  password: 'password',
+  private_key: 'private_key',
+} as const;
+
+export interface ExtractedTextEntry {
+  id: number;
+  findingId: number;
+  extractor: ExtractedTextEntryExtractor;
+  text: string;
+  truncated: boolean;
+  sensitiveCategories: ExtractedTextEntrySensitiveCategoriesItem[];
+  /** @nullable */
+  ocrProvider?: string | null;
+  createdAt: string;
+}
+
+export type EntityEntryType = typeof EntityEntryType[keyof typeof EntityEntryType];
+
+
+export const EntityEntryType = {
+  person: 'person',
+  organization: 'organization',
+  date: 'date',
+  invoice_number: 'invoice_number',
+  case_reference: 'case_reference',
+  amount: 'amount',
+} as const;
+
+export interface EntityEntry {
+  id: number;
+  findingId: number;
+  type: EntityEntryType;
+  value: string;
+  createdAt: string;
+}
+
+export interface ExtractionDetailResponse {
+  extraction: ExtractedTextEntry;
+  entities: EntityEntry[];
+}
+
+export interface SummaryResponse {
+  findingId: number;
+  summary: string;
+  provider: string;
+  requiresCloudConsent: boolean;
 }
 
 export type GetDashboardRecentActivityParams = {
@@ -603,5 +853,78 @@ scanId?: number;
 
 export type ClearFindings200 = {
   cleared: number;
+};
+
+export type SearchParams = {
+q?: string;
+path?: string;
+extension?: string;
+category?: string;
+aiCategory?: string;
+tag?: string;
+riskLevel?: SearchRiskLevel;
+minSizeBytes?: number;
+maxSizeBytes?: number;
+dateFrom?: string;
+dateTo?: string;
+scanId?: number;
+duplicatesOnly?: boolean;
+limit?: number;
+offset?: number;
+recordHistory?: boolean;
+};
+
+export type SearchRiskLevel = typeof SearchRiskLevel[keyof typeof SearchRiskLevel];
+
+
+export const SearchRiskLevel = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  critical: 'critical',
+} as const;
+
+export type ListSearchHistoryParams = {
+limit?: number;
+};
+
+export type ListSearchHistory200 = {
+  history: SearchHistoryEntry[];
+};
+
+export type ClearSearchHistory200 = {
+  cleared: number;
+};
+
+export type ListSavedSearches200 = {
+  savedSearches: SavedSearch[];
+};
+
+export type DeleteSavedSearch200 = {
+  deleted: boolean;
+};
+
+export type BulkReviewFindings200 = {
+  updated: number;
+};
+
+export type GetFindingAudit200 = {
+  entries: FindingAuditEntry[];
+};
+
+export type ListActionQueueParams = {
+status?: ListActionQueueStatus;
+};
+
+export type ListActionQueueStatus = typeof ListActionQueueStatus[keyof typeof ListActionQueueStatus];
+
+
+export const ListActionQueueStatus = {
+  pending: 'pending',
+  dismissed: 'dismissed',
+} as const;
+
+export type ListActionQueue200 = {
+  items: ActionQueueEntry[];
 };
 

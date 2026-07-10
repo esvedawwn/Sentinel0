@@ -50,6 +50,36 @@ If a configured cloud provider errors, times out, or returns malformed data,
 is never left unclassified, and no partial/cloud data is retried silently in
 the background.
 
+## Document extraction & OCR
+
+Text extraction (and OCR) is a separate subsystem from AI classification, with its own
+consent boundary:
+
+- Extraction runs **only per-file, on-demand** — there is no bulk, background, or
+  full-tree extraction/OCR path anywhere in the codebase
+- The OCR provider defaults to a local/offline implementation; the cloud OCR path is
+  wired but stays inert unless `userSettings.cloudConsent` is explicitly set to `true`
+- Extracted text and derived entities are stored in dedicated `extractedText` /
+  `entities` tables, separate from `findings` — they are never merged into a finding's
+  own row
+- Sensitive-content detection (legal/banking/medical/identity/API keys/passwords/private
+  keys) and entity extraction (people/orgs/dates/invoice#/case ref/amounts) are both
+  local heuristic/regex passes — no data leaves the machine to compute them
+- AI summarization over extracted text is opt-in per document ID and requires cloud
+  consent, following the same posture as classification above
+- Disabling `localOnlyProcessing` in settings requires `cloudConsent: true` first (the
+  API returns 409 otherwise) — a user cannot accidentally enable cloud processing
+
+## Findings review & search stay local too
+
+- The findings review workflow (state transitions, bulk actions, audit log, action
+  queue) is pure local DB read/write — no network calls, no AI, no filesystem writes
+- Accepting a finding only ever creates a proposed `actionQueue` row describing an
+  intended move/archive/delete/keep; nothing is executed automatically, and dismissing a
+  queued action only deletes the queue row, never touches a file
+- Unified search (NL interpretation + saved searches + history) reuses the same local
+  keyword interpreter as AI search — no query text is ever sent to a cloud provider
+
 ## Summary
 
 | Question | Answer |
@@ -59,3 +89,5 @@ the background.
 | Is file content ever sent anywhere? | No — metadata only, and only if cloud enabled |
 | Can AI delete or move files? | No — recommendation-only, confirmation required |
 | Does search use the cloud? | No — always local keyword rules |
+| Is extraction/OCR ever run in bulk or automatically? | No — strictly per-file, on-demand |
+| Can accepting a finding delete or move a file? | No — it only queues a proposal; nothing executes automatically |
