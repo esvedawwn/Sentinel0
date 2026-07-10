@@ -108,6 +108,11 @@ export function classifyEmptyFolder(dirPath: string): ScanFinding {
   };
 }
 
+/**
+ * Build a duplicate finding for a single file that is a member of a
+ * confirmed (SHA-256 verified) duplicate group. See `duplicateDetector.ts`
+ * for the staged detection pipeline that produces these groups.
+ */
 export function classifyDuplicate(
   filePath: string,
   name: string,
@@ -124,23 +129,6 @@ export function classifyDuplicate(
     hash,
     duplicateGroupHash: hash,
     findingStatus: "duplicate",
-    reason: `Duplicate file — identical content hash (${hash.slice(0, 8)}…)`,
+    reason: `Duplicate file — identical SHA-256 content hash (${hash.slice(0, 8)}…)`,
   };
-}
-
-/**
- * Given a map of hash → file entries, produce duplicate findings.
- * Only hashes that appear more than once are duplicates.
- */
-export function detectDuplicates(
-  hashMap: Map<string, Array<{ path: string; name: string; extension: string; sizeBytes: number }>>
-): ScanFinding[] {
-  const findings: ScanFinding[] = [];
-  for (const [hash, entries] of hashMap) {
-    if (entries.length < 2) continue;
-    for (const e of entries) {
-      findings.push(classifyDuplicate(e.path, e.name, e.extension, e.sizeBytes, hash));
-    }
-  }
-  return findings;
 }

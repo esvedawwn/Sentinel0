@@ -13,4 +13,5 @@ export const ListDuplicatesStatus = {
   pending: 'pending',
   resolved: 'resolved',
   ignored: 'ignored',
+  false_positive: 'false_positive',
 } as const;

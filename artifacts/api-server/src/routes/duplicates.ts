@@ -1,57 +1,68 @@
 import { Router, type IRouter } from "express";
-import { db, duplicateGroupsTable, duplicateGroupFilesTable, filesTable, activityTable } from "@workspace/db";
-import { eq, desc, count, sql, inArray } from "drizzle-orm";
+import { db, duplicateGroupsTable, findingsTable, activityTable } from "@workspace/db";
+import { eq, desc, asc, count, sql } from "drizzle-orm";
 import { ResolveDuplicateParams, ResolveDuplicateBody, ListDuplicatesQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
 
 async function buildGroupResponse(group: typeof duplicateGroupsTable.$inferSelect) {
-  const groupFileLinks = await db
+  const members = await db
     .select()
-    .from(duplicateGroupFilesTable)
-    .where(eq(duplicateGroupFilesTable.groupId, group.id));
+    .from(findingsTable)
+    .where(eq(findingsTable.duplicateGroupId, group.id));
 
-  const fileIds = groupFileLinks.map((gf) => gf.fileId);
-  const files = fileIds.length > 0
-    ? await db.select().from(filesTable).where(inArray(filesTable.id, fileIds))
-    : [];
+  const oneCopySize = members.length > 0
+    ? Math.min(...members.map((m) => m.sizeBytes ?? 0))
+    : 0;
+  const wastedBytes = Math.max(group.totalSizeBytes - oneCopySize, 0);
 
   return {
     id: group.id,
+    hash: group.hash ?? null,
     status: group.status,
     totalSizeBytes: group.totalSizeBytes,
+    wastedBytes,
     savedBytes: group.savedBytes,
+    confidence: group.confidence,
+    explanation: group.explanation,
+    canonicalFindingId: group.canonicalFindingId ?? null,
     createdAt: group.createdAt.toISOString(),
     resolvedAt: group.resolvedAt?.toISOString() ?? null,
-    files: files.map((f) => ({
-      id: f.id,
-      name: f.name,
-      path: f.path,
-      extension: f.extension,
-      sizeBytes: f.sizeBytes,
-      category: f.category,
-      subcategory: f.subcategory ?? null,
-      status: f.status,
-      tags: f.tags,
-      renamedName: f.renamedName ?? null,
-      createdAt: f.createdAt.toISOString(),
-      indexedAt: f.indexedAt.toISOString(),
+    members: members.map((m) => ({
+      findingId: m.id,
+      path: m.path,
+      name: m.name,
+      extension: m.extension ?? "",
+      sizeBytes: m.sizeBytes ?? 0,
+      modifiedAt: m.fileModifiedAt?.toISOString() ?? null,
+      isCanonical: m.id === group.canonicalFindingId,
     })),
   };
 }
 
 router.get("/duplicates", async (req, res): Promise<void> => {
   const params = ListDuplicatesQueryParams.safeParse(req.query);
-  const limit = params.success ? (params.data.limit ?? 20) : 20;
-  const offset = params.success ? (params.data.offset ?? 0) : 0;
-
+  const limit = params.success ? params.data.limit : 20;
+  const offset = params.success ? params.data.offset : 0;
   const statusFilter = params.success ? params.data.status : undefined;
+  const sort = params.success ? params.data.sort : "wastedBytes";
 
-  const query = db.select().from(duplicateGroupsTable).orderBy(desc(duplicateGroupsTable.createdAt));
+  const query = db.select().from(duplicateGroupsTable);
+  const filtered = statusFilter
+    ? query.where(eq(duplicateGroupsTable.status, statusFilter))
+    : query;
 
-  const groups = statusFilter
-    ? await query.where(eq(duplicateGroupsTable.status, statusFilter as "pending" | "resolved" | "ignored")).limit(limit).offset(offset)
-    : await query.limit(limit).offset(offset);
+  // Wasted-bytes sort requires per-group member sizes, which aren't a plain
+  // column — fetch candidates then sort/paginate in memory. Group counts are
+  // small enough (bounded by scan size) for this to be cheap.
+  const allGroups = await filtered.orderBy(desc(duplicateGroupsTable.createdAt));
+  const responses = await Promise.all(allGroups.map(buildGroupResponse));
+
+  const sorted = sort === "wastedBytes"
+    ? responses.sort((a, b) => b.wastedBytes - a.wastedBytes)
+    : responses.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  const page = sorted.slice(offset, offset + limit);
 
   const [totalRow] = await db.select({ total: count() }).from(duplicateGroupsTable);
   const [saveable] = await db
@@ -59,10 +70,8 @@ router.get("/duplicates", async (req, res): Promise<void> => {
     .from(duplicateGroupsTable)
     .where(eq(duplicateGroupsTable.status, "pending"));
 
-  const groupResponses = await Promise.all(groups.map(buildGroupResponse));
-
   res.json({
-    groups: groupResponses,
+    groups: page,
     total: Number(totalRow?.total ?? 0),
     totalSaveable: Number(saveable?.total ?? 0),
   });
@@ -92,26 +101,57 @@ router.post("/duplicates/:id/resolve", async (req, res): Promise<void> => {
     return;
   }
 
-  const savedBytes = body.data.action === "keep_one"
-    ? Math.floor(group.totalSizeBytes * 0.5)
-    : 0;
+  if (body.data.action === "keep_one" && body.data.keepFindingId != null) {
+    const [keptFinding] = await db
+      .select()
+      .from(findingsTable)
+      .where(eq(findingsTable.id, body.data.keepFindingId));
+    if (!keptFinding || keptFinding.duplicateGroupId !== group.id) {
+      res.status(400).json({ error: "keepFindingId must belong to this duplicate group" });
+      return;
+    }
+  }
+
+  const members = await db
+    .select()
+    .from(findingsTable)
+    .where(eq(findingsTable.duplicateGroupId, group.id));
+  const oneCopySize = members.length > 0 ? Math.min(...members.map((m) => m.sizeBytes ?? 0)) : 0;
+  const wastedBytes = Math.max(group.totalSizeBytes - oneCopySize, 0);
+
+  // Marking "keep_one" only records intent (which copy to keep) — it never
+  // deletes files. Any actual file removal is a separate, future, explicitly
+  // confirmed cleanup action.
+  const savedBytes = body.data.action === "keep_one" ? wastedBytes : 0;
+  const status = body.data.action === "ignore"
+    ? "ignored"
+    : body.data.action === "false_positive"
+      ? "false_positive"
+      : "resolved";
 
   const [updated] = await db
     .update(duplicateGroupsTable)
     .set({
-      status: body.data.action === "ignore" ? "ignored" : "resolved",
+      status,
       resolvedAt: new Date(),
       savedBytes,
+      canonicalFindingId: body.data.action === "keep_one" && body.data.keepFindingId != null
+        ? body.data.keepFindingId
+        : group.canonicalFindingId,
     })
     .where(eq(duplicateGroupsTable.id, params.data.id))
     .returning();
 
+  const activityMessage = body.data.action === "ignore"
+    ? "Duplicate group ignored"
+    : body.data.action === "false_positive"
+      ? "Duplicate group marked as false positive"
+      : `Duplicate resolved — ${(savedBytes / 1_000_000).toFixed(1)} MB reclaimable`;
+
   await db.insert(activityTable).values({
     type: "scan_complete",
-    message: body.data.action === "ignore"
-      ? `Duplicate group ignored`
-      : `Duplicate resolved — ${(savedBytes / 1_000_000).toFixed(1)} MB saved`,
-    status: body.data.action === "ignore" ? "info" : "success",
+    message: activityMessage,
+    status: body.data.action === "keep_one" ? "success" : "info",
   });
 
   res.json(await buildGroupResponse(updated));

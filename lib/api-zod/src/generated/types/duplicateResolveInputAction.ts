@@ -12,4 +12,5 @@ export type DuplicateResolveInputAction = typeof DuplicateResolveInputAction[key
 export const DuplicateResolveInputAction = {
   keep_one: 'keep_one',
   ignore: 'ignore',
+  false_positive: 'false_positive',
 } as const;

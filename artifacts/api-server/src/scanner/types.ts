@@ -43,14 +43,27 @@ export const SKIP_DIRS = new Set([
   ".git",
   "dist",
   "build",
+  "out",
+  "target",
   ".cache",
   ".next",
   ".nuxt",
   ".turbo",
+  ".parcel-cache",
+  ".output",
+  ".vercel",
+  ".svelte-kit",
+  ".expo",
+  ".gradle",
   "coverage",
   ".pnpm-store",
+  ".yarn",
+  ".pnp",
+  "vendor",
+  "Pods",
   "__pycache__",
   ".pytest_cache",
+  ".mypy_cache",
   ".venv",
   "venv",
   ".DS_Store",
@@ -67,6 +80,3 @@ export const ARCHIVE_EXTS = new Set([
 
 /** Files > this size trigger a "large_file" finding in real mode (50 MB) */
 export const LARGE_FILE_BYTES = 50 * 1024 * 1024;
-
-/** Files > this size are NOT hashed for duplicate detection (100 MB) */
-export const MAX_HASH_SIZE = 100 * 1024 * 1024;

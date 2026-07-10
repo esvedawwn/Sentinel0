@@ -7,11 +7,13 @@ import {
   scanRootsTable,
   aiClassificationsTable,
   semanticTagsTable,
+  duplicateGroupsTable,
   type RiskLevel,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
-import { walkDirectory, computeHash, countChildren } from "./fileWalker.js";
-import { classifyFile, classifyEmptyFolder, detectDuplicates } from "./findingsEngine.js";
+import { walkDirectory, countChildren } from "./fileWalker.js";
+import { classifyFile, classifyEmptyFolder, classifyDuplicate } from "./findingsEngine.js";
+import { detectDuplicatesStaged, pickCanonical, type HashCandidate } from "./duplicateDetector.js";
 import { ScanFinding, LARGE_FILE_BYTES } from "./types.js";
 import { classifyWithAI } from "../ai/index.js";
 
@@ -63,7 +65,7 @@ export async function runRealScan(
   let foldersScanned = 0;
   let bytesScanned = 0;
   const typeFindings: ScanFinding[] = [];
-  const hashMap = new Map<string, Array<{ path: string; name: string; extension: string; sizeBytes: number }>>();
+  const hashCandidates: HashCandidate[] = [];
   const findingBatch: (typeof findingsTable.$inferInsert)[] = [];
   // Parallel array of per-finding classification metadata, used to seed
   // ai_classifications/semantic_tags once we know the inserted finding ids.
@@ -217,12 +219,13 @@ export async function runRealScan(
           });
         }
 
-        const hash = await computeHash(entry.path, entry.sizeBytes);
-        if (hash) {
-          const existing = hashMap.get(hash) ?? [];
-          existing.push({ path: entry.path, name: entry.name, extension: ext, sizeBytes: entry.sizeBytes });
-          hashMap.set(hash, existing);
-        }
+        hashCandidates.push({
+          path: entry.path,
+          name: entry.name,
+          extension: ext,
+          sizeBytes: entry.sizeBytes,
+          modifiedAt: entry.modifiedAt,
+        });
 
         if (findingBatch.length >= BATCH_SIZE) {
           await flushFindings();
@@ -239,34 +242,84 @@ export async function runRealScan(
 
     await flushFindings();
 
-    // Dedup pass — AI classify duplicate findings too
-    const dupFindings = detectDuplicates(hashMap);
+    // Staged duplicate detection: size -> extension (when helpful) -> SHA-256
+    // hash, with cache reuse and cooperative cancellation. See
+    // duplicateDetector.ts for the pipeline itself.
+    const { hashGroups, hashesComputed, hashesTotal, cancelled } = await detectDuplicatesStaged(hashCandidates, {
+      signal: abortController.signal,
+      cancelCheckInterval: CANCEL_CHECK_INTERVAL,
+      isCancelled: async () => {
+        const [check] = await db.select().from(scansTable).where(eq(scansTable.id, scanId));
+        return !check || check.status === "cancelled";
+      },
+      onProgress: async (computed, total) => {
+        if (computed % PROGRESS_UPDATE_INTERVAL !== 0 && computed !== total) return;
+        const hashProgress = total > 0 ? Math.round((computed / total) * 14) : 14;
+        await db.update(scansTable)
+          .set({ hashesComputed: computed, hashesTotal: total, progressPercent: Math.min(85 + hashProgress, 99) })
+          .where(eq(scansTable.id, scanId));
+      },
+    });
 
-    if (dupFindings.length > 0) {
+    if (cancelled) {
+      await db.update(scansTable).set({
+        status: "cancelled",
+        filesScanned,
+        foldersScanned,
+        bytesScanned,
+        hashesComputed,
+        hashesTotal,
+        completedAt: new Date(),
+      }).where(eq(scansTable.id, scanId));
+      return;
+    }
+
+    let dupFileCount = 0;
+    for (const [hash, members] of hashGroups) {
+      const totalSizeBytes = members.reduce((sum, m) => sum + m.sizeBytes, 0);
+      const canonical = pickCanonical(members);
+      const extensions = new Set(members.map((m) => m.extension));
+      const explanation = extensions.size > 1
+        ? `${members.length} files share identical SHA-256 content across ${extensions.size} extensions — likely renamed or re-exported copies`
+        : `${members.length} files share identical SHA-256 content (${members[0]?.extension || "no extension"})`;
+
+      const [group] = await db.insert(duplicateGroupsTable).values({
+        scanId,
+        hash,
+        status: "pending",
+        totalSizeBytes,
+        savedBytes: 0,
+        confidence: 1,
+        explanation,
+      }).returning();
+
       const dupRows: (typeof findingsTable.$inferInsert)[] = [];
       const dupMeta: typeof aiMetaBatch = [];
 
-      for (const f of dupFindings) {
+      for (const member of members) {
+        const finding = classifyDuplicate(member.path, member.name, member.extension, member.sizeBytes, hash);
         const aiResult = await classifyWithAI({
-          path: f.path,
-          name: f.name,
-          extension: f.extension,
-          sizeBytes: f.sizeBytes,
-          findingType: f.type,
+          path: finding.path,
+          name: finding.name,
+          extension: finding.extension,
+          sizeBytes: finding.sizeBytes,
+          findingType: finding.type,
         });
 
         dupRows.push({
           scanId,
-          type: f.type as "duplicate",
-          path: f.path,
-          name: f.name,
-          extension: f.extension,
-          sizeBytes: f.sizeBytes,
-          hash: f.hash,
-          duplicateGroupHash: f.duplicateGroupHash,
-          findingStatus: f.findingStatus as "duplicate",
-          riskLevel: riskLevelFor(f),
-          reason: f.reason,
+          type: finding.type,
+          path: finding.path,
+          name: finding.name,
+          extension: finding.extension,
+          sizeBytes: finding.sizeBytes,
+          hash: finding.hash,
+          duplicateGroupHash: finding.duplicateGroupHash,
+          duplicateGroupId: group.id,
+          findingStatus: finding.findingStatus,
+          riskLevel: riskLevelFor(finding),
+          reason: finding.reason,
+          fileModifiedAt: member.modifiedAt,
           aiCategory: aiResult.category,
           aiSubcategory: aiResult.subcategory,
           aiConfidence: aiResult.confidence,
@@ -288,37 +341,41 @@ export async function runRealScan(
         });
       }
 
-      for (let i = 0; i < dupRows.length; i += BATCH_SIZE) {
-        const rowsSlice = dupRows.slice(i, i + BATCH_SIZE);
-        const metaSlice = dupMeta.slice(i, i + BATCH_SIZE);
-        const inserted = await db.insert(findingsTable).values(rowsSlice).returning({ id: findingsTable.id });
+      const inserted = await db.insert(findingsTable).values(dupRows).returning({ id: findingsTable.id, path: findingsTable.path });
 
-        const classificationRows: (typeof aiClassificationsTable.$inferInsert)[] = [];
-        const tagRows: (typeof semanticTagsTable.$inferInsert)[] = [];
-        inserted.forEach((row, idx) => {
-          const m = metaSlice[idx];
-          if (!m) return;
-          classificationRows.push({
-            findingId: row.id,
-            provider: m.provider,
-            category: m.category,
-            subcategory: m.subcategory,
-            confidence: m.confidence,
-            explanation: m.explanation,
-            suggestedDestination: m.suggestedDestination,
-            suggestedAction: m.suggestedAction,
-          });
-          for (const tag of m.tags) tagRows.push({ findingId: row.id, tag });
+      const classificationRows: (typeof aiClassificationsTable.$inferInsert)[] = [];
+      const tagRows: (typeof semanticTagsTable.$inferInsert)[] = [];
+      let canonicalFindingId: number | null = null;
+      inserted.forEach((row, idx) => {
+        if (row.path === canonical.path) canonicalFindingId = row.id;
+        const m = dupMeta[idx];
+        if (!m) return;
+        classificationRows.push({
+          findingId: row.id,
+          provider: m.provider,
+          category: m.category,
+          subcategory: m.subcategory,
+          confidence: m.confidence,
+          explanation: m.explanation,
+          suggestedDestination: m.suggestedDestination,
+          suggestedAction: m.suggestedAction,
         });
-        if (classificationRows.length > 0) await db.insert(aiClassificationsTable).values(classificationRows);
-        if (tagRows.length > 0) await db.insert(semanticTagsTable).values(tagRows).onConflictDoNothing();
+        for (const tag of m.tags) tagRows.push({ findingId: row.id, tag });
+      });
+      if (classificationRows.length > 0) await db.insert(aiClassificationsTable).values(classificationRows);
+      if (tagRows.length > 0) await db.insert(semanticTagsTable).values(tagRows).onConflictDoNothing();
+
+      if (canonicalFindingId !== null) {
+        await db.update(duplicateGroupsTable).set({ canonicalFindingId }).where(eq(duplicateGroupsTable.id, group.id));
       }
+
+      dupFileCount += members.length;
     }
 
     await upsertScanRoot(rootPath);
 
-    const totalFindings = typeFindings.length + dupFindings.length;
-    const dupGroups = new Set(dupFindings.map((f) => f.duplicateGroupHash)).size;
+    const dupGroups = hashGroups.size;
+    const totalFindings = typeFindings.length + dupFileCount;
 
     await db.update(scansTable).set({
       status: "completed",
@@ -329,6 +386,8 @@ export async function runRealScan(
       completedAt: new Date(),
       findingsCount: totalFindings,
       duplicatesFound: dupGroups,
+      hashesComputed,
+      hashesTotal,
     }).where(eq(scansTable.id, scanId));
 
     await db.insert(activityTable).values([
@@ -341,7 +400,7 @@ export async function runRealScan(
       ...(dupGroups > 0 ? [{
         scanId,
         type: "duplicate_found" as const,
-        message: `${dupGroups} duplicate group${dupGroups > 1 ? "s" : ""} detected (${dupFindings.length} files)`,
+        message: `${dupGroups} duplicate group${dupGroups > 1 ? "s" : ""} detected (${dupFileCount} files)`,
         status: "warning" as const,
       }] : []),
       {

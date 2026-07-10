@@ -5,15 +5,24 @@
  * Sentinel file intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { DuplicateGroupMember } from './duplicateGroupMember';
 import type { DuplicateGroupStatus } from './duplicateGroupStatus';
-import type { File } from './file';
 
 export interface DuplicateGroup {
   id: number;
-  files: File[];
+  /** @nullable */
+  hash: string | null;
+  members: DuplicateGroupMember[];
   status: DuplicateGroupStatus;
   totalSizeBytes: number;
-  savedBytes?: number;
+  /** Space that could be reclaimed by keeping only the canonical file (totalSizeBytes minus one copy). */
+  wastedBytes: number;
+  savedBytes: number;
+  /** Confidence that group members are true duplicates (0-1). Always 1.0 for this hash-verified pipeline. */
+  confidence: number;
+  explanation: string;
+  /** @nullable */
+  canonicalFindingId: number | null;
   createdAt: string;
   /** @nullable */
   resolvedAt?: string | null;

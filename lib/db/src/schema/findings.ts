@@ -30,6 +30,7 @@ export const findingsTable = sqliteTable(
     sizeBytes: integer("size_bytes").notNull().default(0),
     hash: text("hash"),
     duplicateGroupHash: text("duplicate_group_hash"),
+    duplicateGroupId: integer("duplicate_group_id"),
     findingStatus: text("finding_status").$type<FindingStatus>().notNull(),
     riskLevel: text("risk_level").$type<RiskLevel>().notNull().default("low"),
     reason: text("reason").notNull().default(""),
@@ -55,6 +56,7 @@ export const findingsTable = sqliteTable(
     index("findings_file_modified_at_idx").on(table.fileModifiedAt),
     index("findings_hash_idx").on(table.hash),
     index("findings_scan_id_idx").on(table.scanId),
+    index("findings_duplicate_group_id_idx").on(table.duplicateGroupId),
   ]
 );
 

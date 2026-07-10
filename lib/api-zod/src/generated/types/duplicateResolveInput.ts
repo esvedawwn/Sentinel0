@@ -9,6 +9,9 @@ import type { DuplicateResolveInputAction } from './duplicateResolveInputAction'
 
 export interface DuplicateResolveInput {
   action: DuplicateResolveInputAction;
-  /** @nullable */
-  keepFileId: number | null;
+  /**
+     * Required when action is keep_one — the finding id to keep as canonical. Never triggers deletion; this only marks intent for a future confirmed cleanup step.
+     * @nullable
+     */
+  keepFindingId?: number | null;
 }

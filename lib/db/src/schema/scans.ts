@@ -21,6 +21,10 @@ export const scansTable = sqliteTable("scans", {
   duplicatesFound: integer("duplicates_found").notNull().default(0),
   corruptedFound: integer("corrupted_found").notNull().default(0),
   findingsCount: integer("findings_count").notNull().default(0),
+  // Hashing-stage progress, reported separately from the walk-stage
+  // progressPercent above so the UI can show "hashing N of M candidates".
+  hashesComputed: integer("hashes_computed").notNull().default(0),
+  hashesTotal: integer("hashes_total").notNull().default(0),
 });
 
 export const insertScanSchema = createInsertSchema(scansTable, {

@@ -41,10 +41,11 @@ Background: runRealScan(scanId, path, isSample=true)
         │       └── Each EMPTY DIR → classifyEmptyFolder() → ScanFinding
         │               └── Finding → classifyWithAI() → AIClassificationResult
         │
-        ├── computeHash() — MD5 for files < 100 MB
-        │
-        ├── detectDuplicates() — groups by hash, emits duplicate findings
-        │       └── Each duplicate → classifyWithAI() → AIClassificationResult
+        ├── detectDuplicatesStaged() — staged pipeline: size → extension → SHA-256 hash
+        │       ├── hash cache (fileHashes table) reused when size+mtime unchanged
+        │       ├── cooperative cancellation + hashesComputed/hashesTotal progress
+        │       └── Each hash group → duplicateGroups row + duplicate findings
+        │               └── Each duplicate finding → classifyWithAI() → AIClassificationResult
         │
         └── DB writes (findings table with AI fields, scan progress updates)
 ```
@@ -66,14 +67,47 @@ Background: runRealScan(scanId, path, isSample=true)
 
 ## Scanner Architecture
 
-The real scanner is split into four modules under `artifacts/api-server/src/scanner/`:
+The real scanner is split into modules under `artifacts/api-server/src/scanner/`:
 
 - **`types.ts`** — shared interfaces and constants (FindingType, SKIP_DIRS, thresholds)
 - **`fileWalker.ts`** — async generator that recursively walks a directory
-- **`findingsEngine.ts`** — pure functions that classify files and detect duplicates
-- **`realScanner.ts`** — orchestrator: ties DB writes, progress updates, and the modules above
+- **`findingsEngine.ts`** — pure functions that classify files and build duplicate findings
+- **`duplicateDetector.ts`** — staged duplicate detection pipeline: size grouping →
+  extension split (for large size groups) → SHA-256 hashing, with a path+size+mtime hash
+  cache and cooperative cancellation/progress hooks. Has no knowledge of the `scans`
+  table — callers drive cancellation/progress and persist results
+- **`realScanner.ts`** — orchestrator: ties DB writes, progress updates, and the modules
+  above together; persists `duplicateGroups` rows and links member `findings` via
+  `duplicateGroupId`
 
-This separation means `findingsEngine` has no DB/IO dependencies and is trivially testable.
+This separation means `findingsEngine` and `duplicateDetector` have no DB/IO dependencies
+beyond the hash cache table, and are trivially testable in isolation.
+
+### Duplicate detection pipeline
+
+1. **Size grouping** — files are grouped by exact byte size; unique sizes are dropped
+   immediately (a different size can never be a duplicate; this is a free, zero-IO filter).
+2. **Extension split** — once a size group exceeds a threshold (20 files), it's split
+   further by extension, since same-size cross-extension collisions are rare and splitting
+   shrinks the number of hashes needed for large, noisy size buckets.
+3. **Hashing** — only files that survive both stages are read and hashed with SHA-256
+   (cryptographically collision-safe, unlike the previous MD5-based approach). A hash
+   cache (`fileHashes` table, keyed by absolute path) is checked first; a cache hit is
+   used only when the file's size and modified time still match what was cached.
+4. **Grouping + persistence** — hash groups with 2+ members become a `duplicateGroups`
+   row (`hash`, `totalSizeBytes`, `confidence: 1.0`, `explanation`) plus one `duplicate`
+   finding per member, linked via `findings.duplicateGroupId`. A canonical ("keep this
+   one") candidate is picked as the oldest file by modified time, tie-broken by path, and
+   recorded as `canonicalFindingId` — this is a suggestion only, never an automatic action.
+
+Cancellation is cooperative: the pipeline polls an `isCancelled()` callback between files
+(same cadence as the file-walk cancel check) and can abort an in-flight file read via
+`AbortSignal`. Progress is reported via `hashesComputed`/`hashesTotal` on the `scans` row.
+
+**Never-delete guarantee**: resolving a duplicate group (`keep_one`) only sets
+`canonicalFindingId` and a `savedBytes` estimate — no file is ever read for deletion or
+removed from disk. Any real cleanup is future work requiring an explicit preview +
+confirmation step (see Backlog).
 
 ## AI Intelligence Layer
 

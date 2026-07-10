@@ -8,3 +8,4 @@ export * from "./scanRoots";
 export * from "./aiClassifications";
 export * from "./semanticTags";
 export * from "./ignoredFindings";
+export * from "./fileHashes";

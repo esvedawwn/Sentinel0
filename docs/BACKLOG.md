@@ -36,11 +36,16 @@ See `docs/AI_ARCHITECTURE.md`, `docs/AI_PRIVACY.md`, and `docs/AI_ROADMAP.md` fo
 ### Scanner Improvements
 - [ ] Progress streaming via SSE — real-time file count in UI
 - [ ] Parallel scanning with `worker_threads` for large directories
-- [ ] Incremental scan — only re-process changed files (mtime / inode cache)
+- [x] Incremental scan — hash cache keyed by (path, size, mtime) reused across scans
+      (2026-07-10); a full incremental scan (skip unchanged files entirely) is still open
 - [ ] Watch mode — trigger re-scan on filesystem change events
 - [ ] `.gitignore`-aware scanning
 - [ ] Symbolic link handling (follow or skip, configurable)
-- [ ] Hash algorithm option — xxHash for speed on large volumes
+- [ ] Hash algorithm option — xxHash for speed on large volumes (SHA-256 is used today for
+      collision-safety; xxHash would trade some safety margin for a large speed gain)
+- [ ] Real destructive "clean up duplicates" flow — preview affected paths, require typed
+      confirmation, then delete/move non-canonical copies. Today `keep_one` only records
+      intent (`canonicalFindingId` + saveable bytes); no files are ever removed
 
 ## AI
 
@@ -55,8 +60,10 @@ See `docs/AI_ARCHITECTURE.md`, `docs/AI_PRIVACY.md`, and `docs/AI_ROADMAP.md` fo
 
 - [ ] macOS extended attributes (xattr) parsing for metadata
 - [ ] Two-pass progress calculation (count first, then walk)
-- [ ] Content-aware dedup — perceptual hash for images (pHash)
-- [ ] Cross-directory duplicate grouping
+- [ ] Content-aware dedup — perceptual hash for images (pHash) — would raise confidence
+      below 1.0 and needs a UI treatment for "likely" vs. "certain" duplicates
+- [x] Cross-directory duplicate grouping — the staged pipeline groups by content hash
+      across the entire scanned tree, not just within one directory (2026-07-10)
 - [ ] Duplicate folder detection
 
 ## Findings
@@ -64,7 +71,8 @@ See `docs/AI_ARCHITECTURE.md`, `docs/AI_PRIVACY.md`, and `docs/AI_ROADMAP.md` fo
 - [ ] Finding age — show how long a lock file has existed (mtime from FS)
 - [ ] Severity scoring — weighted by type, size, age, and AI confidence
 - [ ] Findings webhooks — notify Slack/Discord on scan complete
-- [ ] Duplicate space savings — show bytes saveable per group
+- [x] Duplicate space savings — show bytes saveable per group (`wastedBytes` on
+      `DuplicateGroup`, surfaced in the Organise UI) (2026-07-10)
 
 ## Dashboard
 

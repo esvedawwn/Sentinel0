@@ -2,3 +2,4 @@
 - [TanStack Query v5 queryKey fix](tanstack-querykey.md) — Orval generates `UseQueryOptions` (not Partial), so every `query:` option must include the `queryKey` explicitly from the exported getter function.
 - [SQLite migration](sqlite-migration.md) — Sentinel uses @libsql/client + drizzle-orm/libsql; must be external in esbuild and direct dep of api-server.
 - [AI intelligence layer](ai-intelligence-layer.md) — classifyWithAI() in ai/index.ts; 24-category LocalRuleProvider always available offline; OpenAI/Embeddings are stubs; includes local-only NL search + status reporting.
+- [Staged duplicate detection](duplicate-detection.md) — size→extension→hash staging + mtime-keyed hash cache pattern for avoiding full-tree re-hashing on re-scans; never-auto-delete convention.

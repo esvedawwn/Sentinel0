@@ -173,6 +173,17 @@ export interface FileStats {
   totalSizeBytes: number;
 }
 
+export interface DuplicateGroupMember {
+  findingId: number;
+  path: string;
+  name: string;
+  extension: string;
+  sizeBytes: number;
+  /** @nullable */
+  modifiedAt?: string | null;
+  isCanonical: boolean;
+}
+
 export type DuplicateGroupStatus = typeof DuplicateGroupStatus[keyof typeof DuplicateGroupStatus];
 
 
@@ -180,14 +191,24 @@ export const DuplicateGroupStatus = {
   pending: 'pending',
   resolved: 'resolved',
   ignored: 'ignored',
+  false_positive: 'false_positive',
 } as const;
 
 export interface DuplicateGroup {
   id: number;
-  files: File[];
+  /** @nullable */
+  hash: string | null;
+  members: DuplicateGroupMember[];
   status: DuplicateGroupStatus;
   totalSizeBytes: number;
-  savedBytes?: number;
+  /** Space that could be reclaimed by keeping only the canonical file (totalSizeBytes minus one copy). */
+  wastedBytes: number;
+  savedBytes: number;
+  /** Confidence that group members are true duplicates (0-1). Always 1.0 for this hash-verified pipeline. */
+  confidence: number;
+  explanation: string;
+  /** @nullable */
+  canonicalFindingId: number | null;
   createdAt: string;
   /** @nullable */
   resolvedAt?: string | null;
@@ -205,12 +226,16 @@ export type DuplicateResolveInputAction = typeof DuplicateResolveInputAction[key
 export const DuplicateResolveInputAction = {
   keep_one: 'keep_one',
   ignore: 'ignore',
+  false_positive: 'false_positive',
 } as const;
 
 export interface DuplicateResolveInput {
   action: DuplicateResolveInputAction;
-  /** @nullable */
-  keepFileId: number | null;
+  /**
+     * Required when action is keep_one — the finding id to keep as canonical. Never triggers deletion; this only marks intent for a future confirmed cleanup step.
+     * @nullable
+     */
+  keepFindingId?: number | null;
 }
 
 export interface Category {
@@ -495,6 +520,7 @@ export const ListFilesStatus = {
 
 export type ListDuplicatesParams = {
 status?: ListDuplicatesStatus;
+sort?: ListDuplicatesSort;
 limit?: number;
 offset?: number;
 };
@@ -506,6 +532,15 @@ export const ListDuplicatesStatus = {
   pending: 'pending',
   resolved: 'resolved',
   ignored: 'ignored',
+  false_positive: 'false_positive',
+} as const;
+
+export type ListDuplicatesSort = typeof ListDuplicatesSort[keyof typeof ListDuplicatesSort];
+
+
+export const ListDuplicatesSort = {
+  wastedBytes: 'wastedBytes',
+  createdAt: 'createdAt',
 } as const;
 
 export type ListActivityParams = {

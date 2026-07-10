@@ -290,11 +290,13 @@ export const GetFileStatsResponse = zod.object({
 /**
  * @summary List duplicate file groups
  */
+export const listDuplicatesQuerySortDefault = `wastedBytes`;
 export const listDuplicatesQueryLimitDefault = 20;
 export const listDuplicatesQueryOffsetDefault = 0;
 
 export const ListDuplicatesQueryParams = zod.object({
-  "status": zod.enum(['pending', 'resolved', 'ignored']).optional(),
+  "status": zod.enum(['pending', 'resolved', 'ignored', 'false_positive']).optional(),
+  "sort": zod.enum(['wastedBytes', 'createdAt']).default(listDuplicatesQuerySortDefault),
   "limit": zod.coerce.number().default(listDuplicatesQueryLimitDefault),
   "offset": zod.coerce.number().default(listDuplicatesQueryOffsetDefault)
 })
@@ -302,23 +304,23 @@ export const ListDuplicatesQueryParams = zod.object({
 export const ListDuplicatesResponse = zod.object({
   "groups": zod.array(zod.object({
   "id": zod.number(),
-  "files": zod.array(zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
+  "hash": zod.string().nullable(),
+  "members": zod.array(zod.object({
+  "findingId": zod.number(),
   "path": zod.string(),
+  "name": zod.string(),
   "extension": zod.string(),
   "sizeBytes": zod.number(),
-  "category": zod.string(),
-  "subcategory": zod.string().nullish(),
-  "status": zod.enum(['ready', 'review', 'action_required', 'corrupted']),
-  "tags": zod.array(zod.string()),
-  "createdAt": zod.string(),
-  "indexedAt": zod.string(),
-  "renamedName": zod.string().nullish()
+  "modifiedAt": zod.string().nullish(),
+  "isCanonical": zod.boolean()
 })),
-  "status": zod.enum(['pending', 'resolved', 'ignored']),
+  "status": zod.enum(['pending', 'resolved', 'ignored', 'false_positive']),
   "totalSizeBytes": zod.number(),
-  "savedBytes": zod.number().optional(),
+  "wastedBytes": zod.number().describe('Space that could be reclaimed by keeping only the canonical file (totalSizeBytes minus one copy).'),
+  "savedBytes": zod.number(),
+  "confidence": zod.number().describe('Confidence that group members are true duplicates (0-1). Always 1.0 for this hash-verified pipeline.'),
+  "explanation": zod.string(),
+  "canonicalFindingId": zod.number().nullable(),
   "createdAt": zod.string(),
   "resolvedAt": zod.string().nullish()
 })),
@@ -335,29 +337,29 @@ export const ResolveDuplicateParams = zod.object({
 })
 
 export const ResolveDuplicateBody = zod.object({
-  "action": zod.enum(['keep_one', 'ignore']),
-  "keepFileId": zod.number().nullable()
+  "action": zod.enum(['keep_one', 'ignore', 'false_positive']),
+  "keepFindingId": zod.number().nullish().describe('Required when action is keep_one — the finding id to keep as canonical. Never triggers deletion; this only marks intent for a future confirmed cleanup step.')
 })
 
 export const ResolveDuplicateResponse = zod.object({
   "id": zod.number(),
-  "files": zod.array(zod.object({
-  "id": zod.number(),
-  "name": zod.string(),
+  "hash": zod.string().nullable(),
+  "members": zod.array(zod.object({
+  "findingId": zod.number(),
   "path": zod.string(),
+  "name": zod.string(),
   "extension": zod.string(),
   "sizeBytes": zod.number(),
-  "category": zod.string(),
-  "subcategory": zod.string().nullish(),
-  "status": zod.enum(['ready', 'review', 'action_required', 'corrupted']),
-  "tags": zod.array(zod.string()),
-  "createdAt": zod.string(),
-  "indexedAt": zod.string(),
-  "renamedName": zod.string().nullish()
+  "modifiedAt": zod.string().nullish(),
+  "isCanonical": zod.boolean()
 })),
-  "status": zod.enum(['pending', 'resolved', 'ignored']),
+  "status": zod.enum(['pending', 'resolved', 'ignored', 'false_positive']),
   "totalSizeBytes": zod.number(),
-  "savedBytes": zod.number().optional(),
+  "wastedBytes": zod.number().describe('Space that could be reclaimed by keeping only the canonical file (totalSizeBytes minus one copy).'),
+  "savedBytes": zod.number(),
+  "confidence": zod.number().describe('Confidence that group members are true duplicates (0-1). Always 1.0 for this hash-verified pipeline.'),
+  "explanation": zod.string(),
+  "canonicalFindingId": zod.number().nullable(),
   "createdAt": zod.string(),
   "resolvedAt": zod.string().nullish()
 })

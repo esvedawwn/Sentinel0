@@ -294,7 +294,13 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, resolved, ignored]
+            enum: [pending, resolved, ignored, false_positive]
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [wastedBytes, createdAt]
+            default: wastedBytes
         - name: limit
           in: query
           schema:
@@ -812,23 +818,54 @@ components:
         totalSizeBytes:
           type: integer
 
+    DuplicateGroupMember:
+      type: object
+      required: [findingId, path, name, extension, sizeBytes, isCanonical]
+      properties:
+        findingId:
+          type: integer
+        path:
+          type: string
+        name:
+          type: string
+        extension:
+          type: string
+        sizeBytes:
+          type: integer
+        modifiedAt:
+          type: ["string", "null"]
+        isCanonical:
+          type: boolean
+
     DuplicateGroup:
       type: object
-      required: [id, files, status, totalSizeBytes, createdAt]
+      required: [id, hash, members, status, totalSizeBytes, wastedBytes, savedBytes, confidence, explanation, canonicalFindingId, createdAt]
       properties:
         id:
           type: integer
-        files:
+        hash:
+          type: ["string", "null"]
+        members:
           type: array
           items:
-            $ref: "#/components/schemas/File"
+            $ref: "#/components/schemas/DuplicateGroupMember"
         status:
           type: string
-          enum: [pending, resolved, ignored]
+          enum: [pending, resolved, ignored, false_positive]
         totalSizeBytes:
           type: integer
+        wastedBytes:
+          type: integer
+          description: Space that could be reclaimed by keeping only the canonical file (totalSizeBytes minus one copy).
         savedBytes:
           type: integer
+        confidence:
+          type: number
+          description: Confidence that group members are true duplicates (0-1). Always 1.0 for this hash-verified pipeline.
+        explanation:
+          type: string
+        canonicalFindingId:
+          type: ["integer", "null"]
         createdAt:
           type: string
         resolvedAt:
@@ -849,13 +886,14 @@ components:
 
     DuplicateResolveInput:
       type: object
-      required: [action, keepFileId]
+      required: [action]
       properties:
         action:
           type: string
-          enum: [keep_one, ignore]
-        keepFileId:
+          enum: [keep_one, ignore, false_positive]
+        keepFindingId:
           type: ["integer", "null"]
+          description: Required when action is keep_one — the finding id to keep as canonical. Never triggers deletion; this only marks intent for a future confirmed cleanup step.
 
     Category:
       type: object

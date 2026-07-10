@@ -7,6 +7,76 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.5.0-alpha] — 2026-07-10 — Staged Duplicate Detection
+
+### Added
+
+#### Schema
+- New `fileHashes` table — a content-hash cache keyed by absolute path, storing
+  `sizeBytes` / `modifiedAt` / `hash` / `algo`. Re-scans reuse a cached hash instead of
+  re-reading a file when its size and modified time are unchanged
+- `duplicateGroups` gained `hash`, `confidence` (always `1.0` — this pipeline only ever
+  groups on a cryptographic hash match), `explanation` (human-readable grouping reason),
+  and `canonicalFindingId` (the user- or heuristically-selected "keep this one" file)
+- `duplicateGroups.status` gained a `false_positive` value, additive alongside `pending` /
+  `resolved` / `ignored`
+- `findings` gained `duplicateGroupId`, linking each duplicate finding directly to its
+  group (indexed) — this replaces the old, never-populated `duplicateGroupFiles` /
+  `files` table link as the source of group membership
+- `scans` gained `hashesComputed` / `hashesTotal` for hashing-stage progress reporting
+
+#### Scanner
+- New staged duplicate-detection pipeline (`scanner/duplicateDetector.ts`), replacing the
+  old inline per-file MD5 hashing:
+  1. group candidates by exact file size (an instant, free filter — different sizes can
+     never be duplicates)
+  2. within a size group, split further by extension once the group is large enough that
+     the split meaningfully cuts the number of hashes needed
+  3. only files that survive both stages are ever read and hashed, with SHA-256
+     (previously MD5)
+  4. hashes are cached by path + size + modified time, so unchanged files are never
+     re-read on subsequent scans
+- Cooperative cancellation: hashing polls the scan's status between files (same
+  cancel-check cadence as the file walk) and can abort an in-flight file read via
+  `AbortSignal`; a cancelled scan is persisted with `status: "cancelled"` rather than
+  silently dropping progress
+- Progress reporting: `scans.hashesComputed` / `hashesTotal` update as hashing proceeds,
+  mapped to the tail of the scan's overall progress percentage
+- `SKIP_DIRS` extended with more build/cache/package-internal directories (`out`,
+  `target`, `.parcel-cache`, `.output`, `.vercel`, `.svelte-kit`, `.expo`, `.gradle`,
+  `.yarn`, `.pnp`, `vendor`, `Pods`, `.mypy_cache`) on top of the existing `node_modules`,
+  `.git`, `build`, `dist`, and cache directories
+
+#### API
+- `GET /duplicates` gained a `sort` param (`wastedBytes` default, or `createdAt`) and
+  `false_positive` as a filterable status
+- `DuplicateGroup` response now includes `members` (finding-based, not the old unused
+  `files` table), `wastedBytes` (total size minus one canonical copy), `confidence`,
+  `explanation`, and `canonicalFindingId`
+- `POST /duplicates/:id/resolve` gained a `false_positive` action (alongside `keep_one` /
+  `ignore`) and `keepFindingId` to select which copy to treat as canonical
+
+#### UI
+- Organise page duplicate cards: sorted by wasted space (largest first), show the group's
+  explanation and confidence, let the user click any member to select it as the preferred
+  original ("Keep Selected"), and add a "Not a duplicate" (false positive) action alongside
+  Ignore
+
+#### Testing
+- `scanner/__tests__/duplicateDetector.test.ts` — identical files, same-name-but-different-
+  content, same-size-but-different-content, cached-hash reuse (including cache
+  invalidation on mtime change), and cancelled hashing mid-pipeline
+
+### Safety
+- Duplicate detection never deletes files — resolving a group only records which copy to
+  keep (`canonicalFindingId`) and a saveable-bytes estimate; actual cleanup remains a
+  future, explicitly confirmed action (tracked in the Backlog)
+
+### Removed
+- Old inline MD5 hashing in `realScanner.ts`, and the unused `detectDuplicates()` /
+  hash-map-based duplicate grouping in `findingsEngine.ts` — both replaced by the staged
+  SHA-256 pipeline above
+
 ## [v0.4.0-alpha] — 2026-07-10 — Persistent Indexing & Scan History
 
 ### Added

@@ -25,9 +25,10 @@ A dark-themed file intelligence web app that scans, classifies, deduplicates, an
 ## Where things live
 
 - `lib/api-spec/openapi.yaml` — source-of-truth API contract
-- `lib/db/src/schema/` — Drizzle schema (scans, files, findings, duplicates, activity, scanRoots, aiClassifications, semanticTags, ignoredFindings)
+- `lib/db/src/schema/` — Drizzle schema (scans, files, findings, duplicates, fileHashes, activity, scanRoots, aiClassifications, semanticTags, ignoredFindings)
 - `artifacts/api-server/src/routes/` — Express route handlers (dashboard, scans, files, findings, duplicates, categories, activity, reports, scanRoots)
-- `artifacts/api-server/src/scanner/realScanner.ts` — real filesystem scan; populates findings, AI classification history, semantic tags, and upserts scan roots
+- `artifacts/api-server/src/scanner/realScanner.ts` — real filesystem scan; populates findings, AI classification history, semantic tags, upserts scan roots, and persists duplicate groups
+- `artifacts/api-server/src/scanner/duplicateDetector.ts` — staged duplicate detection: size → extension → SHA-256 hash, with path+size+mtime hash cache reuse and cooperative cancellation/progress
 - `artifacts/sentinel/src/pages/` — Dashboard, Analyse, Organise, Findings, Reports, ScanHistory
 - `artifacts/sentinel/src/components/Layout.tsx` — sidebar nav with ⌘1–7 shortcuts
 - `artifacts/sentinel/src/index.css` — full dark theme (CSS vars for #111111 bg, #1A1A1A panel, #222222 card, #34D399 green)
@@ -39,8 +40,9 @@ A dark-themed file intelligence web app that scans, classifies, deduplicates, an
 - OpenAPI-first: all endpoints defined in `openapi.yaml` before implementation; Orval generates React Query hooks + Zod schemas.
 - Categories are hardcoded in the categories route (no DB table needed; they're stable config).
 - Scans trigger a background `simulateScan()` / `realScanner.ts` function in the server process that streams file batches into the DB, simulating (or performing) a real indexing operation. Every completed scan is persisted — nothing is scan-and-discard.
-- `duplicate_group_files.file_id` must reference `files.id` (not `duplicate_groups.id`) — this was a schema bug fixed during development.
+- `duplicate_group_files`/`files` are legacy and unused for duplicate membership — duplicate group membership is now via `findings.duplicateGroupId` (each duplicate finding points at its group).
 - Every `findings`/`files`/`duplicateGroups`/`activity` row carries a `scanId` FK, so scan history can always be reconstructed and reopened via `GET /findings?scanId=`.
+- Duplicate detection is a staged pipeline (size → extension → SHA-256 hash) with a `fileHashes` cache keyed by path+size+mtime; resolving a group (`keep_one`) only records `canonicalFindingId` + a saveable-bytes estimate — it never deletes or moves files.
 - `findings.riskLevel` is a display-only heuristic (`riskLevelFor()` in `realScanner.ts`) — it never drives automatic deletion or action.
 - Ignoring a finding is additive: `ignoredFindings` gets a row and `findings.findingStatus` flips to `ignored`, but the finding row itself is never deleted — `unignore` reverses it. This is the mechanism satisfying "no deleting historical data without confirmation" for findings.
 - `aiClassifications` is an append-only history table; `findings.ai_*` columns are a denormalized copy of the latest classification, kept for fast reads.

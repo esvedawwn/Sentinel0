@@ -1,23 +1,6 @@
-import fs from "fs";
 import fsPromises from "fs/promises";
 import path from "path";
-import crypto from "crypto";
-import { SKIP_DIRS, MAX_HASH_SIZE } from "./types.js";
-
-/**
- * Compute MD5 hash of a file using a read stream.
- * Returns null if the file is too large, unreadable, or an error occurs.
- */
-export function computeHash(filePath: string, sizeBytes: number): Promise<string | null> {
-  if (sizeBytes > MAX_HASH_SIZE || sizeBytes === 0) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const hash = crypto.createHash("md5");
-    const stream = fs.createReadStream(filePath);
-    stream.on("data", (chunk) => hash.update(chunk));
-    stream.on("end", () => resolve(hash.digest("hex")));
-    stream.on("error", () => resolve(null));
-  });
-}
+import { SKIP_DIRS } from "./types.js";
 
 export interface WalkEntry {
   path: string;

@@ -5,10 +5,12 @@
  * Sentinel file intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListDuplicatesSort } from './listDuplicatesSort';
 import type { ListDuplicatesStatus } from './listDuplicatesStatus';
 
 export type ListDuplicatesParams = {
 status?: ListDuplicatesStatus;
+sort?: ListDuplicatesSort;
 limit?: number;
 offset?: number;
 };
