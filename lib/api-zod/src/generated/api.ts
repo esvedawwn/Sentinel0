@@ -515,7 +515,10 @@ export const GetFindingsSummaryResponse = zod.object({
 export const GetAIStatusResponse = zod.object({
   "status": zod.enum(['local', 'cloud', 'offline', 'analysing', 'failed', 'consent_required']),
   "provider": zod.string(),
-  "cloudEnabled": zod.boolean().describe('Whether a cloud provider (OpenAI\/Embeddings) is configured and enabled')
+  "cloudEnabled": zod.boolean().describe('Whether a cloud provider (OpenAI\/Embeddings) is configured and enabled'),
+  "providerAvailability": zod.record(zod.string(), zod.boolean()).describe('Availability of every registered provider, keyed by provider id (local, openai, embeddings)'),
+  "lastError": zod.string().nullable().describe('Message from the most recent provider failure, or null if none has occurred since startup'),
+  "lastClassificationDurationMs": zod.number().nullable().describe('Duration in milliseconds of the most recent classification call, or null if none has run yet')
 })
 
 

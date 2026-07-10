@@ -84,4 +84,110 @@ describe("classifyLocalRule", () => {
       expect(result.recommendation.requiresConfirmation).toBe(true);
     }
   });
+
+  describe("confidence scoring", () => {
+    it("clamps confidence to the 0-100 range", () => {
+      const result = classifyLocalRule(input({ findingType: "zero_byte" }));
+      expect(result.confidence).toBeGreaterThanOrEqual(0);
+      expect(result.confidence).toBeLessThanOrEqual(100);
+    });
+
+    it("assigns higher confidence to strong finding-type signals than to weak path-only hints", () => {
+      const strong = classifyLocalRule(input({ findingType: "duplicate", name: "copy.pdf", path: "/a/copy.pdf" }));
+      const weak = classifyLocalRule(input({ name: "clip.xyz", extension: ".xyz", path: "/home/videos/clip.xyz" }));
+      expect(strong.confidence).toBeGreaterThan(weak.confidence);
+    });
+
+    it("gives a document keyword match higher confidence than a path-only keyword match for the same category", () => {
+      const docMatch = classifyLocalRule(input({ name: "legal-contract.pdf", extension: ".pdf", path: "/misc/legal-contract.pdf" }));
+      const pathOnlyMatch = classifyLocalRule(input({ name: "notes", extension: "", path: "/legal/notes" }));
+      expect(docMatch.category).toBe("Legal");
+      expect(pathOnlyMatch.category).toBe("Legal");
+      expect(docMatch.confidence).toBeGreaterThan(pathOnlyMatch.confidence);
+    });
+
+    it("gives the Unknown fallback a low confidence score", () => {
+      const result = classifyLocalRule(input({ name: "mystery.xyz", extension: ".xyz", path: "/misc/mystery.xyz" }));
+      expect(result.confidence).toBeLessThan(50);
+    });
+  });
+
+  describe("semantic tags", () => {
+    it("attaches relevant tags for a duplicate finding", () => {
+      const result = classifyLocalRule(input({ findingType: "duplicate", name: "copy.pdf", path: "/a/copy.pdf" }));
+      expect(result.tags).toEqual(expect.arrayContaining(["duplicate", "review"]));
+    });
+
+    it("attaches extension-derived tags for media files", () => {
+      const result = classifyLocalRule(input({ name: "clip.mp4", extension: ".mp4", path: "/videos/clip.mp4" }));
+      expect(result.tags).toEqual(expect.arrayContaining(["video", "mp4"]));
+    });
+
+    it("attaches a category-slug tag for keyword-matched documents", () => {
+      const result = classifyLocalRule(input({ name: "invoice-march.pdf", extension: ".pdf", path: "/docs/invoice-march.pdf" }));
+      expect(result.tags).toEqual(expect.arrayContaining(["invoices", "document"]));
+    });
+
+    it("never returns an empty tag list", () => {
+      const cases = [
+        input({ findingType: "zero_byte" }),
+        input({ name: "mystery.xyz", extension: ".xyz", path: "/misc/mystery.xyz" }),
+        input({ name: "IMG_0001.CR2", extension: ".cr2", path: "/photos/IMG_0001.CR2" }),
+      ];
+      for (const c of cases) {
+        expect(classifyLocalRule(c).tags.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe("suggested destinations", () => {
+    it("suggests a documents subfolder for keyword-matched document categories", () => {
+      const result = classifyLocalRule(input({ name: "medical-report.pdf", extension: ".pdf", path: "/docs/medical-report.pdf" }));
+      expect(result.suggestedDestination).toBe("Documents/Medical");
+    });
+
+    it("suggests Pictures/Screenshots for screenshots", () => {
+      const result = classifyLocalRule(input({ name: "Screenshot 2025-01-01 at 10.00.00.png", extension: ".png", path: "/desktop/Screenshot 2025-01-01 at 10.00.00.png" }));
+      expect(result.suggestedDestination).toBe("Pictures/Screenshots");
+    });
+
+    it("returns null suggestedDestination for files with no natural single-folder home (e.g. lock files, installers)", () => {
+      const lock = classifyLocalRule(input({ findingType: "idlk_file", name: "doc.idlk", extension: ".idlk", path: "/a/doc.idlk" }));
+      const installer = classifyLocalRule(input({ findingType: "installer", name: "setup.dmg", extension: ".dmg", path: "/downloads/setup.dmg" }));
+      expect(lock.suggestedDestination).toBeNull();
+      expect(installer.suggestedDestination).toBeNull();
+    });
+
+    it("suggests Design/Branding for branded vector assets", () => {
+      const result = classifyLocalRule(input({ name: "brand-logo.svg", extension: ".svg", path: "/assets/brand-logo.svg" }));
+      expect(result.suggestedDestination).toBe("Design/Branding");
+    });
+  });
+
+  describe("suggested actions", () => {
+    it("provides a non-empty, human-readable suggested action string for every result", () => {
+      const cases = [
+        input({ findingType: "zero_byte" }),
+        input({ findingType: "duplicate", name: "copy.pdf", path: "/a/copy.pdf" }),
+        input({ name: "mystery.xyz", extension: ".xyz", path: "/misc/mystery.xyz" }),
+      ];
+      for (const c of cases) {
+        const result = classifyLocalRule(c);
+        expect(typeof result.suggestedAction).toBe("string");
+        expect(result.suggestedAction.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("frames a safe-to-delete recommendation's suggested action in cautious, non-destructive language", () => {
+      const result = classifyLocalRule(input({ findingType: "zero_byte" }));
+      expect(result.recommendation.safe).toBe(true);
+      expect(result.suggestedAction.toLowerCase()).toContain("safe to delete");
+    });
+
+    it("frames a review recommendation's suggested action without asserting deletion is safe", () => {
+      const result = classifyLocalRule(input({ findingType: "archive", extension: ".zip", name: "backup.zip", path: "/a/backup.zip" }));
+      expect(result.recommendation.safe).toBe(false);
+      expect(result.suggestedAction.toLowerCase()).not.toContain("safe to delete");
+    });
+  });
 });

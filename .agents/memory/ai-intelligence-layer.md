@@ -13,7 +13,8 @@ description: Architecture and integration points for the AI file classification 
 - `providers/openai.ts` — stub; requires OPENAI_API_KEY
 - `providers/embeddings.ts` — stub; requires EMBEDDINGS_API_KEY
 - `search.ts` — `interpretSearchQuery()`, pure local keyword-based NL search parser (never calls cloud, independent of classification provider)
-- `status.ts` — `getAIStatus()` reports `"local" | "cloud" | "offline"` for UI badges
+- `status.ts` — `getAIStatus()` reports `"local" | "cloud" | "offline"` plus diagnostics: `providerAvailability` (per-provider up/down), `lastError`, `lastClassificationDurationMs`
+- `classifier.ts` also exports `lastAIError()`, `lastClassificationDurationMs()`, `providerAvailability()` — diagnostic reads only, no side effects; `resetProvider()` clears them (used in tests)
 
 ## Provider selection priority
 1. EmbeddingsProvider (if EMBEDDINGS_API_KEY set)

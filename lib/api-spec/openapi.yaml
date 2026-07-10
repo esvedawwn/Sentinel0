@@ -878,7 +878,7 @@ components:
 
     AIStatusResponse:
       type: object
-      required: [status, provider, cloudEnabled]
+      required: [status, provider, cloudEnabled, providerAvailability, lastError, lastClassificationDurationMs]
       properties:
         status:
           type: string
@@ -888,6 +888,17 @@ components:
         cloudEnabled:
           type: boolean
           description: "Whether a cloud provider (OpenAI/Embeddings) is configured and enabled"
+        providerAvailability:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: "Availability of every registered provider, keyed by provider id (local, openai, embeddings)"
+        lastError:
+          type: ["string", "null"]
+          description: "Message from the most recent provider failure, or null if none has occurred since startup"
+        lastClassificationDurationMs:
+          type: ["integer", "null"]
+          description: "Duration in milliseconds of the most recent classification call, or null if none has run yet"
 
     AISearchInterpretation:
       type: object

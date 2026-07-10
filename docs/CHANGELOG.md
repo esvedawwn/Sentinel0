@@ -7,6 +7,50 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.3.1-alpha] — 2026-07-10 — AI Review Pass
+
+### Added
+
+#### AI Diagnostics
+- `getAIStatus()` now reports `providerAvailability` (per-provider up/down), `lastError`
+  (message from the most recent provider failure, or `null`), and
+  `lastClassificationDurationMs` (timing of the most recent classification call)
+- `classifier.ts` gained `lastAIError()`, `lastClassificationDurationMs()`, and
+  `providerAvailability()` for diagnostics without mutating the active provider
+- New developer-facing **AI Diagnostics** panel on the Settings page: active provider,
+  local/cloud mode, cloud-enabled flag, per-provider availability, last error, last
+  classification duration
+- `AIStatusResponse` OpenAPI schema extended with the three new fields; hooks regenerated
+
+#### Testing
+- `src/ai/__tests__/classifier.test.ts` — provider auto-selection, `AI_PROVIDER` override,
+  missing-API-key behaviour, provider fallback on error, diagnostics instrumentation
+- `src/ai/__tests__/status.test.ts` — cloud-disabled-by-default, cloud activation once a
+  key is set, provider availability reporting, last-error/duration surfacing
+- Expanded `localRule.test.ts` with dedicated suites for confidence scoring, semantic
+  tags, suggested destinations, and suggested actions
+- Expanded `search.test.ts` with dedicated natural-language interpretation cases
+  (case-insensitivity, multi-category queries, size comparatives, explanation text)
+- Total AI test count: 16 → 55, all passing
+
+### Verified (no code change required)
+- Cloud AI is disabled by default — `cloudEnabled` is `false` and the active provider is
+  `local-rule` unless `OPENAI_API_KEY` or `EMBEDDINGS_API_KEY` is explicitly set
+- No API keys are hardcoded anywhere in the AI layer — both cloud providers read
+  exclusively from `process.env`
+- File contents are never uploaded automatically — `AIClassificationInput` carries only
+  filesystem metadata (path, name, extension, size, finding type, sibling filenames),
+  never file bytes
+- AI recommendations cannot directly delete, move, or rename files — `AIRecommendation`
+  is advisory only, `requiresConfirmation` is always `true`, and no code path in the
+  scanner or routes executes a recommendation automatically
+
+### Fixed
+- None — full workspace typecheck and the full test suite were already green; this pass
+  found no compile errors or failing tests to fix
+
+---
+
 ## [v0.3.0-alpha] — 2026-07-10 — AI Layer Expansion
 
 ### Added

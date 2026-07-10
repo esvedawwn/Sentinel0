@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useGetAIStatus, getGetAIStatusQueryKey } from "@workspace/api-client-react";
 
 interface SettingRowProps {
   label: string;
@@ -78,6 +79,101 @@ const DEFAULT_SKIP_DIRS = [
   "__pycache__",
   ".pnpm-store",
 ];
+
+function StatusPill({ label, tone }: { label: string; tone: "green" | "amber" | "red" | "neutral" }) {
+  const colors: Record<typeof tone, { bg: string; fg: string }> = {
+    green: { bg: "rgba(52,211,153,0.15)", fg: "#34D399" },
+    amber: { bg: "rgba(245,158,11,0.15)", fg: "#F59E0B" },
+    red: { bg: "rgba(248,113,113,0.15)", fg: "#F87171" },
+    neutral: { bg: "rgba(255,255,255,0.08)", fg: "rgba(255,255,255,0.5)" },
+  };
+  const c = colors[tone];
+  return (
+    <span
+      className="text-xs font-mono px-2 py-0.5 rounded"
+      style={{ background: c.bg, color: c.fg, fontFamily: "var(--app-font-mono)" }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function AIDiagnosticsPanel() {
+  const { data: status, isLoading, isError } = useGetAIStatus({
+    query: { queryKey: getGetAIStatusQueryKey(), refetchInterval: 5000 },
+  });
+
+  return (
+    <div
+      className="rounded-lg px-5 mt-6"
+      style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      <SectionHeader title="AI Diagnostics (developer)" />
+
+      {isLoading && (
+        <div className="py-4 text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+          Loading AI status…
+        </div>
+      )}
+
+      {isError && (
+        <div className="py-4 text-xs" style={{ color: "#F87171" }}>
+          Unable to reach the AI status endpoint.
+        </div>
+      )}
+
+      {status && (
+        <div className="py-2">
+          <SettingRow label="Active Provider" description="The classifier currently used for new findings.">
+            <span className="text-xs font-mono" style={{ color: "#ffffff", fontFamily: "var(--app-font-mono)" }}>
+              {status.provider}
+            </span>
+          </SettingRow>
+
+          <SettingRow label="Mode" description="Whether classification runs offline or against a cloud provider.">
+            <StatusPill
+              label={status.status === "local" ? "LOCAL (offline)" : status.status.toUpperCase()}
+              tone={status.status === "local" ? "green" : status.status === "cloud" ? "amber" : "neutral"}
+            />
+          </SettingRow>
+
+          <SettingRow label="Cloud AI Enabled" description="True only when an operator has configured an API key.">
+            <StatusPill label={status.cloudEnabled ? "ENABLED" : "DISABLED (default)"} tone={status.cloudEnabled ? "amber" : "green"} />
+          </SettingRow>
+
+          <SettingRow label="Provider Availability" description="Availability check for every registered provider.">
+            <div className="flex gap-1.5">
+              {Object.entries(status.providerAvailability).map(([name, available]) => (
+                <StatusPill key={name} label={`${name}: ${available ? "up" : "down"}`} tone={available ? "green" : "neutral"} />
+              ))}
+            </div>
+          </SettingRow>
+
+          <SettingRow label="Last AI Error" description="Message from the most recent provider failure, if any, since the server started.">
+            {status.lastError ? (
+              <span className="text-xs font-mono" style={{ color: "#F87171", fontFamily: "var(--app-font-mono)" }}>
+                {status.lastError}
+              </span>
+            ) : (
+              <StatusPill label="None" tone="green" />
+            )}
+          </SettingRow>
+
+          <SettingRow label="Last Classification Duration" description="How long the most recent classification call took to run.">
+            <span className="text-xs font-mono" style={{ color: "rgba(255,255,255,0.6)", fontFamily: "var(--app-font-mono)" }}>
+              {status.lastClassificationDurationMs === null ? "—" : `${status.lastClassificationDurationMs} ms`}
+            </span>
+          </SettingRow>
+        </div>
+      )}
+
+      <p className="text-xs pb-4 pt-1" style={{ color: "rgba(255,255,255,0.2)" }}>
+        AI classification is local-only by default. No file contents are ever uploaded, and AI
+        recommendations are preview-only — they never delete, move, or rename files automatically.
+      </p>
+    </div>
+  );
+}
 
 export default function Settings() {
   const [hashDuplicates, setHashDuplicates] = useState(true);
@@ -252,6 +348,8 @@ export default function Settings() {
           ))}
         </div>
       </div>
+
+      <AIDiagnosticsPanel />
 
       <div className="flex justify-end mt-6">
         <button

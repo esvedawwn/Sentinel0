@@ -5,6 +5,7 @@
  * Sentinel file intelligence API
  * OpenAPI spec version: 0.1.0
  */
+import type { AIStatusResponseProviderAvailability } from './aIStatusResponseProviderAvailability';
 import type { AIStatusResponseStatus } from './aIStatusResponseStatus';
 
 export interface AIStatusResponse {
@@ -12,4 +13,16 @@ export interface AIStatusResponse {
   provider: string;
   /** Whether a cloud provider (OpenAI/Embeddings) is configured and enabled */
   cloudEnabled: boolean;
+  /** Availability of every registered provider, keyed by provider id (local, openai, embeddings) */
+  providerAvailability: AIStatusResponseProviderAvailability;
+  /**
+     * Message from the most recent provider failure, or null if none has occurred since startup
+     * @nullable
+     */
+  lastError: string | null;
+  /**
+     * Duration in milliseconds of the most recent classification call, or null if none has run yet
+     * @nullable
+     */
+  lastClassificationDurationMs: number | null;
 }

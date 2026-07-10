@@ -14,6 +14,7 @@ export * from './aIRecommendation';
 export * from './aIRecommendationAction';
 export * from './aISearchInterpretation';
 export * from './aIStatusResponse';
+export * from './aIStatusResponseProviderAvailability';
 export * from './aIStatusResponseStatus';
 export * from './attentionSummary';
 export * from './category';

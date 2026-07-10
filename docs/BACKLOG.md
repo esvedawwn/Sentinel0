@@ -12,6 +12,8 @@ Items are ordered by priority within each category.
 - [ ] User feedback loop — "Correct Category" button writes correction to DB for future training
 - [ ] AI reclassify button — re-run AI on existing findings without re-scanning
 - [ ] AI summary panel on Dashboard — breakdown of AI categories across all findings
+- [x] Developer-facing AI diagnostics (active provider, provider availability, local/cloud
+      mode, last AI error, last classification duration) — added to Settings page (2026-07-10)
 - [ ] Surface `GET /api/ai/status` as a persistent Local/Cloud/Offline badge in the UI header
 - [ ] Wire `GET /api/ai/search` into the Findings search box as an opt-in "smart search" toggle
 - [ ] Suggested destination "Apply" flow — confirmation dialog + a real (currently unimplemented) move operation

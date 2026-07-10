@@ -8,7 +8,14 @@ export type {
   AIStatus,
 } from "./types.js";
 
-export { classifyWithAI, activeProviderName, resetProvider } from "./classifier.js";
+export {
+  classifyWithAI,
+  activeProviderName,
+  resetProvider,
+  lastAIError,
+  lastClassificationDurationMs,
+  providerAvailability,
+} from "./classifier.js";
 export { LocalRuleProvider, classifyLocalRule } from "./providers/localRule.js";
 export { OpenAIProvider } from "./providers/openai.js";
 export { EmbeddingsProvider } from "./providers/embeddings.js";

@@ -295,11 +295,28 @@ export const AIStatusResponseStatus = {
   consent_required: 'consent_required',
 } as const;
 
+/**
+ * Availability of every registered provider, keyed by provider id (local, openai, embeddings)
+ */
+export type AIStatusResponseProviderAvailability = {[key: string]: boolean};
+
 export interface AIStatusResponse {
   status: AIStatusResponseStatus;
   provider: string;
   /** Whether a cloud provider (OpenAI/Embeddings) is configured and enabled */
   cloudEnabled: boolean;
+  /** Availability of every registered provider, keyed by provider id (local, openai, embeddings) */
+  providerAvailability: AIStatusResponseProviderAvailability;
+  /**
+     * Message from the most recent provider failure, or null if none has occurred since startup
+     * @nullable
+     */
+  lastError: string | null;
+  /**
+     * Duration in milliseconds of the most recent classification call, or null if none has run yet
+     * @nullable
+     */
+  lastClassificationDurationMs: number | null;
 }
 
 export interface AISearchInterpretation {
