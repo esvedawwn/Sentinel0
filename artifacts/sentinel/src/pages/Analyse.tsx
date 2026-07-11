@@ -8,6 +8,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { formatBytes, formatTimestamp, statusColor, statusLabel } from "@/lib/utils";
 import { motion } from "framer-motion";
+import FilePreviewTooltip from "@/components/FilePreviewTooltip";
 
 type FileStatus = "ready" | "review" | "action_required" | "corrupted";
 
@@ -136,76 +137,85 @@ export default function Analyse() {
         ) : (
           <div className="space-y-1">
             {files.map((file, i) => (
-              <motion.div
+              <FilePreviewTooltip
                 key={file.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: i * 0.01, duration: 0.15 }}
-                onClick={() => setSelectedId(selectedId === file.id ? null : file.id)}
-                className="flex items-center gap-4 px-4 py-3 rounded cursor-pointer transition-colors duration-100"
-                style={{
-                  background: selectedId === file.id ? "#222222" : "transparent",
-                  border: selectedId === file.id ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedId !== file.id)
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedId !== file.id)
-                    (e.currentTarget as HTMLElement).style.background = "transparent";
-                }}
+                name={file.name}
+                path={file.path}
+                extension={file.extension}
+                sizeBytes={file.sizeBytes}
+                category={file.category}
+                status={file.status}
               >
-                {/* Extension badge */}
-                <span
-                  className="text-xs font-mono px-1.5 py-0.5 rounded shrink-0"
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.01, duration: 0.15 }}
+                  onClick={() => setSelectedId(selectedId === file.id ? null : file.id)}
+                  className="flex items-center gap-4 px-4 py-3 rounded cursor-pointer transition-colors duration-100"
                   style={{
-                    background: "rgba(255,255,255,0.08)",
-                    color: "rgba(255,255,255,0.5)",
-                    fontFamily: "var(--app-font-mono)",
-                    minWidth: "40px",
-                    textAlign: "center",
+                    background: selectedId === file.id ? "#222222" : "transparent",
+                    border: selectedId === file.id ? "1px solid rgba(255,255,255,0.1)" : "1px solid transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedId !== file.id)
+                      (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.03)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedId !== file.id)
+                      (e.currentTarget as HTMLElement).style.background = "transparent";
                   }}
                 >
-                  {file.extension || "—"}
-                </span>
-
-                {/* Name + path */}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-white truncate">{file.name}</div>
-                  <div
-                    className="text-xs font-mono truncate"
-                    style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                  {/* Extension badge */}
+                  <span
+                    className="text-xs font-mono px-1.5 py-0.5 rounded shrink-0"
+                    style={{
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.5)",
+                      fontFamily: "var(--app-font-mono)",
+                      minWidth: "40px",
+                      textAlign: "center",
+                    }}
                   >
-                    {file.path}
+                    {file.extension || "—"}
+                  </span>
+
+                  {/* Name + path */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white truncate">{file.name}</div>
+                    <div
+                      className="text-xs font-mono truncate"
+                      style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
+                    >
+                      {file.path}
+                    </div>
                   </div>
-                </div>
 
-                {/* Category */}
-                <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>
-                  {file.category}
-                </span>
+                  {/* Category */}
+                  <span className="text-xs shrink-0" style={{ color: "rgba(255,255,255,0.4)" }}>
+                    {file.category}
+                  </span>
 
-                {/* Size */}
-                <span
-                  className="text-xs font-mono shrink-0 w-20 text-right"
-                  style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)" }}
-                >
-                  {formatBytes(file.sizeBytes)}
-                </span>
+                  {/* Size */}
+                  <span
+                    className="text-xs font-mono shrink-0 w-20 text-right"
+                    style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)" }}
+                  >
+                    {formatBytes(file.sizeBytes)}
+                  </span>
 
-                {/* Status */}
-                <span
-                  className="text-xs font-mono shrink-0 px-2 py-0.5 rounded"
-                  style={{
-                    fontFamily: "var(--app-font-mono)",
-                    color: statusColor(file.status),
-                    background: `${statusColor(file.status)}18`,
-                  }}
-                >
-                  {statusLabel(file.status)}
-                </span>
-              </motion.div>
+                  {/* Status */}
+                  <span
+                    className="text-xs font-mono shrink-0 px-2 py-0.5 rounded"
+                    style={{
+                      fontFamily: "var(--app-font-mono)",
+                      color: statusColor(file.status),
+                      background: `${statusColor(file.status)}18`,
+                    }}
+                  >
+                    {statusLabel(file.status)}
+                  </span>
+                </motion.div>
+              </FilePreviewTooltip>
             ))}
           </div>
         )}

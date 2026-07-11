@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import FilePreviewTooltip from "@/components/FilePreviewTooltip";
 import { useSearchParams, Link } from "wouter";
 import {
   useListFindings,
@@ -630,73 +631,83 @@ export default function Findings() {
                   {findings.map((finding, idx) => {
                     const isSelected = selectedId === finding.id;
                     return (
-                      <motion.div
+                      <FilePreviewTooltip
                         key={finding.id}
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                        className="grid items-center px-4 py-3 cursor-pointer transition-colors duration-100"
-                        style={{
-                          gridTemplateColumns: "24px 2fr 1fr 1fr 1fr 1fr 80px",
-                          background: isSelected
-                            ? "rgba(52,211,153,0.06)"
-                            : idx % 2 === 0
-                            ? "transparent"
-                            : "rgba(255,255,255,0.015)",
-                          borderBottom: "1px solid rgba(255,255,255,0.04)",
-                          borderLeft: isSelected
-                            ? "2px solid #34D399"
-                            : "2px solid transparent",
-                        }}
-                        onClick={() =>
-                          setSelectedId(isSelected ? null : finding.id)
-                        }
+                        name={finding.name}
+                        path={finding.path}
+                        extension={finding.extension}
+                        sizeBytes={finding.sizeBytes}
+                        category={finding.type}
+                        aiCategory={finding.aiCategory ?? null}
+                        riskLevel={finding.riskLevel ?? null}
                       >
-                        <input
-                          type="checkbox"
-                          checked={checkedIds.has(finding.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleChecked(finding.id)}
-                        />
-                        <div className="min-w-0 pr-4">
-                          <div
-                            className="text-sm font-medium truncate"
-                            style={{
-                              color: isSelected ? "#34D399" : "#ffffff",
-                            }}
-                          >
-                            {finding.name}
-                          </div>
-                          <div
-                            className="text-xs truncate mt-0.5"
-                            style={{
-                              color: "rgba(255,255,255,0.25)",
-                              fontFamily: "var(--app-font-mono)",
-                              fontSize: "0.7rem",
-                            }}
-                          >
-                            {finding.path.replace(
-                              /^\/home\/runner\/workspace\/sample-data\//,
-                              "sample-data/"
-                            )}
-                          </div>
-                        </div>
-                        <TypeBadge type={finding.type} />
-                        <StatusBadge status={finding.findingStatus} />
-                        <ReviewStatusBadge status={finding.reviewStatus ?? "new"} />
-                        <AICategoryDot category={finding.aiCategory} />
-                        <div
-                          className="text-right text-xs font-mono"
+                        <motion.div
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                          className="grid items-center px-4 py-3 cursor-pointer transition-colors duration-100"
                           style={{
-                            color: "rgba(255,255,255,0.4)",
-                            fontFamily: "var(--app-font-mono)",
+                            gridTemplateColumns: "24px 2fr 1fr 1fr 1fr 1fr 80px",
+                            background: isSelected
+                              ? "rgba(52,211,153,0.06)"
+                              : idx % 2 === 0
+                              ? "transparent"
+                              : "rgba(255,255,255,0.015)",
+                            borderBottom: "1px solid rgba(255,255,255,0.04)",
+                            borderLeft: isSelected
+                              ? "2px solid #34D399"
+                              : "2px solid transparent",
                           }}
+                          onClick={() =>
+                            setSelectedId(isSelected ? null : finding.id)
+                          }
                         >
-                          {finding.sizeBytes > 0
-                            ? formatBytes(finding.sizeBytes)
-                            : "—"}
-                        </div>
-                      </motion.div>
+                          <input
+                            type="checkbox"
+                            checked={checkedIds.has(finding.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleChecked(finding.id)}
+                          />
+                          <div className="min-w-0 pr-4">
+                            <div
+                              className="text-sm font-medium truncate"
+                              style={{
+                                color: isSelected ? "#34D399" : "#ffffff",
+                              }}
+                            >
+                              {finding.name}
+                            </div>
+                            <div
+                              className="text-xs truncate mt-0.5"
+                              style={{
+                                color: "rgba(255,255,255,0.25)",
+                                fontFamily: "var(--app-font-mono)",
+                                fontSize: "0.7rem",
+                              }}
+                            >
+                              {finding.path.replace(
+                                /^\/home\/runner\/workspace\/sample-data\//,
+                                "sample-data/"
+                              )}
+                            </div>
+                          </div>
+                          <TypeBadge type={finding.type} />
+                          <StatusBadge status={finding.findingStatus} />
+                          <ReviewStatusBadge status={finding.reviewStatus ?? "new"} />
+                          <AICategoryDot category={finding.aiCategory} />
+                          <div
+                            className="text-right text-xs font-mono"
+                            style={{
+                              color: "rgba(255,255,255,0.4)",
+                              fontFamily: "var(--app-font-mono)",
+                            }}
+                          >
+                            {finding.sizeBytes > 0
+                              ? formatBytes(finding.sizeBytes)
+                              : "—"}
+                          </div>
+                        </motion.div>
+                      </FilePreviewTooltip>
                     );
                   })}
                 </div>

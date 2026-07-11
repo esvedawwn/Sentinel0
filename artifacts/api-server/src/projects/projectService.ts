@@ -3,12 +3,18 @@
  * auto-creates or auto-reorganises files.
  *
  * SIGNALS (each 0–1, weighted average → final score):
- *  - folderProximity   (0.30) — files share a common ancestor folder
- *  - sharedTags        (0.20) — overlapping semantic tags
- *  - sharedEntities    (0.20) — overlapping extracted entities (people, orgs, refs)
- *  - filenameSimilarity(0.15) — Jaccard overlap of filename tokens
- *  - sharedAiCategory  (0.10) — same AI category
- *  - dateProximity     (0.05) — file-modified timestamps within 30 days of each other
+ *  - folderProximity    (0.25) — files share a common ancestor folder
+ *  - sharedTags         (0.18) — overlapping semantic tags
+ *  - sharedEntities     (0.18) — overlapping extracted entities (people, orgs, refs)
+ *  - filenameSimilarity (0.14) — Jaccard overlap of filename tokens
+ *  - sharedAiCategory   (0.10) — same AI category
+ *  - dateProximity      (0.05) — file-modified timestamps within 30 days of each other
+ *  - semanticSimilarity (0.10) — cosine similarity of embedding vectors (0 when unavailable)
+ *
+ * USER CORRECTIONS:
+ *  - Pairs already co-located in an approved project are skipped (they're organised).
+ *  - Pairs that appeared in a previously-rejected candidate require a higher threshold
+ *    (+0.15 above CANDIDATE_THRESHOLD) before being proposed again.
  *
  * ALGORITHM:
  *  1. Score every pair of findings (O(n²), capped at 500 findings per call).
@@ -21,7 +27,7 @@
  * Nothing reaches the filesystem — this is purely metadata grouping.
  */
 
-import { eq, and, inArray, sql, ne } from "drizzle-orm";
+import { eq, and, inArray, sql, desc } from "drizzle-orm";
 import {
   db,
   findingsTable,
@@ -31,6 +37,7 @@ import {
   projectCandidateFilesTable,
   projectsTable,
   projectFilesTable,
+  embeddingChunksTable,
   type Finding,
   type ProjectCandidate,
   type Project,
@@ -49,18 +56,27 @@ export interface PairSignals {
   filenameSimilarity: number;
   sharedAiCategory: number;
   dateProximity: number;
+  /** Cosine similarity of pre-computed embedding vectors. 0 when no embeddings available. */
+  semanticSimilarity: number;
 }
 
-const WEIGHTS: Record<keyof PairSignals, number> = {
-  folderProximity: 0.30,
-  sharedTags: 0.20,
-  sharedEntities: 0.20,
-  filenameSimilarity: 0.15,
+export const WEIGHTS: Record<keyof PairSignals, number> = {
+  folderProximity: 0.25,
+  sharedTags: 0.18,
+  sharedEntities: 0.18,
+  filenameSimilarity: 0.14,
   sharedAiCategory: 0.10,
   dateProximity: 0.05,
+  semanticSimilarity: 0.10,
 };
 
 export const CANDIDATE_THRESHOLD = 0.35;
+
+/**
+ * Pairs found in approved projects → skip re-proposing.
+ * Pairs found in rejected candidates → raise threshold by this delta.
+ */
+export const REJECTION_THRESHOLD_DELTA = 0.15;
 
 export interface CandidateWithFiles {
   candidate: ProjectCandidate;
@@ -78,46 +94,45 @@ export interface ProjectDetail {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Scoring helpers
+// Pure scoring helpers (exported for testing)
 // ────────────────────────────────────────────────────────────────────────────
 
-function folderDepth(path: string): string[] {
+export function folderSegments(path: string): string[] {
   return path.replace(/\\/g, "/").split("/").filter(Boolean);
 }
 
-function commonPrefixLength(a: string[], b: string[]): number {
+export function commonPrefixLength(a: string[], b: string[]): number {
   let i = 0;
   while (i < a.length && i < b.length && a[i] === b[i]) i++;
   return i;
 }
 
-function computeFolderProximity(pathA: string, pathB: string): number {
-  const a = folderDepth(pathA);
-  const b = folderDepth(pathB);
+export function computeFolderProximity(pathA: string, pathB: string): number {
+  const a = folderSegments(pathA);
+  const b = folderSegments(pathB);
   if (a.length === 0 || b.length === 0) return 0;
   const common = commonPrefixLength(a, b);
-  // Score by how large a fraction of the shorter path is shared
   return common / Math.min(a.length, b.length);
 }
 
-function tokenizeFilename(name: string): Set<string> {
+export function tokenizeFilename(name: string): Set<string> {
   return new Set(
     name
       .toLowerCase()
-      .replace(/\.[^.]+$/, "") // strip extension
+      .replace(/\.[^.]+$/, "")
       .split(/[\s\-_.]+/)
       .filter((t) => t.length >= 2)
   );
 }
 
-function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+export function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 && b.size === 0) return 0;
   const intersection = [...a].filter((x) => b.has(x)).length;
   const union = new Set([...a, ...b]).size;
   return intersection / union;
 }
 
-function dateProximityScore(a: Date | null, b: Date | null): number {
+export function dateProximityScore(a: Date | null, b: Date | null): number {
   if (!a || !b) return 0;
   const diffDays = Math.abs(a.getTime() - b.getTime()) / (1000 * 60 * 60 * 24);
   if (diffDays <= 1) return 1;
@@ -127,7 +142,23 @@ function dateProximityScore(a: Date | null, b: Date | null): number {
   return 0;
 }
 
-function computeScore(signals: PairSignals): number {
+/**
+ * Cosine similarity between two Float32 vectors.
+ * Returns 0 if either is null or dimensions differ.
+ */
+export function cosineSimilarity(a: Float32Array | null, b: Float32Array | null): number {
+  if (!a || !b || a.length !== b.length || a.length === 0) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : Math.max(0, Math.min(1, dot / denom));
+}
+
+export function computeScore(signals: PairSignals): number {
   let score = 0;
   for (const [key, weight] of Object.entries(WEIGHTS)) {
     score += signals[key as keyof PairSignals] * weight;
@@ -139,18 +170,29 @@ function computeScore(signals: PairSignals): number {
 // Pair scoring
 // ────────────────────────────────────────────────────────────────────────────
 
-interface FindingAugmented extends Finding {
+export interface FindingAugmented extends Finding {
   tags: string[];
   entityValues: string[];
+  /** Pre-loaded first-chunk embedding vector, or null if not available */
+  embeddingVector: Float32Array | null;
 }
 
 async function augmentFindings(findings: Finding[]): Promise<FindingAugmented[]> {
   const ids = findings.map((f) => f.id);
   if (ids.length === 0) return [];
 
-  const [tagRows, entityRows] = await Promise.all([
+  const [tagRows, entityRows, embeddingRows] = await Promise.all([
     db.select().from(semanticTagsTable).where(inArray(semanticTagsTable.findingId, ids)),
     db.select().from(entitiesTable).where(inArray(entitiesTable.findingId, ids)),
+    db
+      .select({ findingId: embeddingChunksTable.findingId, vector: embeddingChunksTable.vector })
+      .from(embeddingChunksTable)
+      .where(
+        and(
+          inArray(embeddingChunksTable.findingId, ids),
+          eq(embeddingChunksTable.chunkIndex, 0)
+        )
+      ),
   ]);
 
   const tagsByFinding = new Map<number, string[]>();
@@ -167,14 +209,24 @@ async function augmentFindings(findings: Finding[]): Promise<FindingAugmented[]>
     entitiesByFinding.set(row.findingId, list);
   }
 
+  const embeddingByFinding = new Map<number, Float32Array>();
+  for (const row of embeddingRows) {
+    if (row.vector) {
+      const buf = row.vector as Buffer;
+      const arr = new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
+      embeddingByFinding.set(row.findingId, arr);
+    }
+  }
+
   return findings.map((f) => ({
     ...f,
     tags: tagsByFinding.get(f.id) ?? [],
     entityValues: entitiesByFinding.get(f.id) ?? [],
+    embeddingVector: embeddingByFinding.get(f.id) ?? null,
   }));
 }
 
-function pairSignals(a: FindingAugmented, b: FindingAugmented): PairSignals {
+export function pairSignals(a: FindingAugmented, b: FindingAugmented): PairSignals {
   const aTags = new Set(a.tags);
   const bTags = new Set(b.tags);
   const aEntities = new Set(a.entityValues);
@@ -187,7 +239,8 @@ function pairSignals(a: FindingAugmented, b: FindingAugmented): PairSignals {
 
   const sharedEntities =
     aEntities.size + bEntities.size > 0
-      ? ([...aEntities].filter((e) => bEntities.has(e)).length * 2) / (aEntities.size + bEntities.size)
+      ? ([...aEntities].filter((e) => bEntities.has(e)).length * 2) /
+        (aEntities.size + bEntities.size)
       : 0;
 
   return {
@@ -197,22 +250,105 @@ function pairSignals(a: FindingAugmented, b: FindingAugmented): PairSignals {
     filenameSimilarity: jaccardSimilarity(tokenizeFilename(a.name), tokenizeFilename(b.name)),
     sharedAiCategory: a.aiCategory && b.aiCategory && a.aiCategory === b.aiCategory ? 1 : 0,
     dateProximity: dateProximityScore(a.fileModifiedAt, b.fileModifiedAt),
+    semanticSimilarity: cosineSimilarity(a.embeddingVector, b.embeddingVector),
   };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Greedy single-linkage clustering
+// User-correction helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-function cluster(
+function pairKey(a: number, b: number): string {
+  return `${Math.min(a, b)}-${Math.max(a, b)}`;
+}
+
+interface CorrectionMap {
+  /** Pairs already in an approved project — skip re-proposing */
+  approvedPairs: Set<string>;
+  /** Pairs that appeared in a rejected candidate — raise threshold by REJECTION_THRESHOLD_DELTA */
+  rejectedPairs: Set<string>;
+}
+
+async function buildCorrectionMap(findingIds: number[]): Promise<CorrectionMap> {
+  if (findingIds.length === 0) return { approvedPairs: new Set(), rejectedPairs: new Set() };
+
+  // Approved pairs: findings that share an approved project
+  const approvedLinks = await db
+    .select({ projectId: projectFilesTable.projectId, findingId: projectFilesTable.findingId })
+    .from(projectFilesTable)
+    .where(inArray(projectFilesTable.findingId, findingIds));
+
+  const byProject = new Map<number, number[]>();
+  for (const link of approvedLinks) {
+    const list = byProject.get(link.projectId) ?? [];
+    list.push(link.findingId);
+    byProject.set(link.projectId, list);
+  }
+
+  const approvedPairs = new Set<string>();
+  for (const ids of byProject.values()) {
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        approvedPairs.add(pairKey(ids[i], ids[j]));
+      }
+    }
+  }
+
+  // Rejected pairs: findings that appeared together in a rejected candidate
+  const rejectedCandidates = await db
+    .select({ id: projectCandidatesTable.id })
+    .from(projectCandidatesTable)
+    .where(eq(projectCandidatesTable.status, "rejected"));
+
+  const rejectedPairs = new Set<string>();
+  if (rejectedCandidates.length > 0) {
+    const rejectedIds = rejectedCandidates.map((c) => c.id);
+    const rejectedLinks = await db
+      .select({
+        candidateId: projectCandidateFilesTable.candidateId,
+        findingId: projectCandidateFilesTable.findingId,
+      })
+      .from(projectCandidateFilesTable)
+      .where(
+        and(
+          inArray(projectCandidateFilesTable.candidateId, rejectedIds),
+          inArray(projectCandidateFilesTable.findingId, findingIds)
+        )
+      );
+
+    const byCandidate = new Map<number, number[]>();
+    for (const link of rejectedLinks) {
+      const list = byCandidate.get(link.candidateId) ?? [];
+      list.push(link.findingId);
+      byCandidate.set(link.candidateId, list);
+    }
+
+    for (const ids of byCandidate.values()) {
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          rejectedPairs.add(pairKey(ids[i], ids[j]));
+        }
+      }
+    }
+  }
+
+  return { approvedPairs, rejectedPairs };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Greedy single-linkage clustering (exported for testing)
+// ────────────────────────────────────────────────────────────────────────────
+
+export function cluster(
   findings: FindingAugmented[],
-  threshold = CANDIDATE_THRESHOLD
+  threshold = CANDIDATE_THRESHOLD,
+  corrections?: CorrectionMap
 ): Array<{ ids: number[]; signals: PairSignals; score: number }> {
   const n = findings.length;
   const parent: number[] = Array.from({ length: n }, (_, i) => i);
   const signalSums: PairSignals[] = Array.from({ length: n }, () => ({
     folderProximity: 0, sharedTags: 0, sharedEntities: 0,
-    filenameSimilarity: 0, sharedAiCategory: 0, dateProximity: 0,
+    filenameSimilarity: 0, sharedAiCategory: 0, dateProximity: 0, semanticSimilarity: 0,
   }));
   const pairCounts: number[] = new Array(n).fill(0);
 
@@ -226,9 +362,22 @@ function cluster(
 
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
+      const aId = findings[i].id;
+      const bId = findings[j].id;
+      const key = pairKey(aId, bId);
+
+      // Skip pairs that are already in an approved project
+      if (corrections?.approvedPairs.has(key)) continue;
+
       const signals = pairSignals(findings[i], findings[j]);
       const score = computeScore(signals);
-      if (score >= threshold) {
+
+      // Raise threshold for pairs previously rejected
+      const effectiveThreshold = corrections?.rejectedPairs.has(key)
+        ? threshold + REJECTION_THRESHOLD_DELTA
+        : threshold;
+
+      if (score >= effectiveThreshold) {
         union(i, j);
         const root = find(i);
         for (const key of Object.keys(signals) as Array<keyof PairSignals>) {
@@ -239,7 +388,6 @@ function cluster(
     }
   }
 
-  // Group by root
   const groups = new Map<number, number[]>();
   for (let i = 0; i < n; i++) {
     const root = find(i);
@@ -260,6 +408,7 @@ function cluster(
         filenameSimilarity: signalSums[root].filenameSimilarity / pairs,
         sharedAiCategory: signalSums[root].sharedAiCategory / pairs,
         dateProximity: signalSums[root].dateProximity / pairs,
+        semanticSimilarity: signalSums[root].semanticSimilarity / pairs,
       };
       return {
         ids: group.map((i) => findings[i].id),
@@ -270,10 +419,10 @@ function cluster(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Name generation for candidates
+// Name generation (exported for testing)
 // ────────────────────────────────────────────────────────────────────────────
 
-function signalExplanation(signals: PairSignals): string {
+export function signalExplanation(signals: PairSignals): string {
   const parts: string[] = [];
   if (signals.folderProximity >= 0.5) parts.push("files share a common folder");
   if (signals.sharedTags >= 0.3) parts.push("overlapping semantic tags");
@@ -281,14 +430,18 @@ function signalExplanation(signals: PairSignals): string {
   if (signals.filenameSimilarity >= 0.3) parts.push("similar filenames");
   if (signals.sharedAiCategory >= 0.5) parts.push("same AI category");
   if (signals.dateProximity >= 0.5) parts.push("close modification dates");
+  if (signals.semanticSimilarity >= 0.5) parts.push("similar document content");
   if (parts.length === 0) return "Weak multi-signal match";
-  return parts[0][0].toUpperCase() + parts[0].slice(1) + (parts.length > 1 ? ` and ${parts.length - 1} other signal${parts.length > 2 ? "s" : ""}` : "");
+  return (
+    parts[0][0].toUpperCase() +
+    parts[0].slice(1) +
+    (parts.length > 1 ? ` and ${parts.length - 1} other signal${parts.length > 2 ? "s" : ""}` : "")
+  );
 }
 
-function deriveName(findings: FindingAugmented[]): string {
-  // Find the most common folder segment across the findings
+export function deriveName(findings: FindingAugmented[]): string {
   const segments = findings
-    .flatMap((f) => folderDepth(f.path).slice(0, -1)) // exclude filename
+    .flatMap((f) => folderSegments(f.path).slice(0, -1))
     .reduce<Map<string, number>>((acc, seg) => {
       acc.set(seg, (acc.get(seg) ?? 0) + 1);
       return acc;
@@ -301,7 +454,6 @@ function deriveName(findings: FindingAugmented[]): string {
     }
   }
 
-  // Fall back to first finding's name stem
   const stem = findings[0]?.name.replace(/\.[^.]+$/, "") ?? "Unnamed";
   return `Project: ${stem} (${findings.length} files)`;
 }
@@ -313,20 +465,26 @@ function deriveName(findings: FindingAugmented[]): string {
 /**
  * Generate project candidates from findings in the DB. Caps at 500 findings
  * to keep O(n²) pair scoring in a reasonable time budget.
+ *
+ * Incorporates user corrections:
+ *  - Pairs already in an approved project are skipped.
+ *  - Pairs from rejected candidates require a higher score to re-appear.
  */
 export async function generateCandidates(opts: {
   scanId?: number;
   limit?: number;
 }): Promise<CandidateWithFiles[]> {
   const cap = Math.min(opts.limit ?? 500, 500);
-  const baseQuery = db.select().from(findingsTable).limit(cap);
 
   const rawFindings = opts.scanId
     ? await db.select().from(findingsTable).where(eq(findingsTable.scanId, opts.scanId)).limit(cap)
-    : await baseQuery;
+    : await db.select().from(findingsTable).limit(cap);
 
   const findings = await augmentFindings(rawFindings);
-  const clusters = cluster(findings);
+  const findingIds = findings.map((f) => f.id);
+
+  const corrections = await buildCorrectionMap(findingIds);
+  const clusters = cluster(findings, CANDIDATE_THRESHOLD, corrections);
 
   const created: CandidateWithFiles[] = [];
 
@@ -371,7 +529,8 @@ export async function approveCandidate(candidateId: number): Promise<Project> {
     .then((r) => r[0]);
 
   if (!candidate) throw new Error(`Candidate ${candidateId} not found`);
-  if (candidate.status !== "pending") throw new Error(`Candidate ${candidateId} is already ${candidate.status}`);
+  if (candidate.status !== "pending")
+    throw new Error(`Candidate ${candidateId} is already ${candidate.status}`);
 
   const candidateFiles = await db
     .select()
@@ -401,6 +560,27 @@ export async function approveCandidate(candidateId: number): Promise<Project> {
     .where(eq(projectCandidatesTable.id, candidateId));
 
   return project;
+}
+
+/**
+ * Reject a candidate so it won't be re-proposed unless the signals strengthen.
+ */
+export async function rejectCandidate(candidateId: number): Promise<void> {
+  const candidate = await db
+    .select()
+    .from(projectCandidatesTable)
+    .where(eq(projectCandidatesTable.id, candidateId))
+    .limit(1)
+    .then((r) => r[0]);
+
+  if (!candidate) throw new Error(`Candidate ${candidateId} not found`);
+  if (candidate.status !== "pending")
+    throw new Error(`Candidate ${candidateId} is already ${candidate.status}`);
+
+  await db
+    .update(projectCandidatesTable)
+    .set({ status: "rejected", updatedAt: new Date() })
+    .where(eq(projectCandidatesTable.id, candidateId));
 }
 
 /**
@@ -469,7 +649,6 @@ export async function splitProject(
   if (!original) throw new Error(`Project ${projectId} not found`);
   if (findingIds.length === 0) throw new Error("No finding IDs provided for split");
 
-  // Remove from original
   await db
     .delete(projectFilesTable)
     .where(
@@ -479,7 +658,6 @@ export async function splitProject(
       )
     );
 
-  // Create new project with the split files
   const [newProject] = await db
     .insert(projectsTable)
     .values({
@@ -567,14 +745,19 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
 }
 
 /**
- * List all pending candidates.
+ * List candidates, optionally filtered by status.
  */
 export async function listCandidates(status?: string): Promise<CandidateWithFiles[]> {
   const rows = status
     ? await db
         .select()
         .from(projectCandidatesTable)
-        .where(eq(projectCandidatesTable.status, status as "pending" | "approved" | "rejected" | "merged"))
+        .where(
+          eq(
+            projectCandidatesTable.status,
+            status as "pending" | "approved" | "rejected" | "merged"
+          )
+        )
     : await db.select().from(projectCandidatesTable);
 
   const result: CandidateWithFiles[] = [];
