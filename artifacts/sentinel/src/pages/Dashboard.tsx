@@ -66,7 +66,7 @@ export default function Dashboard() {
 
   const totalFiles = summary?.totalFiles ?? 0;
   const organisedCount = Math.round(totalFiles * organisedPct / 100);
-  const unorganisedCount = totalFiles - organisedCount;
+  const _unorganisedCount = totalFiles - organisedCount;
 
   const lastScanLabel = summary?.lastScanAt
     ? new Date(summary.lastScanAt).toLocaleDateString("en-AU", {

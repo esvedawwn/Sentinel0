@@ -1,7 +1,5 @@
 import path from "path";
 import {
-  FindingType,
-  FindingStatus,
   ScanFinding,
   INSTALLER_EXTS,
   ARCHIVE_EXTS,

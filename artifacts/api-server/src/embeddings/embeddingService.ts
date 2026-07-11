@@ -27,18 +27,16 @@
  *    for the consent model.
  */
 
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   db,
   embeddingChunksTable,
   extractedTextTable,
   userSettingsTable,
-  findingsTable,
-  type EmbeddingChunk,
   type EmbeddingModel,
 } from "@workspace/db";
 import { chunkText, type TextChunk } from "./chunker.js";
-import { buildEmbeddingsProvider, cosineSimilarity, type EmbeddingsProvider, type EmbeddingVector } from "./providers.js";
+import { buildEmbeddingsProvider, cosineSimilarity } from "./providers.js";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types

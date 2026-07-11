@@ -69,7 +69,7 @@ export default function ScanHistory() {
   });
 
   const scans: Scan[] = data ?? [];
-  const total = offset + scans.length + (scans.length === PAGE_SIZE ? 1 : 0);
+  const _total = offset + scans.length + (scans.length === PAGE_SIZE ? 1 : 0);
   const hasMore = scans.length === PAGE_SIZE;
 
   return (

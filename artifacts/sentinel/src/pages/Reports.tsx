@@ -1,5 +1,5 @@
 import { useGetReportsOverview, useGetReportsScanHistory } from "@workspace/api-client-react";
-import { formatBytes, formatNumber, formatTimestamp, statusColor, statusLabel } from "@/lib/utils";
+import { formatBytes, formatNumber } from "@/lib/utils";
 import {
   BarChart,
   Bar,
@@ -61,7 +61,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function Reports() {
   const { data: overview, isLoading } = useGetReportsOverview();
-  const { data: scanHistory } = useGetReportsScanHistory({ days: 30 });
+  const { data: _scanHistory } = useGetReportsScanHistory({ days: 30 });
 
   const categoryData = (overview?.categoryBreakdown ?? []).map((c, i) => ({
     name: c.label,

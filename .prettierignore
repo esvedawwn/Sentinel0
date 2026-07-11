@@ -1,0 +1,11 @@
+node_modules
+dist
+build
+target
+.cache
+.local
+pnpm-lock.yaml
+**/src/generated/**
+sample-data
+**/*.d.ts
+coverage

@@ -27,7 +27,7 @@
  * Nothing reaches the filesystem — this is purely metadata grouping.
  */
 
-import { eq, and, inArray, sql, desc } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import {
   db,
   findingsTable,
@@ -41,8 +41,6 @@ import {
   type Finding,
   type ProjectCandidate,
   type Project,
-  type ProjectFile,
-  type InsertProject,
 } from "@workspace/db";
 
 // ────────────────────────────────────────────────────────────────────────────

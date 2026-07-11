@@ -55,6 +55,7 @@ router.post("/findings/:id/extract", async (req, res): Promise<void> => {
     return;
   }
 
+  // eslint-disable-next-line no-useless-assignment
   let extractorResult: { extractor: string; text: string; truncated: boolean } | null = null;
 
   try {

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, activityTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { ListActivityQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();

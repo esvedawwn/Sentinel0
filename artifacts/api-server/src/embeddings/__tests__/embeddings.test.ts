@@ -117,7 +117,7 @@ describe("chunkText", () => {
     const text = Array.from({ length: 5 }, (_, i) => `Paragraph ${i + 1} ${"content ".repeat(10)}`).join("\n\n");
     const chunks = chunkText(text);
     expect(chunks.length).toBeGreaterThan(0);
-    chunks.forEach((c, i) => {
+    chunks.forEach((c, _i) => {
       expect(c.index).toBeGreaterThanOrEqual(0);
     });
   });

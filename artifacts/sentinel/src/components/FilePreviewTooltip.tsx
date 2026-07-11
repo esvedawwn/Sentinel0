@@ -9,9 +9,9 @@
  * Usage: wrap any file row element with this component.
  */
 
-import { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { formatBytes } from "@/lib/utils";
+import { formatBytes } from "../lib/utils";
 
 export interface FilePreviewInfo {
   name: string;

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, duplicateGroupsTable, findingsTable, activityTable } from "@workspace/db";
-import { eq, desc, asc, count, sql } from "drizzle-orm";
+import { eq, desc, count, sql } from "drizzle-orm";
 import { ResolveDuplicateParams, ResolveDuplicateBody, ListDuplicatesQueryParams } from "@workspace/api-zod";
 
 const router: IRouter = Router();
