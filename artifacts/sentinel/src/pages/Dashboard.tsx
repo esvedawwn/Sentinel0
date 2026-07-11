@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
+import { Settings, RefreshCw } from "lucide-react";
 import {
   useGetDashboardSummary,
   useGetDashboardRecentActivity,
@@ -12,40 +13,6 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatBytes, formatNumber, formatTimestamp, activityIcon, statusColor } from "@/lib/utils";
-
-function MetricCard({
-  label,
-  value,
-  color,
-  sub,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-  sub?: string;
-}) {
-  return (
-    <div className="sentinel-card p-5 flex flex-col gap-2">
-      <span
-        className="text-xs tracking-widest uppercase"
-        style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)" }}
-      >
-        {label}
-      </span>
-      <span
-        className="text-3xl font-bold font-mono tracking-tight"
-        style={{ color: color ?? "#ffffff", fontFamily: "var(--app-font-mono)" }}
-      >
-        {value}
-      </span>
-      {sub && (
-        <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
-          {sub}
-        </span>
-      )}
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const [scanPath, setScanPath] = useState("");
@@ -62,8 +29,8 @@ export default function Dashboard() {
   });
 
   const { data: activity } = useGetDashboardRecentActivity(
-    { limit: 15 },
-    { query: { queryKey: getGetDashboardRecentActivityQueryKey({ limit: 15 }), refetchInterval: 5000 } }
+    { limit: 12 },
+    { query: { queryKey: getGetDashboardRecentActivityQueryKey({ limit: 12 }), refetchInterval: 5000 } }
   );
 
   const { data: attention } = useGetDashboardNeedsAttention({
@@ -92,279 +59,770 @@ export default function Dashboard() {
     );
   };
 
-  const organisedColor =
-    (summary?.organisedPercent ?? 0) >= 95 ? "#34D399" : "#FBBF24";
+  const organisedPct = summary?.organisedPercent ?? 0;
+  const r = 120;
+  const circumference = 2 * Math.PI * r;
+  const dashOffset = circumference - (circumference * organisedPct) / 100;
+
+  const totalFiles = summary?.totalFiles ?? 0;
+  const organisedCount = Math.round(totalFiles * organisedPct / 100);
+  const unorganisedCount = totalFiles - organisedCount;
 
   const lastScanLabel = summary?.lastScanAt
-    ? `Last scan ${formatTimestamp(summary.lastScanAt)}`
-    : "No scans yet";
+    ? new Date(summary.lastScanAt).toLocaleDateString("en-AU", {
+        day: "2-digit", month: "short", year: "numeric",
+        hour: "2-digit", minute: "2-digit", hour12: false,
+      })
+    : null;
+
+  const isScanning = summary?.systemStatus === "scanning";
 
   return (
-    <div className="p-8 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-xl font-semibold text-white">Dashboard</h1>
-          <p
-            className="text-xs font-mono mt-1"
-            style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}
-          >
-            {summary?.lastScanAt
-              ? `LAST SCAN · ${new Date(summary.lastScanAt).toLocaleTimeString("en-AU", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}`
-              : "NO SCANS YET"}
-          </p>
-        </div>
-        <div className="flex gap-3">
-          {!showScanInput ? (
-            <div className="flex gap-2">
-              <button
-                onClick={handleSampleScan}
-                disabled={createScan.isPending}
-                className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
-                style={{
-                  background: "rgba(52,211,153,0.12)",
-                  color: "#34D399",
-                  border: "1px solid rgba(52,211,153,0.3)",
-                }}
-              >
-                {createScan.isPending ? "Scanning…" : "Scan Sample Data"}
-              </button>
-              <button
-                onClick={() => setShowScanInput(true)}
-                className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
-                style={{ background: "#34D399", color: "#111111" }}
-              >
-                Simulate Scan
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                autoFocus
-                value={scanPath}
-                onChange={(e) => setScanPath(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleScan();
-                  if (e.key === "Escape") setShowScanInput(false);
-                }}
-                placeholder="/Users/Documents"
-                className="px-3 py-2 text-sm rounded text-white outline-none w-56"
-                style={{
-                  background: "#222222",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  fontFamily: "var(--app-font-mono)",
-                  fontSize: "0.8rem",
-                }}
-              />
-              <button
-                onClick={handleScan}
-                disabled={createScan.isPending}
-                className="px-4 py-2 text-sm font-medium rounded transition-colors duration-150"
-                style={{ background: "#34D399", color: "#111111" }}
-              >
-                {createScan.isPending ? "Starting..." : "Start"}
-              </button>
-              <button
-                onClick={() => setShowScanInput(false)}
-                className="px-3 py-2 text-sm rounded"
-                style={{ background: "#222222", color: "rgba(255,255,255,0.5)" }}
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+    <div style={{ background: "#111111", color: "#FFFFFF", minHeight: "100vh" }}>
 
-      {/* Metric Cards */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          label="Total Files"
-          value={isLoading ? "—" : formatNumber(summary?.totalFiles ?? 0)}
-        />
-        <MetricCard
-          label="Organised"
-          value={isLoading ? "—" : `${summary?.organisedPercent ?? 0}%`}
-          color={organisedColor}
-        />
-        <MetricCard
-          label="Duplicates"
-          value={isLoading ? "—" : formatNumber(summary?.duplicatesCount ?? 0)}
-          color={summary?.duplicatesCount ? "#FBBF24" : "#34D399"}
-          sub="awaiting review"
-        />
-        <MetricCard
-          label="Recoverable"
-          value={isLoading ? "—" : formatBytes(summary?.bytesRecoverable ?? 0)}
-          color="#34D399"
-          sub="from findings"
-        />
-      </div>
-
-      {/* Scan Progress */}
-      <AnimatePresence>
-        {summary?.systemStatus === "scanning" && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2 }}
-            className="sentinel-card p-5 mb-6"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <span
-                  className="text-xs tracking-widest uppercase font-mono"
-                  style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)" }}
-                >
-                  Current Scan · {summary?.currentScanPath ?? ""}
-                </span>
-              </div>
-              <span
-                className="text-xs font-mono px-2 py-0.5 rounded"
-                style={{
-                  background: "rgba(96, 165, 250, 0.12)",
-                  color: "#60A5FA",
-                  fontFamily: "var(--app-font-mono)",
-                }}
-              >
-                IN PROGRESS · {summary?.currentScanProgress ?? 0}%
-              </span>
-            </div>
-            <div
-              className="h-1.5 rounded-full overflow-hidden"
-              style={{ background: "rgba(255,255,255,0.08)" }}
+      {/* ── Hero ─────────────────────────────────────────────────── */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          height: 380,
+          background: "#111111",
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }}
+      >
+        {/* Top strip */}
+        <div
+          className="flex items-center justify-between px-8 pt-6"
+          style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className="font-mono font-bold tracking-widest text-sm uppercase"
+              style={{ color: "#FFFFFF" }}
             >
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: "#60A5FA" }}
-                initial={{ width: 0 }}
-                animate={{ width: `${summary?.currentScanProgress ?? 0}%` }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              Sentinel
+            </span>
+            <span
+              className="font-mono text-[10px] px-2 py-0.5 rounded uppercase tracking-wider"
+              style={{ background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }}
+            >
+              v0.1-α
+            </span>
+          </div>
 
-      {/* Two-column: Activity + Needs Attention */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Recent Activity */}
-        <div className="col-span-2 sentinel-card p-5">
-          <h2
-            className="text-xs tracking-widest uppercase mb-4"
-            style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)" }}
-          >
-            Recent Activity
-          </h2>
-          <div className="space-y-0">
-            <AnimatePresence initial={false}>
-              {(activity ?? []).map((entry, i) => (
-                <motion.div
-                  key={entry.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.03, duration: 0.2 }}
-                  className="flex items-start gap-3 py-2.5"
-                  style={{ borderBottom: i < (activity?.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.05)" : "none" }}
+          <div className="flex items-center gap-3">
+            {!showScanInput ? (
+              <>
+                <button
+                  onClick={handleSampleScan}
+                  disabled={createScan.isPending || isScanning}
+                  className="font-mono text-xs px-4 py-1.5 rounded transition-colors"
+                  style={{
+                    background: "rgba(52,211,153,0.1)",
+                    color: "#34D399",
+                    border: "1px solid rgba(52,211,153,0.25)",
+                  }}
                 >
-                  <span
-                    className="font-mono text-xs w-16 shrink-0 pt-0.5"
-                    style={{
-                      color: "rgba(255,255,255,0.3)",
-                      fontFamily: "var(--app-font-mono)",
-                    }}
-                  >
-                    {formatTimestamp(entry.timestamp)}
-                  </span>
-                  <span
-                    className="text-sm font-mono shrink-0"
-                    style={{ color: statusColor(entry.status) }}
-                  >
-                    {activityIcon(entry.status)}
-                  </span>
-                  <span className="text-sm" style={{ color: "rgba(255,255,255,0.8)" }}>
-                    {entry.message}
-                  </span>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            {(!activity || activity.length === 0) && (
-              <p className="text-sm py-4" style={{ color: "rgba(255,255,255,0.3)" }}>
-                No activity yet. Start a scan to index your files.
-              </p>
+                  {createScan.isPending ? "Scanning…" : "Scan Sample"}
+                </button>
+                <button
+                  onClick={() => setShowScanInput(true)}
+                  className="font-mono text-xs px-4 py-1.5 rounded transition-colors"
+                  style={{ background: "#34D399", color: "#111111" }}
+                >
+                  New Scan
+                </button>
+              </>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  autoFocus
+                  value={scanPath}
+                  onChange={(e) => setScanPath(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleScan();
+                    if (e.key === "Escape") setShowScanInput(false);
+                  }}
+                  placeholder="/Users/Documents"
+                  className="font-mono text-xs px-3 py-1.5 rounded text-white outline-none w-44"
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                  }}
+                />
+                <button
+                  onClick={handleScan}
+                  disabled={createScan.isPending}
+                  className="font-mono text-xs px-3 py-1.5 rounded"
+                  style={{ background: "#34D399", color: "#111111" }}
+                >
+                  {createScan.isPending ? "Starting…" : "Start"}
+                </button>
+                <button
+                  onClick={() => setShowScanInput(false)}
+                  className="font-mono text-xs px-3 py-1.5 rounded"
+                  style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}
+                >
+                  Cancel
+                </button>
+              </>
             )}
+
+            <button
+              onClick={() => queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() })}
+              className="p-2 rounded-full"
+              style={{ color: "rgba(255,255,255,0.4)" }}
+            >
+              <RefreshCw size={14} />
+            </button>
+            <button
+              onClick={() => navigate("/settings")}
+              className="p-2 rounded-full"
+              style={{ color: "rgba(255,255,255,0.4)" }}
+            >
+              <Settings size={14} />
+            </button>
           </div>
         </div>
 
-        {/* Needs Attention */}
-        <div className="flex flex-col gap-4">
-          {(attention?.corruptedFiles ?? 0) > 0 && (
-            <div
-              className="sentinel-card p-5 cursor-pointer transition-colors duration-150"
-              onClick={() => navigate("/organise")}
-              style={{ borderColor: "rgba(248, 113, 113, 0.3)" }}
+        {/* Left title */}
+        <div
+          className="absolute flex flex-col gap-2"
+          style={{ left: 40, top: "50%", transform: "translateY(-50%)" }}
+        >
+          <h1
+            className="font-bold tracking-tight"
+            style={{ color: "#FFFFFF", fontSize: "3.25rem", lineHeight: 1.1 }}
+          >
+            File Intelligence
+          </h1>
+          <span
+            className="font-mono text-xs uppercase tracking-widest"
+            style={{ color: "rgba(255,255,255,0.35)" }}
+          >
+            {lastScanLabel ? `Last scan · ${lastScanLabel}` : "No scans yet"}
+          </span>
+        </div>
+
+        {/* Center radial */}
+        <div
+          className="absolute flex items-center justify-center"
+          style={{ left: "50%", top: "50%", transform: "translate(-50%, -50%)", width: 280, height: 280 }}
+        >
+          <svg
+            className="absolute inset-0 w-full h-full"
+            style={{ transform: "rotate(-90deg)" }}
+            viewBox="0 0 280 280"
+          >
+            <circle cx="140" cy="140" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />
+            <circle
+              cx="140"
+              cy="140"
+              r={r}
+              fill="none"
+              stroke="#34D399"
+              strokeWidth="12"
+              strokeDasharray={circumference}
+              strokeDashoffset={isLoading ? circumference : dashOffset}
+              strokeLinecap="round"
+              style={{
+                filter: "drop-shadow(0 0 16px rgba(52,211,153,0.45))",
+                transition: "stroke-dashoffset 1s ease-out",
+              }}
+            />
+          </svg>
+          <div className="text-center flex flex-col items-center" style={{ zIndex: 1 }}>
+            <span
+              className="font-mono font-bold tracking-tighter"
+              style={{ color: "#34D399", fontSize: "4.5rem", lineHeight: 1 }}
             >
-              <div className="mb-2">
-                <span
-                  className="text-xs tracking-widest uppercase font-mono"
-                  style={{ color: "#F87171", fontFamily: "var(--app-font-mono)" }}
-                >
-                  Action Required
+              {isLoading ? "—" : organisedPct}
+              <span className="text-3xl" style={{ color: "rgba(255,255,255,0.25)", marginLeft: 4 }}>%</span>
+            </span>
+            <span
+              className="font-mono text-[10px] uppercase tracking-[0.2em] mt-2"
+              style={{ color: "rgba(255,255,255,0.45)" }}
+            >
+              Organised
+            </span>
+          </div>
+        </div>
+
+        {/* Right floating card */}
+        <div
+          className="absolute flex flex-col shadow-2xl"
+          style={{
+            top: 56,
+            right: 40,
+            width: 248,
+            background: "rgba(26,26,26,0.88)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 8,
+            padding: "20px 20px 16px",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <span
+            className="font-mono text-[10px] uppercase tracking-widest mb-3"
+            style={{ color: "rgba(255,255,255,0.4)" }}
+          >
+            Space Recoverable
+          </span>
+          <span
+            className="font-mono font-bold tracking-tight mb-4"
+            style={{ color: "#FFFFFF", fontSize: "2.25rem", lineHeight: 1 }}
+          >
+            {isLoading ? "—" : formatBytes(summary?.bytesRecoverable ?? 0).split(" ")[0]}
+            <span className="text-base ml-2" style={{ color: "rgba(255,255,255,0.3)" }}>
+              {isLoading ? "" : formatBytes(summary?.bytesRecoverable ?? 0).split(" ")[1]}
+            </span>
+          </span>
+
+          {/* Sparkline */}
+          <div className="w-full mb-3" style={{ height: 32, opacity: 0.85 }}>
+            <svg width="100%" height="100%" viewBox="0 0 200 30" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(52,211,153,0.18)" />
+                  <stop offset="100%" stopColor="rgba(52,211,153,0)" />
+                </linearGradient>
+              </defs>
+              <path
+                d="M0,25 Q20,10 40,20 T80,15 T120,25 T160,10 T200,20"
+                fill="none"
+                stroke="#34D399"
+                strokeWidth="2"
+                style={{ filter: "drop-shadow(0 2px 4px rgba(52,211,153,0.4))" }}
+              />
+              <path
+                d="M0,25 Q20,10 40,20 T80,15 T120,25 T160,10 T200,20 L200,30 L0,30 Z"
+                fill="url(#sg)"
+              />
+            </svg>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ background: "#34D399", boxShadow: "0 0 6px rgba(52,211,153,0.8)" }}
+            />
+            <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "#34D399" }}>
+              {isScanning ? "Scanning…" : "Optimal"}
+            </span>
+          </div>
+        </div>
+
+        {/* Scan progress bar inside hero when scanning */}
+        <AnimatePresence>
+          {isScanning && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute bottom-0 left-0 right-0"
+            >
+              <div className="h-0.5 w-full" style={{ background: "rgba(255,255,255,0.06)" }}>
+                <motion.div
+                  className="h-full"
+                  style={{ background: "#34D399", boxShadow: "0 0 8px rgba(52,211,153,0.6)" }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${summary?.currentScanProgress ?? 0}%` }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Metrics grid ─────────────────────────────────────────── */}
+      <div className="px-8 pt-6 pb-2" style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div className="grid grid-cols-4 gap-5">
+
+          {/* Card 1 – Total Files */}
+          <div
+            className="flex flex-col justify-between"
+            style={{
+              background: "#1A1A1A",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: 8,
+              padding: 24,
+              minHeight: 220,
+            }}
+          >
+            <div>
+              <span
+                className="font-mono text-[10px] uppercase tracking-widest block mb-4"
+                style={{ color: "rgba(255,255,255,0.4)" }}
+              >
+                Total Files
+              </span>
+              <span
+                className="font-mono font-bold block mb-5 tracking-tight"
+                style={{ color: "#FFFFFF", fontSize: "2.5rem", lineHeight: 1 }}
+              >
+                {isLoading ? "—" : formatNumber(totalFiles)}
+              </span>
+            </div>
+
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#34D399" }} />
+                  <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                    Organised
+                  </span>
+                </div>
+                <span className="font-mono text-xs font-bold" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  {isLoading ? "—" : formatNumber(organisedCount)}
                 </span>
               </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.2)" }} />
+                  <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                    Unorganised
+                  </span>
+                </div>
+                <span className="font-mono text-xs font-bold" style={{ color: "rgba(255,255,255,0.9)" }}>
+                  {isLoading ? "—" : formatNumber(unorganisedCount)}
+                </span>
+              </div>
+
               <div
-                className="text-2xl font-bold font-mono mb-1"
-                style={{ color: "#F87171", fontFamily: "var(--app-font-mono)" }}
+                className="flex w-full rounded-full overflow-hidden mt-3"
+                style={{ height: 5, background: "rgba(255,255,255,0.06)" }}
               >
+                <div
+                  style={{
+                    width: `${organisedPct}%`,
+                    background: "#34D399",
+                    transition: "width 0.8s ease",
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2 – Organised % */}
+          <div
+            className="flex flex-col justify-between"
+            style={{
+              background: "#1A1A1A",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: 8,
+              padding: 24,
+              minHeight: 220,
+            }}
+          >
+            <div>
+              <span
+                className="font-mono text-[10px] uppercase tracking-widest block mb-4"
+                style={{ color: "rgba(255,255,255,0.4)" }}
+              >
+                Organised
+              </span>
+              <span
+                className="font-mono font-bold block mb-1 tracking-tight"
+                style={{ color: "#34D399", fontSize: "2.5rem", lineHeight: 1 }}
+              >
+                {isLoading ? "—" : organisedPct}
+                <span className="text-2xl ml-1" style={{ color: "rgba(255,255,255,0.25)" }}>%</span>
+              </span>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-end justify-between mb-2">
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest"
+                  style={{ color: "rgba(255,255,255,0.35)" }}
+                >
+                  Health
+                </span>
+                <span
+                  className="font-mono text-xs"
+                  style={{ color: organisedPct >= 80 ? "#34D399" : organisedPct >= 50 ? "#FBBF24" : "#F87171" }}
+                >
+                  {organisedPct >= 80 ? "Good" : organisedPct >= 50 ? "Fair" : "Needs Work"}
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full flex gap-1">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-full flex-1"
+                    style={{
+                      borderRadius: i === 0 ? "9999px 0 0 9999px" : i === 2 ? "0 9999px 9999px 0" : 0,
+                      background:
+                        organisedPct >= 33 * (i + 1)
+                          ? i === 0
+                            ? "rgba(52,211,153,0.4)"
+                            : i === 1
+                            ? "rgba(52,211,153,0.65)"
+                            : "#34D399"
+                          : "rgba(255,255,255,0.07)",
+                      boxShadow:
+                        organisedPct >= 33 * (i + 1) && i === 2
+                          ? "0 0 8px rgba(52,211,153,0.3)"
+                          : "none",
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3 – Duplicates */}
+          <div
+            className="flex flex-col justify-between"
+            style={{
+              background: "#1A1A1A",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: 8,
+              padding: 24,
+              minHeight: 220,
+              cursor: "pointer",
+            }}
+            onClick={() => navigate("/organise")}
+          >
+            <div className="flex justify-between items-start">
+              <div>
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest block mb-4"
+                  style={{ color: "rgba(255,255,255,0.4)" }}
+                >
+                  Duplicates
+                </span>
+                <span
+                  className="font-mono font-bold block mb-2 tracking-tight"
+                  style={{
+                    color: (summary?.duplicatesCount ?? 0) > 0 ? "#FBBF24" : "#34D399",
+                    fontSize: "2.5rem",
+                    lineHeight: 1,
+                  }}
+                >
+                  {isLoading ? "—" : formatNumber(summary?.duplicatesCount ?? 0)}
+                </span>
+                {(summary?.duplicatesCount ?? 0) > 0 && (
+                  <span
+                    className="font-mono text-[10px] px-2 py-1 rounded uppercase tracking-widest"
+                    style={{ background: "rgba(251,191,36,0.1)", color: "#FBBF24" }}
+                  >
+                    Needs Review
+                  </span>
+                )}
+              </div>
+
+              {/* Mini donut */}
+              <div className="w-10 h-10 mt-1">
+                <svg viewBox="0 0 36 36" className="w-full h-full" style={{ transform: "rotate(-90deg)" }}>
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.06)"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#FBBF24"
+                    strokeWidth="3"
+                    strokeDasharray="100"
+                    strokeDashoffset={
+                      isLoading || totalFiles === 0
+                        ? 100
+                        : Math.round(100 - ((summary?.duplicatesCount ?? 0) / totalFiles) * 100)
+                    }
+                  />
+                </svg>
+              </div>
+            </div>
+
+            <div className="space-y-2 mt-4">
+              <div
+                className="flex justify-between items-center pb-2"
+                style={{ borderBottom: "1px dashed rgba(255,255,255,0.07)" }}
+              >
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest"
+                  style={{ color: "rgba(255,255,255,0.35)" }}
+                >
+                  Awaiting Review
+                </span>
+                <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  {isLoading ? "—" : formatNumber(summary?.duplicatesCount ?? 0)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest"
+                  style={{ color: "rgba(255,255,255,0.35)" }}
+                >
+                  Recoverable
+                </span>
+                <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  {isLoading ? "—" : formatBytes(summary?.bytesRecoverable ?? 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4 – Needs Attention */}
+          <div
+            className="flex flex-col justify-between"
+            style={{
+              background: "#1A1A1A",
+              border: "1px solid rgba(255,255,255,0.07)",
+              borderRadius: 8,
+              padding: 24,
+              minHeight: 220,
+              cursor: "pointer",
+            }}
+            onClick={() => navigate("/findings")}
+          >
+            <span
+              className="font-mono text-[10px] uppercase tracking-widest block mb-4"
+              style={{ color: "rgba(255,255,255,0.4)" }}
+            >
+              Attention
+            </span>
+
+            <div className="grid grid-cols-2 gap-4 mb-5">
+              <div>
+                <span
+                  className="font-mono font-bold block tracking-tight"
+                  style={{ color: "#F87171", fontSize: "2rem", lineHeight: 1 }}
+                >
+                  {isLoading ? "—" : formatNumber(attention?.corruptedFiles ?? 0)}
+                </span>
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest"
+                  style={{ color: "rgba(248,113,113,0.65)" }}
+                >
+                  Corrupted
+                </span>
+              </div>
+              <div>
+                <span
+                  className="font-mono font-bold block tracking-tight"
+                  style={{ color: "rgba(255,255,255,0.8)", fontSize: "2rem", lineHeight: 1 }}
+                >
+                  {isLoading ? "—" : formatNumber(attention?.duplicates ?? 0)}
+                </span>
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest"
+                  style={{ color: "rgba(255,255,255,0.35)" }}
+                >
+                  Duplicates
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              {[
+                { label: "Corrupted", color: "#F87171", value: attention?.corruptedFiles ?? 0 },
+                { label: "Duplicate", color: "#FBBF24", value: attention?.duplicates ?? 0 },
+              ].map(({ label, color, value }) => {
+                const pct = totalFiles > 0 ? Math.min(100, (value / totalFiles) * 600) : 0;
+                return (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span
+                      className="font-mono text-[10px] uppercase tracking-widest w-20 shrink-0"
+                      style={{ color }}
+                    >
+                      {label}
+                    </span>
+                    <div
+                      className="flex-1 rounded-full overflow-hidden"
+                      style={{ height: 3, background: "rgba(255,255,255,0.06)" }}
+                    >
+                      <div
+                        style={{ width: `${pct}%`, background: color, height: "100%", transition: "width 0.6s" }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Activity + Status ─────────────────────────────────────── */}
+      <div
+        className="px-8 pt-5 pb-8 grid grid-cols-3 gap-5"
+        style={{ maxWidth: 1400, margin: "0 auto" }}
+      >
+        {/* Activity feed */}
+        <div
+          className="col-span-2"
+          style={{
+            background: "#1A1A1A",
+            border: "1px solid rgba(255,255,255,0.07)",
+            borderRadius: 8,
+            padding: 24,
+          }}
+        >
+          <span
+            className="font-mono text-[10px] uppercase tracking-widest block mb-5"
+            style={{ color: "rgba(255,255,255,0.4)" }}
+          >
+            Recent Activity
+          </span>
+          <AnimatePresence initial={false}>
+            {(activity ?? []).map((entry, i) => (
+              <motion.div
+                key={entry.id}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.025, duration: 0.2 }}
+                className="flex items-start gap-3 py-2.5"
+                style={{
+                  borderBottom:
+                    i < (activity?.length ?? 0) - 1
+                      ? "1px solid rgba(255,255,255,0.04)"
+                      : "none",
+                }}
+              >
+                <span
+                  className="font-mono text-xs w-16 shrink-0 pt-px"
+                  style={{ color: "rgba(255,255,255,0.25)", fontFamily: "monospace" }}
+                >
+                  {formatTimestamp(entry.timestamp)}
+                </span>
+                <span className="text-sm shrink-0" style={{ color: statusColor(entry.status) }}>
+                  {activityIcon(entry.status)}
+                </span>
+                <span className="text-sm" style={{ color: "rgba(255,255,255,0.75)" }}>
+                  {entry.message}
+                </span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {(!activity || activity.length === 0) && (
+            <p
+              className="text-sm font-mono py-6 text-center"
+              style={{ color: "rgba(255,255,255,0.2)" }}
+            >
+              No activity yet — start a scan to index your files.
+            </p>
+          )}
+        </div>
+
+        {/* Status column */}
+        <div className="flex flex-col gap-4">
+          {isScanning && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{
+                background: "#1A1A1A",
+                border: "1px solid rgba(96,165,250,0.2)",
+                borderRadius: 8,
+                padding: 20,
+              }}
+            >
+              <span
+                className="font-mono text-[10px] uppercase tracking-widest block mb-2"
+                style={{ color: "#60A5FA" }}
+              >
+                Scanning · {summary?.currentScanPath ?? ""}
+              </span>
+              <div
+                className="font-mono font-bold mb-4"
+                style={{ color: "#60A5FA", fontSize: "1.75rem" }}
+              >
+                {summary?.currentScanProgress ?? 0}%
+              </div>
+              <div
+                className="w-full rounded-full overflow-hidden"
+                style={{ height: 4, background: "rgba(255,255,255,0.06)" }}
+              >
+                <motion.div
+                  style={{ background: "#60A5FA", height: "100%" }}
+                  animate={{ width: `${summary?.currentScanProgress ?? 0}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {(attention?.corruptedFiles ?? 0) > 0 && (
+            <div
+              style={{
+                background: "#1A1A1A",
+                border: "1px solid rgba(248,113,113,0.2)",
+                borderRadius: 8,
+                padding: 20,
+                cursor: "pointer",
+              }}
+              onClick={() => navigate("/organise")}
+            >
+              <span
+                className="font-mono text-[10px] uppercase tracking-widest block mb-2"
+                style={{ color: "#F87171" }}
+              >
+                Action Required
+              </span>
+              <div className="font-mono font-bold mb-1" style={{ color: "#F87171", fontSize: "1.75rem" }}>
                 {formatNumber(attention?.corruptedFiles ?? 0)}
               </div>
-              <p className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
-                Corrupted files need manual attention
+              <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+                Corrupted files need attention
               </p>
             </div>
           )}
 
           {(attention?.duplicates ?? 0) > 0 && (
             <div
-              className="sentinel-card p-5 cursor-pointer transition-colors duration-150"
+              style={{
+                background: "#1A1A1A",
+                border: "1px solid rgba(251,191,36,0.18)",
+                borderRadius: 8,
+                padding: 20,
+                cursor: "pointer",
+              }}
               onClick={() => navigate("/organise")}
-              style={{ borderColor: "rgba(251, 191, 36, 0.25)" }}
             >
-              <div className="mb-2">
-                <span
-                  className="text-xs tracking-widest uppercase font-mono"
-                  style={{ color: "#FBBF24", fontFamily: "var(--app-font-mono)" }}
-                >
-                  Review
-                </span>
-              </div>
-              <div
-                className="text-2xl font-bold font-mono mb-1"
-                style={{ color: "#FBBF24", fontFamily: "var(--app-font-mono)" }}
+              <span
+                className="font-mono text-[10px] uppercase tracking-widest block mb-2"
+                style={{ color: "#FBBF24" }}
               >
+                Review
+              </span>
+              <div className="font-mono font-bold mb-1" style={{ color: "#FBBF24", fontSize: "1.75rem" }}>
                 {formatNumber(attention?.duplicates ?? 0)}
               </div>
-              <p className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
-                Duplicates — review and merge
+              <p className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+                Duplicates awaiting review
               </p>
             </div>
           )}
 
-          {(attention?.corruptedFiles ?? 0) === 0 && (attention?.duplicates ?? 0) === 0 && (
-            <div className="sentinel-card p-5">
-              <span
-                className="text-xs tracking-widest uppercase font-mono"
-                style={{ color: "#34D399", fontFamily: "var(--app-font-mono)" }}
+          {(attention?.corruptedFiles ?? 0) === 0 &&
+            (attention?.duplicates ?? 0) === 0 &&
+            !isScanning && (
+              <div
+                style={{
+                  background: "#1A1A1A",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                  borderRadius: 8,
+                  padding: 20,
+                }}
               >
-                All Clear
-              </span>
-              <p className="text-sm mt-2" style={{ color: "rgba(255,255,255,0.4)" }}>
-                Nothing needs attention right now.
-              </p>
-            </div>
-          )}
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest block mb-2"
+                  style={{ color: "#34D399" }}
+                >
+                  All Clear
+                </span>
+                <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
+                  Nothing needs attention right now.
+                </p>
+              </div>
+            )}
         </div>
       </div>
     </div>
