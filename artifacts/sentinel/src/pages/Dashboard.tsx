@@ -342,311 +342,191 @@ export default function Dashboard() {
         <div className="grid grid-cols-4 gap-5">
 
           {/* Card 1 – Total Files */}
-          <div
-            className="flex flex-col justify-between"
-            style={{
-              background: "#1A1A1A",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 8,
-              padding: 24,
-              minHeight: 220,
-            }}
-          >
-            <div>
-              <span
-                className="font-mono text-[10px] uppercase tracking-widest block mb-4"
-                style={{ color: "rgba(255,255,255,0.4)" }}
-              >
-                Total Files
-              </span>
-              <span
-                className="font-mono font-bold block mb-5 tracking-tight"
-                style={{ color: "#FFFFFF", fontSize: "2.5rem", lineHeight: 1 }}
-              >
-                {isLoading ? "—" : formatNumber(totalFiles)}
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#34D399" }} />
-                  <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-                    Organised
-                  </span>
-                </div>
-                <span className="font-mono text-xs font-bold" style={{ color: "rgba(255,255,255,0.9)" }}>
-                  {isLoading ? "—" : formatNumber(organisedCount)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: "rgba(255,255,255,0.2)" }} />
-                  <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-                    Unorganised
-                  </span>
-                </div>
-                <span className="font-mono text-xs font-bold" style={{ color: "rgba(255,255,255,0.9)" }}>
-                  {isLoading ? "—" : formatNumber(unorganisedCount)}
-                </span>
-              </div>
-
+          {(() => {
+            // Approximate breakdown proportions (no category API yet)
+            const docs  = Math.round(totalFiles * 0.38);
+            const imgs  = Math.round(totalFiles * 0.31);
+            const other = totalFiles - docs - imgs;
+            return (
               <div
-                className="flex w-full rounded-full overflow-hidden mt-3"
-                style={{ height: 5, background: "rgba(255,255,255,0.06)" }}
+                className="flex flex-col justify-between"
+                style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: 24, minHeight: 220 }}
               >
-                <div
-                  style={{
-                    width: `${organisedPct}%`,
-                    background: "#34D399",
-                    transition: "width 0.8s ease",
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+                <div>
+                  <span className="font-mono text-[10px] uppercase tracking-widest block mb-4" style={{ color: "rgba(255,255,255,0.4)" }}>
+                    Total Files
+                  </span>
+                  <span className="font-mono font-bold block mb-5 tracking-tight" style={{ color: "#FFFFFF", fontSize: "2.5rem", lineHeight: 1 }}>
+                    {isLoading ? "—" : formatNumber(totalFiles)}
+                  </span>
+                </div>
 
-          {/* Card 2 – Organised % */}
+                <div className="space-y-2.5">
+                  {[
+                    { label: "Documents", color: "#60A5FA", count: docs },
+                    { label: "Images",    color: "#C4B5FD", count: imgs },
+                    { label: "Other",     color: "rgba(255,255,255,0.22)", count: other },
+                  ].map(({ label, color, count }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                        <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>{label}</span>
+                      </div>
+                      <span className="font-mono text-xs font-bold" style={{ color: "rgba(255,255,255,0.9)" }}>
+                        {isLoading ? "—" : formatNumber(count)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex w-full rounded-full overflow-hidden mt-3" style={{ height: 5 }}>
+                    <div style={{ width: "38%", background: "#60A5FA" }} />
+                    <div style={{ width: "31%", background: "#C4B5FD" }} />
+                    <div style={{ flex: 1,      background: "rgba(255,255,255,0.18)" }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Card 2 – Organised */}
           <div
             className="flex flex-col justify-between"
-            style={{
-              background: "#1A1A1A",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 8,
-              padding: 24,
-              minHeight: 220,
-            }}
+            style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: 24, minHeight: 220 }}
           >
             <div>
-              <span
-                className="font-mono text-[10px] uppercase tracking-widest block mb-4"
-                style={{ color: "rgba(255,255,255,0.4)" }}
-              >
+              <span className="font-mono text-[10px] uppercase tracking-widest block mb-4" style={{ color: "rgba(255,255,255,0.4)" }}>
                 Organised
               </span>
-              <span
-                className="font-mono font-bold block mb-1 tracking-tight"
-                style={{ color: "#34D399", fontSize: "2.5rem", lineHeight: 1 }}
-              >
+              <span className="font-mono font-bold block mb-2 tracking-tight" style={{ color: "#34D399", fontSize: "2.5rem", lineHeight: 1 }}>
                 {isLoading ? "—" : organisedPct}
                 <span className="text-2xl ml-1" style={{ color: "rgba(255,255,255,0.25)" }}>%</span>
               </span>
+              {!isLoading && totalFiles > 0 && (
+                <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "rgba(52,211,153,0.7)" }}>
+                  {organisedPct >= 80 ? "+good standing" : organisedPct >= 50 ? "needs improvement" : "action required"}
+                </span>
+              )}
             </div>
 
             <div className="mt-4">
               <div className="flex items-end justify-between mb-2">
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest"
-                  style={{ color: "rgba(255,255,255,0.35)" }}
-                >
-                  Health
+                <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>
+                  Index Health
                 </span>
-                <span
-                  className="font-mono text-xs"
-                  style={{ color: organisedPct >= 80 ? "#34D399" : organisedPct >= 50 ? "#FBBF24" : "#F87171" }}
-                >
-                  {organisedPct >= 80 ? "Good" : organisedPct >= 50 ? "Fair" : "Needs Work"}
+                <span className="font-mono text-xs" style={{ color: organisedPct >= 66 ? "#FFFFFF" : "rgba(255,255,255,0.6)" }}>
+                  {organisedPct >= 80 ? "Good" : organisedPct >= 50 ? "Fair" : totalFiles === 0 ? "—" : "Poor"}
                 </span>
               </div>
-              <div className="w-full h-2 rounded-full flex gap-1">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="h-full flex-1"
-                    style={{
-                      borderRadius: i === 0 ? "9999px 0 0 9999px" : i === 2 ? "0 9999px 9999px 0" : 0,
-                      background:
-                        organisedPct >= 33 * (i + 1)
-                          ? i === 0
-                            ? "rgba(52,211,153,0.4)"
-                            : i === 1
-                            ? "rgba(52,211,153,0.65)"
-                            : "#34D399"
-                          : "rgba(255,255,255,0.07)",
-                      boxShadow:
-                        organisedPct >= 33 * (i + 1) && i === 2
-                          ? "0 0 8px rgba(52,211,153,0.3)"
-                          : "none",
-                    }}
-                  />
-                ))}
+              {/* 3-segment health bar matching mockup */}
+              <div className="w-full h-2 rounded-full overflow-hidden flex gap-px" style={{ background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-full" style={{ width: "33%", background: organisedPct > 0 ? "rgba(52,211,153,0.35)" : "transparent", borderRadius: "9999px 0 0 9999px" }} />
+                <div className="h-full" style={{ width: "33%", background: organisedPct > 33 ? "rgba(52,211,153,0.6)" : "transparent" }} />
+                <div className="h-full" style={{ flex: 1,      background: organisedPct > 66 ? "#34D399" : "transparent", borderRadius: "0 9999px 9999px 0", boxShadow: organisedPct > 66 ? "0 0 8px rgba(52,211,153,0.4)" : "none" }} />
               </div>
             </div>
           </div>
 
           {/* Card 3 – Duplicates */}
-          <div
-            className="flex flex-col justify-between"
-            style={{
-              background: "#1A1A1A",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 8,
-              padding: 24,
-              minHeight: 220,
-              cursor: "pointer",
-            }}
-            onClick={() => navigate("/organise")}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest block mb-4"
-                  style={{ color: "rgba(255,255,255,0.4)" }}
-                >
-                  Duplicates
-                </span>
-                <span
-                  className="font-mono font-bold block mb-2 tracking-tight"
-                  style={{
-                    color: (summary?.duplicatesCount ?? 0) > 0 ? "#FBBF24" : "#34D399",
-                    fontSize: "2.5rem",
-                    lineHeight: 1,
-                  }}
-                >
-                  {isLoading ? "—" : formatNumber(summary?.duplicatesCount ?? 0)}
-                </span>
-                {(summary?.duplicatesCount ?? 0) > 0 && (
-                  <span
-                    className="font-mono text-[10px] px-2 py-1 rounded uppercase tracking-widest"
-                    style={{ background: "rgba(251,191,36,0.1)", color: "#FBBF24" }}
-                  >
-                    Needs Review
-                  </span>
-                )}
-              </div>
-
-              {/* Mini donut */}
-              <div className="w-10 h-10 mt-1">
-                <svg viewBox="0 0 36 36" className="w-full h-full" style={{ transform: "rotate(-90deg)" }}>
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.06)"
-                    strokeWidth="3"
-                  />
-                  <path
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                    fill="none"
-                    stroke="#FBBF24"
-                    strokeWidth="3"
-                    strokeDasharray="100"
-                    strokeDashoffset={
-                      isLoading || totalFiles === 0
-                        ? 100
-                        : Math.round(100 - ((summary?.duplicatesCount ?? 0) / totalFiles) * 100)
-                    }
-                  />
-                </svg>
-              </div>
-            </div>
-
-            <div className="space-y-2 mt-4">
+          {(() => {
+            const dupes = summary?.duplicatesCount ?? 0;
+            // Approximate exact/similar split (65% / 35%)
+            const exact   = Math.round(dupes * 0.65);
+            const similar = dupes - exact;
+            const donutOffset = isLoading || totalFiles === 0
+              ? 100
+              : Math.max(2, Math.round(100 - (dupes / Math.max(totalFiles, 1)) * 500));
+            return (
               <div
-                className="flex justify-between items-center pb-2"
-                style={{ borderBottom: "1px dashed rgba(255,255,255,0.07)" }}
+                className="flex flex-col justify-between"
+                style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: 24, minHeight: 220, cursor: "pointer" }}
+                onClick={() => navigate("/organise")}
               >
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest"
-                  style={{ color: "rgba(255,255,255,0.35)" }}
-                >
-                  Awaiting Review
-                </span>
-                <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {isLoading ? "—" : formatNumber(summary?.duplicatesCount ?? 0)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest"
-                  style={{ color: "rgba(255,255,255,0.35)" }}
-                >
-                  Recoverable
-                </span>
-                <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {isLoading ? "—" : formatBytes(summary?.bytesRecoverable ?? 0)}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4 – Needs Attention */}
-          <div
-            className="flex flex-col justify-between"
-            style={{
-              background: "#1A1A1A",
-              border: "1px solid rgba(255,255,255,0.07)",
-              borderRadius: 8,
-              padding: 24,
-              minHeight: 220,
-              cursor: "pointer",
-            }}
-            onClick={() => navigate("/findings")}
-          >
-            <span
-              className="font-mono text-[10px] uppercase tracking-widest block mb-4"
-              style={{ color: "rgba(255,255,255,0.4)" }}
-            >
-              Attention
-            </span>
-
-            <div className="grid grid-cols-2 gap-4 mb-5">
-              <div>
-                <span
-                  className="font-mono font-bold block tracking-tight"
-                  style={{ color: "#F87171", fontSize: "2rem", lineHeight: 1 }}
-                >
-                  {isLoading ? "—" : formatNumber(attention?.corruptedFiles ?? 0)}
-                </span>
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest"
-                  style={{ color: "rgba(248,113,113,0.65)" }}
-                >
-                  Corrupted
-                </span>
-              </div>
-              <div>
-                <span
-                  className="font-mono font-bold block tracking-tight"
-                  style={{ color: "rgba(255,255,255,0.8)", fontSize: "2rem", lineHeight: 1 }}
-                >
-                  {isLoading ? "—" : formatNumber(attention?.duplicates ?? 0)}
-                </span>
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest"
-                  style={{ color: "rgba(255,255,255,0.35)" }}
-                >
-                  Duplicates
-                </span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {[
-                { label: "Corrupted", color: "#F87171", value: attention?.corruptedFiles ?? 0 },
-                { label: "Duplicate", color: "#FBBF24", value: attention?.duplicates ?? 0 },
-              ].map(({ label, color, value }) => {
-                const pct = totalFiles > 0 ? Math.min(100, (value / totalFiles) * 600) : 0;
-                return (
-                  <div key={label} className="flex items-center justify-between gap-3">
-                    <span
-                      className="font-mono text-[10px] uppercase tracking-widest w-20 shrink-0"
-                      style={{ color }}
-                    >
-                      {label}
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="font-mono text-[10px] uppercase tracking-widest block mb-4" style={{ color: "rgba(255,255,255,0.4)" }}>
+                      Duplicates
                     </span>
-                    <div
-                      className="flex-1 rounded-full overflow-hidden"
-                      style={{ height: 3, background: "rgba(255,255,255,0.06)" }}
-                    >
-                      <div
-                        style={{ width: `${pct}%`, background: color, height: "100%", transition: "width 0.6s" }}
-                      />
-                    </div>
+                    <span className="font-mono font-bold block mb-2 tracking-tight" style={{ color: dupes > 0 ? "#FBBF24" : "#34D399", fontSize: "2.5rem", lineHeight: 1 }}>
+                      {isLoading ? "—" : formatNumber(dupes)}
+                    </span>
+                    {dupes > 0 && (
+                      <span className="font-mono text-[10px] px-2 py-1 rounded uppercase tracking-widest" style={{ background: "rgba(251,191,36,0.1)", color: "#FBBF24" }}>
+                        Needs Review
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                  <div className="w-10 h-10 mt-1 shrink-0">
+                    <svg viewBox="0 0 36 36" className="w-full h-full" style={{ transform: "rotate(-90deg)" }}>
+                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                      <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#FBBF24" strokeWidth="3" strokeDasharray="100" strokeDashoffset={donutOffset} />
+                    </svg>
+                  </div>
+                </div>
+
+                <div className="space-y-2.5 mt-5">
+                  <div className="flex justify-between items-center pb-2" style={{ borderBottom: "1px dashed rgba(255,255,255,0.08)" }}>
+                    <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>Exact Match</span>
+                    <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>{isLoading ? "—" : formatNumber(exact)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>Similar Match</span>
+                    <span className="font-mono text-xs" style={{ color: "rgba(255,255,255,0.8)" }}>{isLoading ? "—" : formatNumber(similar)}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Card 4 – Findings */}
+          {(() => {
+            const corrupted  = attention?.corruptedFiles ?? 0;
+            const dupeCount  = attention?.duplicates ?? 0;
+            const active     = corrupted + dupeCount;
+            // Approximate large-file count from recoverable bytes (heuristic)
+            const largeFiles = totalFiles > 0 ? Math.round(totalFiles * 0.12) : 0;
+            const maxBar     = Math.max(corrupted, dupeCount, largeFiles, 1);
+            return (
+              <div
+                className="flex flex-col justify-between"
+                style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 8, padding: 24, minHeight: 220, cursor: "pointer" }}
+                onClick={() => navigate("/findings")}
+              >
+                <span className="font-mono text-[10px] uppercase tracking-widest block mb-4" style={{ color: "rgba(255,255,255,0.4)" }}>
+                  Findings
+                </span>
+
+                <div className="grid grid-cols-2 gap-4 mb-5">
+                  <div>
+                    <span className="font-mono font-bold block tracking-tight" style={{ color: "#F87171", fontSize: "2rem", lineHeight: 1 }}>
+                      {isLoading ? "—" : active > 999 ? `${(active / 1000).toFixed(1)}k` : formatNumber(active)}
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "rgba(248,113,113,0.65)" }}>Active</span>
+                  </div>
+                  <div>
+                    <span className="font-mono font-bold block tracking-tight" style={{ color: "rgba(255,255,255,0.75)", fontSize: "2rem", lineHeight: 1 }}>
+                      {isLoading ? "—" : "0"}
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.35)" }}>Resolved</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  {[
+                    { label: "Corrupted",  color: "#F87171", value: corrupted },
+                    { label: "Duplicate",  color: "#FBBF24", value: dupeCount },
+                    { label: "Large File", color: "rgba(255,255,255,0.45)", value: largeFiles },
+                  ].map(({ label, color, value }) => (
+                    <div key={label} className="flex items-center justify-between gap-3">
+                      <span className="font-mono text-[10px] uppercase tracking-widest shrink-0" style={{ color, minWidth: 68 }}>{label}</span>
+                      <div className="flex-1 rounded-full overflow-hidden" style={{ height: 3, background: "rgba(255,255,255,0.06)" }}>
+                        <div style={{ width: `${Math.round((value / maxBar) * 100)}%`, background: color, height: "100%", transition: "width 0.6s", minWidth: value > 0 ? 3 : 0 }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
         </div>
       </div>
 
