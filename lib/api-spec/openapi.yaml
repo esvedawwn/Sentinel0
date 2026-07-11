@@ -36,6 +36,10 @@ tags:
     description: Document text extraction, OCR, sensitive-content detection, and entity extraction
   - name: settings
     description: User privacy and processing settings
+  - name: embeddings
+    description: Semantic embedding index — build, rebuild, delete, and query via vector similarity
+  - name: projects
+    description: Project intelligence — candidate grouping, approval, merge, split, and project detail
 
 paths:
   /healthz:
@@ -1037,6 +1041,443 @@ paths:
         "409":
           description: Cloud consent required
 
+  # ── Semantic search / embeddings ────────────────────────────────────────────
+
+  /search/semantic:
+    get:
+      operationId: semanticSearch
+      tags: [embeddings]
+      summary: Hybrid semantic + lexical search
+      description: >
+        Embeds the query using the configured embeddings provider (local by
+        default), computes cosine similarity against stored chunk vectors, and
+        optionally blends with lexical results for a hybrid score. Returns
+        finding IDs with per-result scores and matched passages.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: minScore
+          in: query
+          schema:
+            type: number
+            default: 0.05
+        - name: hybrid
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Semantic search results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemanticSearchResponse"
+        "400":
+          description: Invalid query
+
+  /search/index/stats:
+    get:
+      operationId: getIndexStats
+      tags: [embeddings]
+      summary: Get embedding index statistics
+      responses:
+        "200":
+          description: Index stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndexStats"
+
+  /search/index/rebuild:
+    post:
+      operationId: rebuildEmbeddingIndex
+      tags: [embeddings]
+      summary: Rebuild the full embedding index
+      description: >
+        Re-embeds all findings that have extracted text. Existing chunks are
+        replaced. Requires embeddingsEnabled=true in settings.
+      responses:
+        "200":
+          description: Rebuild summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RebuildIndexResponse"
+        "400":
+          description: Embeddings disabled
+
+  /search/index/embedding/{findingId}:
+    post:
+      operationId: embedFinding
+      tags: [embeddings]
+      summary: Embed a single finding's extracted text
+      parameters:
+        - name: findingId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Embedding stored
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmbedFindingResponse"
+        "400":
+          description: Embeddings disabled or no extracted text
+    delete:
+      operationId: deleteEmbedding
+      tags: [embeddings]
+      summary: Delete all embedding chunks for a finding
+      parameters:
+        - name: findingId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Chunks removed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteEmbeddingResponse"
+
+  # ── Projects ──────────────────────────────────────────────────────────────
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List approved projects
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, archived, deleted]
+      responses:
+        "200":
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [projects]
+                properties:
+                  projects:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProjectSummary"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project manually
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectSummary"
+
+  /projects/candidates:
+    get:
+      operationId: listProjectCandidates
+      tags: [projects]
+      summary: List project candidates
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, merged]
+            default: pending
+      responses:
+        "200":
+          description: Candidate list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [candidates]
+                properties:
+                  candidates:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProjectCandidate"
+
+  /projects/candidates/generate:
+    post:
+      operationId: generateProjectCandidates
+      tags: [projects]
+      summary: Generate project candidates from current findings
+      description: >
+        Runs the grouping algorithm over existing findings and persists new
+        candidate rows. AI recommends relationships — no files are moved or
+        renamed. Users must explicitly approve, reject, or merge candidates.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                scanId:
+                  type: integer
+                limit:
+                  type: integer
+                  default: 500
+      responses:
+        "200":
+          description: Generated candidates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [generated, candidates]
+                properties:
+                  generated:
+                    type: integer
+                  candidates:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProjectCandidate"
+
+  /projects/candidates/merge:
+    post:
+      operationId: mergeProjectCandidates
+      tags: [projects]
+      summary: Merge two or more candidates into a single project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidateIds]
+              properties:
+                candidateIds:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 2
+      responses:
+        "200":
+          description: Merged project
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [project]
+                properties:
+                  project:
+                    $ref: "#/components/schemas/ProjectSummary"
+
+  /projects/candidates/{id}/approve:
+    post:
+      operationId: approveProjectCandidate
+      tags: [projects]
+      summary: Approve a candidate and create a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Approved project
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [project]
+                properties:
+                  project:
+                    $ref: "#/components/schemas/ProjectSummary"
+        "400":
+          description: Already approved or invalid
+
+  /projects/candidates/{id}/reject:
+    post:
+      operationId: rejectProjectCandidate
+      tags: [projects]
+      summary: Reject a candidate
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id:
+                    type: integer
+                  status:
+                    type: string
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get full project detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDetail"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project name, description, status, or summary
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, archived, deleted]
+                summary:
+                  type: string
+      responses:
+        "200":
+          description: Updated
+        "404":
+          description: Not found
+
+  /projects/{id}/files:
+    post:
+      operationId: addFileToProject
+      tags: [projects]
+      summary: Add a finding to a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [findingId]
+              properties:
+                findingId:
+                  type: integer
+      responses:
+        "201":
+          description: Added
+
+  /projects/{id}/files/{findingId}:
+    delete:
+      operationId: removeFileFromProject
+      tags: [projects]
+      summary: Remove a finding from a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: findingId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Removed
+
+  /projects/{id}/split:
+    post:
+      operationId: splitProject
+      tags: [projects]
+      summary: Split specific files out of a project into a new project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [findingIds, newName]
+              properties:
+                findingIds:
+                  type: array
+                  items:
+                    type: integer
+                newName:
+                  type: string
+      responses:
+        "200":
+          description: New project created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [newProject]
+                properties:
+                  newProject:
+                    $ref: "#/components/schemas/ProjectSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -1834,3 +2275,212 @@ components:
           type: string
         requiresCloudConsent:
           type: boolean
+
+    # ── Embeddings / semantic search ─────────────────────────────────────────
+
+    SemanticSearchResult:
+      type: object
+      required: [findingId, semanticScore, lexicalScore, combinedScore]
+      properties:
+        findingId:
+          type: integer
+        semanticScore:
+          type: number
+          format: float
+        lexicalScore:
+          type: number
+          format: float
+        combinedScore:
+          type: number
+          format: float
+        matchedPassage:
+          type: string
+          nullable: true
+          description: Best-matching chunk of extracted text for this query
+        model:
+          type: string
+          nullable: true
+
+    SemanticSearchResponse:
+      type: object
+      required: [query, hybrid, semanticAvailable, results]
+      properties:
+        query:
+          type: string
+        hybrid:
+          type: boolean
+        semanticAvailable:
+          type: boolean
+          description: Whether any embedding vectors exist in the index
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemanticSearchResult"
+
+    IndexStats:
+      type: object
+      required: [totalChunks, embeddedFindings, model, embeddingsEnabled]
+      properties:
+        totalChunks:
+          type: integer
+        embeddedFindings:
+          type: integer
+        model:
+          type: string
+        embeddingsEnabled:
+          type: boolean
+
+    EmbedFindingResponse:
+      type: object
+      required: [chunksStored, model]
+      properties:
+        chunksStored:
+          type: integer
+        model:
+          type: string
+
+    RebuildIndexResponse:
+      type: object
+      required: [indexed, skipped, model]
+      properties:
+        indexed:
+          type: integer
+        skipped:
+          type: integer
+        model:
+          type: string
+
+    DeleteEmbeddingResponse:
+      type: object
+      required: [findingId, chunksRemoved]
+      properties:
+        findingId:
+          type: integer
+        chunksRemoved:
+          type: integer
+
+    # ── Projects ──────────────────────────────────────────────────────────────
+
+    ProjectSummary:
+      type: object
+      required: [id, name, description, status, confidence, explanation, fileCount, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, deleted]
+        confidence:
+          type: number
+          format: float
+        explanation:
+          type: string
+        summary:
+          type: string
+          nullable: true
+        fileCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ProjectFileSummary:
+      type: object
+      required: [id, name, path, extension, sizeBytes]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        path:
+          type: string
+        extension:
+          type: string
+        sizeBytes:
+          type: integer
+        aiCategory:
+          type: string
+          nullable: true
+        aiConfidence:
+          type: integer
+          nullable: true
+        fileModifiedAt:
+          type: string
+          nullable: true
+
+    ProjectTimelineEntry:
+      type: object
+      required: [findingId, name]
+      properties:
+        findingId:
+          type: integer
+        name:
+          type: string
+        date:
+          type: string
+          nullable: true
+
+    ProjectDetail:
+      type: object
+      required: [project, files, people, orgs, categories, timeline, storageTotalBytes]
+      properties:
+        project:
+          $ref: "#/components/schemas/ProjectSummary"
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectFileSummary"
+        people:
+          type: array
+          items:
+            type: string
+        orgs:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
+        timeline:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectTimelineEntry"
+        storageTotalBytes:
+          type: integer
+
+    ProjectCandidate:
+      type: object
+      required: [id, name, status, score, signals, explanation, findingCount, findingIds, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected, merged]
+        score:
+          type: number
+          format: float
+        signals:
+          type: object
+          additionalProperties:
+            type: number
+        explanation:
+          type: string
+        findingCount:
+          type: integer
+        findingIds:
+          type: array
+          items:
+            type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string

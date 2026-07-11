@@ -14,6 +14,8 @@ import searchRouter from "./search";
 import actionQueueRouter from "./actionQueue";
 import settingsRouter from "./settings";
 import extractionRouter from "./extraction";
+import embeddingsRouter from "./embeddings";
+import projectsRouter from "./projects";
 
 const router: IRouter = Router();
 
@@ -29,8 +31,10 @@ router.use(findingsRouter);
 router.use(aiRouter);
 router.use(scanRootsRouter);
 router.use(searchRouter);
+router.use(embeddingsRouter);
 router.use(actionQueueRouter);
 router.use(settingsRouter);
 router.use(extractionRouter);
+router.use(projectsRouter);
 
 export default router;

@@ -11,6 +11,7 @@ import Search from "@/pages/Search";
 import ActionQueue from "@/pages/ActionQueue";
 import ScanHistory from "@/pages/ScanHistory";
 import Settings from "@/pages/Settings";
+import Projects from "@/pages/Projects";
 import NotFound from "@/pages/not-found";
 
 // When running inside Tauri the global __TAURI__ object is injected by the
@@ -48,6 +49,7 @@ function Router() {
         <Route path="/scan-history" component={ScanHistory} />
         <Route path="/reports" component={Reports} />
         <Route path="/settings" component={Settings} />
+        <Route path="/projects" component={Projects} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

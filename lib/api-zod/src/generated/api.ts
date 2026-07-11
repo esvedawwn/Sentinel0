@@ -1125,3 +1125,354 @@ export const SummarizeFindingResponse = zod.object({
 })
 
 
+/**
+ * Embeds the query using the configured embeddings provider (local by default), computes cosine similarity against stored chunk vectors, and optionally blends with lexical results for a hybrid score. Returns finding IDs with per-result scores and matched passages.
+ * @summary Hybrid semantic + lexical search
+ */
+export const semanticSearchQueryLimitDefault = 20;
+export const semanticSearchQueryMinScoreDefault = 0.05;
+export const semanticSearchQueryHybridDefault = true;
+
+export const SemanticSearchQueryParams = zod.object({
+  "q": zod.coerce.string(),
+  "limit": zod.coerce.number().default(semanticSearchQueryLimitDefault),
+  "minScore": zod.coerce.number().default(semanticSearchQueryMinScoreDefault),
+  "hybrid": zod.coerce.boolean().default(semanticSearchQueryHybridDefault)
+})
+
+export const SemanticSearchResponse = zod.object({
+  "query": zod.string(),
+  "hybrid": zod.boolean(),
+  "semanticAvailable": zod.boolean().describe('Whether any embedding vectors exist in the index'),
+  "results": zod.array(zod.object({
+  "findingId": zod.number(),
+  "semanticScore": zod.number(),
+  "lexicalScore": zod.number(),
+  "combinedScore": zod.number(),
+  "matchedPassage": zod.string().nullish().describe('Best-matching chunk of extracted text for this query'),
+  "model": zod.string().nullish()
+}))
+})
+
+
+/**
+ * @summary Get embedding index statistics
+ */
+export const GetIndexStatsResponse = zod.object({
+  "totalChunks": zod.number(),
+  "embeddedFindings": zod.number(),
+  "model": zod.string(),
+  "embeddingsEnabled": zod.boolean()
+})
+
+
+/**
+ * Re-embeds all findings that have extracted text. Existing chunks are replaced. Requires embeddingsEnabled=true in settings.
+ * @summary Rebuild the full embedding index
+ */
+export const RebuildEmbeddingIndexResponse = zod.object({
+  "indexed": zod.number(),
+  "skipped": zod.number(),
+  "model": zod.string()
+})
+
+
+/**
+ * @summary Embed a single finding's extracted text
+ */
+export const EmbedFindingParams = zod.object({
+  "findingId": zod.coerce.number()
+})
+
+export const EmbedFindingResponse = zod.object({
+  "chunksStored": zod.number(),
+  "model": zod.string()
+})
+
+
+/**
+ * @summary Delete all embedding chunks for a finding
+ */
+export const DeleteEmbeddingParams = zod.object({
+  "findingId": zod.coerce.number()
+})
+
+export const DeleteEmbeddingResponse = zod.object({
+  "findingId": zod.number(),
+  "chunksRemoved": zod.number()
+})
+
+
+/**
+ * @summary List approved projects
+ */
+export const ListProjectsQueryParams = zod.object({
+  "status": zod.enum(['active', 'archived', 'deleted']).optional()
+})
+
+export const ListProjectsResponse = zod.object({
+  "projects": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['active', 'archived', 'deleted']),
+  "confidence": zod.number(),
+  "explanation": zod.string(),
+  "summary": zod.string().nullish(),
+  "fileCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Create a project manually
+ */
+export const CreateProjectBody = zod.object({
+  "name": zod.string(),
+  "description": zod.string().optional()
+})
+
+export const CreateProjectResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['active', 'archived', 'deleted']),
+  "confidence": zod.number(),
+  "explanation": zod.string(),
+  "summary": zod.string().nullish(),
+  "fileCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary List project candidates
+ */
+export const listProjectCandidatesQueryStatusDefault = `pending`;
+
+export const ListProjectCandidatesQueryParams = zod.object({
+  "status": zod.enum(['pending', 'approved', 'rejected', 'merged']).default(listProjectCandidatesQueryStatusDefault)
+})
+
+export const ListProjectCandidatesResponse = zod.object({
+  "candidates": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'merged']),
+  "score": zod.number(),
+  "signals": zod.record(zod.string(), zod.number()),
+  "explanation": zod.string(),
+  "findingCount": zod.number(),
+  "findingIds": zod.array(zod.number()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * Runs the grouping algorithm over existing findings and persists new candidate rows. AI recommends relationships — no files are moved or renamed. Users must explicitly approve, reject, or merge candidates.
+ * @summary Generate project candidates from current findings
+ */
+export const generateProjectCandidatesBodyLimitDefault = 500;
+
+export const GenerateProjectCandidatesBody = zod.object({
+  "scanId": zod.number().optional(),
+  "limit": zod.number().default(generateProjectCandidatesBodyLimitDefault)
+})
+
+export const GenerateProjectCandidatesResponse = zod.object({
+  "generated": zod.number(),
+  "candidates": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "status": zod.enum(['pending', 'approved', 'rejected', 'merged']),
+  "score": zod.number(),
+  "signals": zod.record(zod.string(), zod.number()),
+  "explanation": zod.string(),
+  "findingCount": zod.number(),
+  "findingIds": zod.array(zod.number()),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Merge two or more candidates into a single project
+ */
+export const mergeProjectCandidatesBodyCandidateIdsMin = 2;
+
+
+
+export const MergeProjectCandidatesBody = zod.object({
+  "candidateIds": zod.array(zod.number()).min(mergeProjectCandidatesBodyCandidateIdsMin)
+})
+
+export const MergeProjectCandidatesResponse = zod.object({
+  "project": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['active', 'archived', 'deleted']),
+  "confidence": zod.number(),
+  "explanation": zod.string(),
+  "summary": zod.string().nullish(),
+  "fileCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Approve a candidate and create a project
+ */
+export const ApproveProjectCandidateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ApproveProjectCandidateResponse = zod.object({
+  "project": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['active', 'archived', 'deleted']),
+  "confidence": zod.number(),
+  "explanation": zod.string(),
+  "summary": zod.string().nullish(),
+  "fileCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+})
+
+
+/**
+ * @summary Reject a candidate
+ */
+export const RejectProjectCandidateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RejectProjectCandidateResponse = zod.object({
+  "id": zod.number(),
+  "status": zod.string()
+})
+
+
+/**
+ * @summary Get full project detail
+ */
+export const GetProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetProjectResponse = zod.object({
+  "project": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['active', 'archived', 'deleted']),
+  "confidence": zod.number(),
+  "explanation": zod.string(),
+  "summary": zod.string().nullish(),
+  "fileCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}),
+  "files": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "path": zod.string(),
+  "extension": zod.string(),
+  "sizeBytes": zod.number(),
+  "aiCategory": zod.string().nullish(),
+  "aiConfidence": zod.number().nullish(),
+  "fileModifiedAt": zod.string().nullish()
+})),
+  "people": zod.array(zod.string()),
+  "orgs": zod.array(zod.string()),
+  "categories": zod.array(zod.string()),
+  "timeline": zod.array(zod.object({
+  "findingId": zod.number(),
+  "name": zod.string(),
+  "date": zod.string().nullish()
+})),
+  "storageTotalBytes": zod.number()
+})
+
+
+/**
+ * @summary Update project name, description, status, or summary
+ */
+export const UpdateProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateProjectBody = zod.object({
+  "name": zod.string().optional(),
+  "description": zod.string().optional(),
+  "status": zod.enum(['active', 'archived', 'deleted']).optional(),
+  "summary": zod.string().optional()
+})
+
+export const UpdateProjectResponse = zod.unknown()
+
+
+/**
+ * @summary Add a finding to a project
+ */
+export const AddFileToProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const AddFileToProjectBody = zod.object({
+  "findingId": zod.number()
+})
+
+export const AddFileToProjectResponse = zod.void()
+
+
+/**
+ * @summary Remove a finding from a project
+ */
+export const RemoveFileFromProjectParams = zod.object({
+  "id": zod.coerce.number(),
+  "findingId": zod.coerce.number()
+})
+
+export const RemoveFileFromProjectResponse = zod.unknown()
+
+
+/**
+ * @summary Split specific files out of a project into a new project
+ */
+export const SplitProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SplitProjectBody = zod.object({
+  "findingIds": zod.array(zod.number()),
+  "newName": zod.string()
+})
+
+export const SplitProjectResponse = zod.object({
+  "newProject": zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['active', 'archived', 'deleted']),
+  "confidence": zod.number(),
+  "explanation": zod.string(),
+  "summary": zod.string().nullish(),
+  "fileCount": zod.number(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+})
+
+

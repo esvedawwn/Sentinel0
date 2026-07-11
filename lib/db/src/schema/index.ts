@@ -15,3 +15,5 @@ export * from "./actionQueue";
 export * from "./extractedText";
 export * from "./entities";
 export * from "./userSettings";
+export * from "./embeddingChunks";
+export * from "./projects";

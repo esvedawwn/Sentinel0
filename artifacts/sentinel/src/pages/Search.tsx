@@ -9,14 +9,23 @@ import {
   useListSavedSearches,
   useCreateSavedSearch,
   useDeleteSavedSearch,
+  useSemanticSearch,
   getSearchQueryKey,
   getListSearchHistoryQueryKey,
   getListSavedSearchesQueryKey,
+  getSemanticSearchQueryKey,
 } from "@workspace/api-client-react";
-import type { SearchFilters, SavedSearch, SearchHistoryEntry } from "@workspace/api-client-react";
+import type { SearchFilters, SavedSearch, SearchHistoryEntry, SemanticSearchResult } from "@workspace/api-client-react";
 import { formatBytes } from "@/lib/utils";
 
 const RISK_LEVELS = ["low", "medium", "high", "critical"] as const;
+
+const EXAMPLE_QUERIES = [
+  "documents related to a court matter",
+  "renovation plumbing invoices",
+  "brand files for a client",
+  "correspondence about a particular company",
+];
 
 export default function Search() {
   const [searchParams] = useSearchParams();
@@ -25,6 +34,7 @@ export default function Search() {
   const [filters, setFilters] = useState<SearchFilters>({});
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
+  const [mode, setMode] = useState<"lexical" | "semantic">("lexical");
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -55,7 +65,15 @@ export default function Search() {
   const { data, isFetching } = useSearch(searchQueryParams, {
     query: {
       queryKey: getSearchQueryKey(searchQueryParams),
-      enabled: hasQuery,
+      enabled: hasQuery && mode === "lexical",
+    },
+  });
+
+  const semanticParams = { q: committedQuery, limit: 20, hybrid: true };
+  const { data: semanticData, isFetching: semanticFetching } = useSemanticSearch(semanticParams, {
+    query: {
+      queryKey: getSemanticSearchQueryKey(semanticParams),
+      enabled: !!committedQuery && mode === "semantic",
     },
   });
 
@@ -99,6 +117,8 @@ export default function Search() {
   }
 
   const results = data?.findings ?? [];
+  const semanticResults: SemanticSearchResult[] = semanticData?.results ?? [];
+  const isSearching = mode === "lexical" ? isFetching : semanticFetching;
 
   return (
     <div className="p-8 max-w-5xl">
@@ -112,6 +132,49 @@ export default function Search() {
         </p>
       </div>
 
+      {/* Mode selector */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex gap-1" style={{ background: "#1A1A1A", borderRadius: 8, padding: 3, border: "1px solid rgba(255,255,255,0.08)" }}>
+          {(["lexical", "semantic"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              className="px-3 py-1 text-xs font-medium rounded capitalize"
+              style={{
+                background: mode === m ? "#222222" : "transparent",
+                color: mode === m ? "white" : "rgba(255,255,255,0.4)",
+                border: mode === m ? "1px solid rgba(255,255,255,0.12)" : "1px solid transparent",
+              }}
+            >
+              {m === "lexical" ? "Lexical + NL" : "Semantic (AI)"}
+            </button>
+          ))}
+        </div>
+        {mode === "semantic" && (
+          <span className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+            {semanticData?.semanticAvailable
+              ? "Embedding index active"
+              : "⚠ No embeddings yet — embed files via Settings"}
+          </span>
+        )}
+      </div>
+
+      {/* Example queries for semantic mode */}
+      {mode === "semantic" && !committedQuery && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {EXAMPLE_QUERIES.map((q) => (
+            <button
+              key={q}
+              onClick={() => { setQuery(q); setCommittedQuery(q); }}
+              className="text-xs px-2.5 py-1.5 rounded"
+              style={{ background: "#1A1A1A", color: "rgba(255,255,255,0.5)", border: "1px solid rgba(255,255,255,0.1)" }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="flex gap-3 mb-4">
         <input
           autoFocus
@@ -119,7 +182,11 @@ export default function Search() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && runSearch()}
-          placeholder='Try "large PDFs from last month" or "duplicate photos over 5MB"'
+          placeholder={
+            mode === "semantic"
+              ? '"documents related to a court matter"'
+              : '"large PDFs from last month" or "duplicate photos over 5MB"'
+          }
           className="flex-1 px-4 py-3 rounded text-sm text-white outline-none"
           style={{
             background: "#1A1A1A",
@@ -221,10 +288,14 @@ export default function Search() {
             </div>
           )}
 
-          {hasQuery && (
+          {(hasQuery || (mode === "semantic" && !!committedQuery)) && (
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
-                {isFetching ? "Searching…" : `${data?.total ?? 0} results`}
+                {isSearching
+                  ? "Searching…"
+                  : mode === "semantic"
+                  ? `${semanticResults.length} semantic results`
+                  : `${data?.total ?? 0} results`}
               </span>
               {!showSaveInput ? (
                 <button
@@ -262,7 +333,8 @@ export default function Search() {
             </div>
           )}
 
-          {hasQuery && results.length > 0 && (
+          {/* Lexical results */}
+          {mode === "lexical" && hasQuery && results.length > 0 && (
             <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
               {results.map((finding, idx) => (
                 <motion.div
@@ -296,9 +368,70 @@ export default function Search() {
             </div>
           )}
 
-          {hasQuery && !isFetching && results.length === 0 && (
+          {mode === "lexical" && hasQuery && !isFetching && results.length === 0 && (
             <div className="text-center py-16 text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
               No findings matched your search.
+            </div>
+          )}
+
+          {/* Semantic results */}
+          {mode === "semantic" && !!committedQuery && semanticResults.length > 0 && (
+            <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
+              {semanticResults.map((hit, idx) => (
+                <motion.div
+                  key={hit.findingId}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                  className="px-4 py-3"
+                  style={{
+                    background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
+                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-white">Finding #{hit.findingId}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className="text-xs font-mono px-1.5 py-0.5 rounded"
+                        style={{
+                          color: hit.combinedScore >= 0.5 ? "#34D399" : "rgba(255,255,255,0.4)",
+                          background: hit.combinedScore >= 0.5 ? "rgba(52,211,153,0.1)" : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${hit.combinedScore >= 0.5 ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.1)"}`,
+                          fontFamily: "var(--app-font-mono)",
+                        }}
+                      >
+                        {Math.round(hit.combinedScore * 100)}%
+                      </span>
+                      {hit.model && (
+                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.2)", fontFamily: "var(--app-font-mono)" }}>
+                          {hit.model}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {hit.matchedPassage && (
+                    <div
+                      className="text-xs mt-1.5 px-2 py-1.5 rounded italic"
+                      style={{ color: "rgba(255,255,255,0.45)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                    >
+                      "{hit.matchedPassage.length > 120 ? hit.matchedPassage.slice(0, 120) + "…" : hit.matchedPassage}"
+                    </div>
+                  )}
+                  <div className="flex gap-3 mt-1 text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
+                    <span>semantic {Math.round(hit.semanticScore * 100)}%</span>
+                    <span>lexical {Math.round(hit.lexicalScore * 100)}%</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {mode === "semantic" && !!committedQuery && !semanticFetching && semanticResults.length === 0 && (
+            <div className="text-center py-16 text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
+              {semanticData?.semanticAvailable === false
+                ? "No embedding vectors found. Enable embeddings in Settings and rebuild the index."
+                : "No semantic matches found."}
             </div>
           )}
         </div>

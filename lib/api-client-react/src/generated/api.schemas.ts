@@ -741,6 +741,121 @@ export interface SummaryResponse {
   requiresCloudConsent: boolean;
 }
 
+export interface SemanticSearchResult {
+  findingId: number;
+  semanticScore: number;
+  lexicalScore: number;
+  combinedScore: number;
+  /** Best-matching chunk of extracted text for this query */
+  matchedPassage?: string | null;
+  model?: string | null;
+}
+
+export interface SemanticSearchResponse {
+  query: string;
+  hybrid: boolean;
+  /** Whether any embedding vectors exist in the index */
+  semanticAvailable: boolean;
+  results: SemanticSearchResult[];
+}
+
+export interface IndexStats {
+  totalChunks: number;
+  embeddedFindings: number;
+  model: string;
+  embeddingsEnabled: boolean;
+}
+
+export interface EmbedFindingResponse {
+  chunksStored: number;
+  model: string;
+}
+
+export interface RebuildIndexResponse {
+  indexed: number;
+  skipped: number;
+  model: string;
+}
+
+export interface DeleteEmbeddingResponse {
+  findingId: number;
+  chunksRemoved: number;
+}
+
+export type ProjectSummaryStatus = typeof ProjectSummaryStatus[keyof typeof ProjectSummaryStatus];
+
+
+export const ProjectSummaryStatus = {
+  active: 'active',
+  archived: 'archived',
+  deleted: 'deleted',
+} as const;
+
+export interface ProjectSummary {
+  id: number;
+  name: string;
+  description: string;
+  status: ProjectSummaryStatus;
+  confidence: number;
+  explanation: string;
+  summary?: string | null;
+  fileCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectFileSummary {
+  id: number;
+  name: string;
+  path: string;
+  extension: string;
+  sizeBytes: number;
+  aiCategory?: string | null;
+  aiConfidence?: number | null;
+  fileModifiedAt?: string | null;
+}
+
+export interface ProjectTimelineEntry {
+  findingId: number;
+  name: string;
+  date?: string | null;
+}
+
+export interface ProjectDetail {
+  project: ProjectSummary;
+  files: ProjectFileSummary[];
+  people: string[];
+  orgs: string[];
+  categories: string[];
+  timeline: ProjectTimelineEntry[];
+  storageTotalBytes: number;
+}
+
+export type ProjectCandidateStatus = typeof ProjectCandidateStatus[keyof typeof ProjectCandidateStatus];
+
+
+export const ProjectCandidateStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+  merged: 'merged',
+} as const;
+
+export type ProjectCandidateSignals = {[key: string]: number};
+
+export interface ProjectCandidate {
+  id: number;
+  name: string;
+  status: ProjectCandidateStatus;
+  score: number;
+  signals: ProjectCandidateSignals;
+  explanation: string;
+  findingCount: number;
+  findingIds: number[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type GetDashboardRecentActivityParams = {
 limit?: number;
 };
@@ -926,5 +1041,109 @@ export const ListActionQueueStatus = {
 
 export type ListActionQueue200 = {
   items: ActionQueueEntry[];
+};
+
+export type SemanticSearchParams = {
+q: string;
+limit?: number;
+minScore?: number;
+hybrid?: boolean;
+};
+
+export type ListProjectsParams = {
+status?: ListProjectsStatus;
+};
+
+export type ListProjectsStatus = typeof ListProjectsStatus[keyof typeof ListProjectsStatus];
+
+
+export const ListProjectsStatus = {
+  active: 'active',
+  archived: 'archived',
+  deleted: 'deleted',
+} as const;
+
+export type ListProjects200 = {
+  projects: ProjectSummary[];
+};
+
+export type CreateProjectBody = {
+  name: string;
+  description?: string;
+};
+
+export type ListProjectCandidatesParams = {
+status?: ListProjectCandidatesStatus;
+};
+
+export type ListProjectCandidatesStatus = typeof ListProjectCandidatesStatus[keyof typeof ListProjectCandidatesStatus];
+
+
+export const ListProjectCandidatesStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+  merged: 'merged',
+} as const;
+
+export type ListProjectCandidates200 = {
+  candidates: ProjectCandidate[];
+};
+
+export type GenerateProjectCandidatesBody = {
+  scanId?: number;
+  limit?: number;
+};
+
+export type GenerateProjectCandidates200 = {
+  generated: number;
+  candidates: ProjectCandidate[];
+};
+
+export type MergeProjectCandidatesBody = {
+  /** @minItems 2 */
+  candidateIds: number[];
+};
+
+export type MergeProjectCandidates200 = {
+  project: ProjectSummary;
+};
+
+export type ApproveProjectCandidate200 = {
+  project: ProjectSummary;
+};
+
+export type RejectProjectCandidate200 = {
+  id: number;
+  status: string;
+};
+
+export type UpdateProjectBodyStatus = typeof UpdateProjectBodyStatus[keyof typeof UpdateProjectBodyStatus];
+
+
+export const UpdateProjectBodyStatus = {
+  active: 'active',
+  archived: 'archived',
+  deleted: 'deleted',
+} as const;
+
+export type UpdateProjectBody = {
+  name?: string;
+  description?: string;
+  status?: UpdateProjectBodyStatus;
+  summary?: string;
+};
+
+export type AddFileToProjectBody = {
+  findingId: number;
+};
+
+export type SplitProjectBody = {
+  findingIds: number[];
+  newName: string;
+};
+
+export type SplitProject200 = {
+  newProject: ProjectSummary;
 };
 

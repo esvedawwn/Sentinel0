@@ -3,3 +3,6 @@
 - [SQLite migration](sqlite-migration.md) — Sentinel uses @libsql/client + drizzle-orm/libsql; must be external in esbuild and direct dep of api-server.
 - [AI intelligence layer](ai-intelligence-layer.md) — classifyWithAI() in ai/index.ts; 24-category LocalRuleProvider always available offline; OpenAI/Embeddings are stubs; includes local-only NL search + status reporting.
 - [Staged duplicate detection](duplicate-detection.md) — size→extension→hash staging + mtime-keyed hash cache pattern for avoiding full-tree re-hashing on re-scans; never-auto-delete convention.
+- [Orval duplicate-export fix](orval-duplicate-export.md) — api-zod index.ts must export only `generated/api` (not `types/`); new request-body schemas land in BOTH files causing TS2308 on wildcard re-export.
+- [Zod direct dep in api-server](zod-dep-api-server.md) — route files that inline `z.object()` need `zod` as a direct dep in api-server/package.json; transitive via api-zod is not sufficient for TS resolution.
+- [Embeddings + Projects arch](embeddings-projects-arch.md) — local 128-dim hash embeddings, hybrid search, project clustering; all gated by userSettings; no files ever moved; see docs/semantic-search-and-projects.md.

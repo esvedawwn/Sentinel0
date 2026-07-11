@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { key: "6", label: "Scan History", path: "/scan-history", shortcut: "⌘6" },
   { key: "8", label: "Search", path: "/search", shortcut: "⌘K" },
   { key: "9", label: "Action Queue", path: "/action-queue", shortcut: "⌘9" },
+  { key: "0", label: "Projects", path: "/projects", shortcut: "⌘0" },
 ];
 
 const NAV_BOTTOM = [
