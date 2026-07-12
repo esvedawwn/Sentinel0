@@ -13,6 +13,8 @@ import {
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatBytes, formatNumber, formatTimestamp, activityIcon, statusColor } from "@/lib/utils";
+import { isDesktop, pickFolder } from "@/lib/desktop";
+import { ScanProgressBanner } from "@/components/ScanProgressBanner";
 
 export default function Dashboard() {
   const [scanPath, setScanPath] = useState("");
@@ -57,6 +59,14 @@ export default function Dashboard() {
       { data: { path: "sample-data", mode: "sample" } },
       { onSuccess: () => navigate("/findings") }
     );
+  };
+
+  const handleDesktopScan = async () => {
+    const folder = await pickFolder();
+    if (folder) {
+      setScanPath(folder);
+      setShowScanInput(true);
+    }
   };
 
   const organisedPct = summary?.organisedPercent ?? 0;
@@ -127,7 +137,7 @@ export default function Dashboard() {
                   {createScan.isPending ? "Scanning…" : "Scan Sample"}
                 </button>
                 <button
-                  onClick={() => setShowScanInput(true)}
+                  onClick={isDesktop() ? () => { void handleDesktopScan(); } : () => setShowScanInput(true)}
                   className="font-mono text-xs px-4 py-1.5 rounded transition-colors"
                   style={{ background: "#34D399", color: "#111111" }}
                 >
@@ -152,6 +162,22 @@ export default function Dashboard() {
                     border: "1px solid rgba(255,255,255,0.15)",
                   }}
                 />
+                {isDesktop() && (
+                  <button
+                    onClick={async () => {
+                      const f = await pickFolder();
+                      if (f) setScanPath(f);
+                    }}
+                    className="font-mono text-xs px-3 py-1.5 rounded"
+                    style={{
+                      background: "rgba(52,211,153,0.1)",
+                      color: "#34D399",
+                      border: "1px solid rgba(52,211,153,0.25)",
+                    }}
+                  >
+                    Browse…
+                  </button>
+                )}
                 <button
                   onClick={handleScan}
                   disabled={createScan.isPending}
@@ -336,6 +362,8 @@ export default function Dashboard() {
           )}
         </AnimatePresence>
       </div>
+
+      <ScanProgressBanner isScanning={isScanning} />
 
       {/* ── Metrics grid ─────────────────────────────────────────── */}
       <div className="px-8 pt-6 pb-2" style={{ maxWidth: 1400, margin: "0 auto" }}>

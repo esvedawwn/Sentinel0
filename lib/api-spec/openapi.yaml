@@ -592,6 +592,50 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ScanRoot"
+    post:
+      operationId: createScanRoot
+      tags: [scan-roots]
+      summary: Register an approved folder as a scan root (does not start a scan)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScanRootInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanRoot"
+        "409":
+          description: Path already registered
+
+  /scan-roots/{id}:
+    delete:
+      operationId: deleteScanRoot
+      tags: [scan-roots]
+      summary: Remove an approved scan root
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted:
+                    type: boolean
+        "404":
+          description: Not found
 
   /findings/clear:
     delete:
@@ -1609,6 +1653,15 @@ components:
         scanCount:
           type: integer
         lastScannedAt:
+          type: string
+
+    CreateScanRootInput:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+        label:
           type: string
 
     ScanInput:

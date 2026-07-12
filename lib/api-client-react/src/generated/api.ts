@@ -35,9 +35,11 @@ import type {
   ClearFindingsParams,
   ClearSearchHistory200,
   CreateProjectBody,
+  CreateScanRootInput,
   DashboardSummary,
   DeleteEmbeddingResponse,
   DeleteSavedSearch200,
+  DeleteScanRoot200,
   DuplicateGroup,
   DuplicateListResponse,
   DuplicateResolveInput,
@@ -89,6 +91,7 @@ import type {
   Scan,
   ScanHistoryEntry,
   ScanInput,
+  ScanRoot,
   SearchParams,
   SearchResults,
   SemanticSearchParams,
@@ -2155,6 +2158,146 @@ export function useListScanRoots<TData = Awaited<ReturnType<typeof listScanRoots
 
 
 
+
+export const getCreateScanRootUrl = () => {
+
+
+
+
+  return `/api/scan-roots`
+}
+
+/**
+ * @summary Register an approved folder as a scan root (does not start a scan)
+ */
+export const createScanRoot = async (createScanRootInput: CreateScanRootInput, options?: RequestInit): Promise<ScanRoot> => {
+
+  return customFetch<ScanRoot>(getCreateScanRootUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(createScanRootInput)
+  }
+);}
+
+
+
+
+export const getCreateScanRootMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createScanRoot>>, TError,{data: BodyType<CreateScanRootInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createScanRoot>>, TError,{data: BodyType<CreateScanRootInput>}, TContext> => {
+
+const mutationKey = ['createScanRoot'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createScanRoot>>, {data: BodyType<CreateScanRootInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createScanRoot(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateScanRootMutationResult = NonNullable<Awaited<ReturnType<typeof createScanRoot>>>
+    export type CreateScanRootMutationBody = BodyType<CreateScanRootInput>
+    export type CreateScanRootMutationError = ErrorType<void>
+
+    /**
+ * @summary Register an approved folder as a scan root (does not start a scan)
+ */
+export const useCreateScanRoot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createScanRoot>>, TError,{data: BodyType<CreateScanRootInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createScanRoot>>,
+        TError,
+        {data: BodyType<CreateScanRootInput>},
+        TContext
+      > => {
+      return useMutation(getCreateScanRootMutationOptions(options));
+    }
+
+export const getDeleteScanRootUrl = (id: number,) => {
+
+
+
+
+  return `/api/scan-roots/${id}`
+}
+
+/**
+ * @summary Remove an approved scan root
+ */
+export const deleteScanRoot = async (id: number, options?: RequestInit): Promise<DeleteScanRoot200> => {
+
+  return customFetch<DeleteScanRoot200>(getDeleteScanRootUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteScanRootMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteScanRoot>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteScanRoot>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteScanRoot'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteScanRoot>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteScanRoot(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteScanRootMutationResult = NonNullable<Awaited<ReturnType<typeof deleteScanRoot>>>
+
+    export type DeleteScanRootMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove an approved scan root
+ */
+export const useDeleteScanRoot = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteScanRoot>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteScanRoot>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteScanRootMutationOptions(options));
+    }
 
 export const getClearFindingsUrl = (params?: ClearFindingsParams,) => {
   const normalizedParams = new URLSearchParams();

@@ -7,3 +7,5 @@
 - [Orval duplicate-export fix](orval-duplicate-export.md) — api-zod index.ts must export only `generated/api` (not `types/`); new request-body schemas land in BOTH files causing TS2308 on wildcard re-export.
 - [Zod direct dep in api-server](zod-dep-api-server.md) — route files that inline `z.object()` need `zod` as a direct dep in api-server/package.json; transitive via api-zod is not sufficient for TS resolution.
 - [Embeddings + Projects arch](embeddings-projects-arch.md) — local 128-dim hash embeddings, hybrid search, project clustering; all gated by userSettings; no files ever moved; see docs/semantic-search-and-projects.md.
+- [Tauri IPC + desktop bridge](tauri-desktop-bridge.md) — `window.__TAURI__.core.invoke` (withGlobalTauri:true), no npm deps; `isDesktop()`/`pickFolder()` are no-ops in browser.
+- [DB schema push required after changes](db-schema-push.md) — `pnpm --filter @workspace/db run push` must run before API server restarts after any schema edit, or live queries 500.

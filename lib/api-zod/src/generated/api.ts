@@ -647,6 +647,35 @@ export const ListScanRootsResponse = zod.object({
 
 
 /**
+ * @summary Register an approved folder as a scan root (does not start a scan)
+ */
+export const CreateScanRootBody = zod.object({
+  "path": zod.string(),
+  "label": zod.string().optional()
+})
+
+export const CreateScanRootResponse = zod.object({
+  "id": zod.number(),
+  "path": zod.string(),
+  "label": zod.string().nullish(),
+  "scanCount": zod.number(),
+  "lastScannedAt": zod.string()
+})
+
+
+/**
+ * @summary Remove an approved scan root
+ */
+export const DeleteScanRootParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteScanRootResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
  * @summary Clear all findings (or by scanId)
  */
 export const ClearFindingsQueryParams = zod.object({

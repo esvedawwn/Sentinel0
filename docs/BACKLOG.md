@@ -153,8 +153,17 @@ See `docs/AI_ARCHITECTURE.md`, `docs/AI_PRIVACY.md`, and `docs/AI_ROADMAP.md` fo
 
 ## Desktop / Platform
 
-- [ ] Tauri native build — `.dmg` for macOS, `.exe` for Windows
-- [ ] Native file picker via Tauri dialog plugin
+- [x] Tauri native build source — `lib.rs`, `Cargo.toml`, `tauri.conf.json`, SEA
+      build pipeline all complete; compiles to `.dmg` on macOS with Rust/Cargo (2026-07-12)
+- [x] Native file picker via Tauri dialog plugin — `pick_folder` IPC command in
+      `lib.rs`, `isDesktop()`/`pickFolder()` bridge in `src/lib/desktop.ts`,
+      "Browse…" button on Dashboard and Settings (2026-07-12)
+- [x] Settings page — `POST /scan-roots`, `DELETE /scan-roots/:id`, approved folder
+      management UI, live processing/privacy toggles wired to `PATCH /settings` (2026-07-12)
+- [x] Scan progress banner — `ScanProgressBanner` component with live polling, cancel
+      button, and per-scan stats injected into Dashboard (2026-07-12)
+- [ ] macOS `.dmg` distribution — requires Rust/Cargo build on macOS hardware
 - [ ] System tray integration
 - [ ] Local embeddings (Ollama) for fully offline AI
 - [ ] OCR for scanned PDFs
+- [ ] Windows `.exe` build

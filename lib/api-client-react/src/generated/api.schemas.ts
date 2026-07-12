@@ -103,6 +103,11 @@ export interface ScanRoot {
   lastScannedAt: string;
 }
 
+export interface CreateScanRootInput {
+  path: string;
+  label?: string;
+}
+
 export type ScanInputMode = typeof ScanInputMode[keyof typeof ScanInputMode];
 
 
@@ -960,6 +965,10 @@ q: string;
 
 export type ListScanRoots200 = {
   roots: ScanRoot[];
+};
+
+export type DeleteScanRoot200 = {
+  deleted: boolean;
 };
 
 export type ClearFindingsParams = {
