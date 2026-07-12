@@ -1,0 +1,68 @@
+Fix the Sentinel macOS sidecar packaging properly.
+
+Confirmed current failure on Apple Silicon macOS:
+
+postject reports:
+
+Could not find the sentinel
+NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+in the binary
+
+The current script incorrectly continues after this failure and prints success, then copies an invalid Node binary into:
+
+artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin
+
+Environment:
+
+- macOS arm64
+- Node v22.23.1 installed through Homebrew
+- Rust and Tauri 2 installed
+- SEA blob generation succeeds
+- postject injection fails because the copied Node executable does not expose the expected fuse marker
+
+Requirements:
+
+1. Treat any postject, codesign, copy or injection failure as fatal.
+2. Never print success or copy the binary when postject exits non-zero.
+3. Remove any invalid existing sidecar before a build.
+4. Investigate the best supported Node SEA approach for Node 22 on macOS arm64.
+5. Prefer one of these solutions, in order:
+   a. Use Node's supported built-in SEA generation workflow if available for the pinned runtime.
+   b. Pin and download an official Node macOS arm64 binary that contains the required SEA fuse marker, rather than using Homebrew's process.execPath.
+   c. Replace SEA with a more reliable Tauri sidecar packaging strategy that bundles the Node runtime and API server without exposing a public server.
+6. Do not rely on the user's globally installed Node binary.
+7. Pin the exact Node runtime version used for sidecar generation.
+8. Verify the chosen runtime architecture is arm64.
+9. Add a preflight check that confirms the SEA fuse marker exists before invoking postject.
+10. If using postject, check its exit status and confirm injection succeeded.
+11. After injection, run the produced sidecar with a health-check flag or temporary health endpoint and require exit success.
+12. Confirm it binds only to 127.0.0.1.
+13. Keep the existing React/Tauri architecture.
+14. Do not remove SQLite, project intelligence or search features.
+15. Add tests or build validation covering:
+    - invalid sidecar is rejected
+    - missing fuse fails clearly
+    - postject failure stops the build
+    - final binary exists and is executable
+    - final binary passes a local health check
+16. Run:
+    pnpm desktop:build:server
+    pnpm desktop:check
+17. Update:
+    docs/DESKTOP_RELEASE.md
+    docs/MAC_DESKTOP_BUILD.md
+    docs/CHANGELOG.md
+
+Do not claim success unless the generated sidecar actually runs.
+
+Provide:
+- chosen packaging approach
+- pinned Node version and source
+- files changed
+- exact Mac retry commands
+- validation output
+- remaining limitations
+
+Suggested commit:
+
+fix(desktop): use verified macOS sidecar runtime and fail on SEA injection errors

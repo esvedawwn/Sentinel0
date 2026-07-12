@@ -101,6 +101,25 @@ execSync(
 // ── 4. Copy Node.js binary and inject blob ───────────────────────────────────
 const nodeExec = process.execPath;
 
+// Verify the Node.js binary contains the SEA sentinel fuse that postject
+// requires.  Homebrew's Node.js build does NOT embed this marker — only
+// official Node.js binaries (nodejs.org / nvm / volta) do.
+{
+  const binBytes = readFileSync(nodeExec);
+  const fuse = Buffer.from("NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2");
+  if (binBytes.indexOf(fuse) === -1) {
+    console.error(
+      "\nERROR: Your Node.js binary does not contain the SEA fuse marker.\n" +
+      "       Homebrew's node build strips this marker and cannot be used for SEA.\n\n" +
+      "       Fix: install Node.js via nvm or directly from nodejs.org:\n" +
+      "         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash\n" +
+      "         nvm install 22 && nvm use 22\n\n" +
+      "       Then re-run: pnpm desktop:build:server\n"
+    );
+    process.exit(1);
+  }
+}
+
 // Use os.tmpdir() so we are never fighting permissions on the source binary's
 // original install location (Homebrew, NVM, etc. can make it read-only or signed
 // in a way that postject cannot overwrite even after chmod).
