@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link, useSearchParams } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,17 +15,108 @@ import {
   getListSavedSearchesQueryKey,
   getSemanticSearchQueryKey,
 } from "@workspace/api-client-react";
-import type { SearchFilters, SavedSearch, SearchHistoryEntry, SemanticSearchResult } from "@workspace/api-client-react";
+import type {
+  SearchFilters,
+  SavedSearch,
+  SearchHistoryEntry,
+  SemanticSearchResult,
+  AppliedFilter,
+  ScoredFinding,
+} from "@workspace/api-client-react";
 import { formatBytes } from "@/lib/utils";
 
 const RISK_LEVELS = ["low", "medium", "high", "critical"] as const;
 
-const EXAMPLE_QUERIES = [
+const LEXICAL_EXAMPLES = [
+  "large duplicate videos",
+  "legal PDFs from last month",
+  "renovation invoices from 2024",
+  "documents mentioning Kennards",
+  "banking statements over 2 MB",
+];
+
+const SEMANTIC_EXAMPLES = [
   "documents related to a court matter",
   "renovation plumbing invoices",
   "brand files for a client",
   "correspondence about a particular company",
 ];
+
+function RelevancePip({ score }: { score: number }) {
+  const pct = Math.round(score * 100);
+  const color = pct >= 50 ? "#34D399" : pct >= 25 ? "#FBBF24" : "rgba(255,255,255,0.25)";
+  return (
+    <span
+      title={`Relevance score: ${pct}%`}
+      className="text-xs font-mono px-1.5 py-0.5 rounded shrink-0"
+      style={{
+        color,
+        background: "rgba(255,255,255,0.04)",
+        border: `1px solid ${color}33`,
+        fontFamily: "var(--app-font-mono)",
+        minWidth: 38,
+        textAlign: "center" as const,
+      }}
+    >
+      {pct}%
+    </span>
+  );
+}
+
+function FilterChip({
+  filter,
+  onRemove,
+}: {
+  filter: AppliedFilter;
+  onRemove?: () => void;
+}) {
+  const SOURCE_COLORS: Record<string, string> = {
+    category: "#60A5FA",
+    date: "#A78BFA",
+    size: "#FBBF24",
+    extension: "#34D399",
+    status: "#F472B6",
+    entity: "#FB923C",
+  };
+  const color = SOURCE_COLORS[filter.source] ?? "rgba(255,255,255,0.5)";
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded"
+      style={{
+        background: `${color}18`,
+        border: `1px solid ${color}44`,
+        color,
+      }}
+    >
+      <span className="opacity-60 uppercase text-[0.6rem] tracking-wider font-mono">{filter.source}</span>
+      <span>{filter.label}</span>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          className="ml-0.5 opacity-50 hover:opacity-100 leading-none"
+          style={{ color }}
+        >
+          ×
+        </button>
+      )}
+    </span>
+  );
+}
+
+function ConfidenceBadge({ confidence }: { confidence: number }) {
+  if (confidence <= 0) return null;
+  const pct = Math.round(confidence * 100);
+  const color = pct >= 70 ? "#34D399" : pct >= 40 ? "#FBBF24" : "#F87171";
+  return (
+    <span
+      className="text-xs px-2 py-0.5 rounded"
+      style={{ background: `${color}18`, color, border: `1px solid ${color}44` }}
+      title={`NL interpretation confidence: ${pct}%`}
+    >
+      {pct}% confidence
+    </span>
+  );
+}
 
 export default function Search() {
   const [searchParams] = useSearchParams();
@@ -35,6 +126,7 @@ export default function Search() {
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [mode, setMode] = useState<"lexical" | "semantic">("lexical");
+  const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -56,6 +148,7 @@ export default function Search() {
     maxSizeBytes: filters.maxSizeBytes ?? undefined,
     scanId: filters.scanId ?? undefined,
     duplicatesOnly: filters.duplicatesOnly ?? undefined,
+    mentionedEntity: (filters as { mentionedEntity?: string }).mentionedEntity ?? undefined,
     limit: 100,
     recordHistory: true,
   };
@@ -110,15 +203,20 @@ export default function Search() {
 
   function runSearch() {
     setCommittedQuery(query);
+    setExpandedRow(null);
   }
 
   function applyFilters(next: SearchFilters) {
     setFilters(next);
   }
 
-  const results = data?.findings ?? [];
+  const results: ScoredFinding[] = (data?.findings as ScoredFinding[] | undefined) ?? [];
   const semanticResults: SemanticSearchResult[] = semanticData?.results ?? [];
   const isSearching = mode === "lexical" ? isFetching : semanticFetching;
+  const appliedFilters: AppliedFilter[] = (data as { appliedFilters?: AppliedFilter[] } | undefined)?.appliedFilters ?? [];
+  const confidence: number = (data as { confidence?: number } | undefined)?.confidence ?? 0;
+  const unrecognizedTerms: string[] = (data as { unrecognizedTerms?: string[] } | undefined)?.unrecognizedTerms ?? [];
+  const examples = mode === "semantic" ? SEMANTIC_EXAMPLES : LEXICAL_EXAMPLES;
 
   return (
     <div className="p-8 max-w-5xl">
@@ -159,10 +257,10 @@ export default function Search() {
         )}
       </div>
 
-      {/* Example queries for semantic mode */}
-      {mode === "semantic" && !committedQuery && (
+      {/* Example queries */}
+      {!committedQuery && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {EXAMPLE_QUERIES.map((q) => (
+          {examples.map((q) => (
             <button
               key={q}
               onClick={() => { setQuery(q); setCommittedQuery(q); }}
@@ -175,7 +273,8 @@ export default function Search() {
         </div>
       )}
 
-      <div className="flex gap-3 mb-4">
+      {/* Search bar */}
+      <div className="flex gap-3 mb-3">
         <input
           autoFocus
           type="text"
@@ -185,13 +284,10 @@ export default function Search() {
           placeholder={
             mode === "semantic"
               ? '"documents related to a court matter"'
-              : '"large PDFs from last month" or "duplicate photos over 5MB"'
+              : '"large PDFs from last month" or "duplicate photos over 5 MB"'
           }
           className="flex-1 px-4 py-3 rounded text-sm text-white outline-none"
-          style={{
-            background: "#1A1A1A",
-            border: "1px solid rgba(255,255,255,0.12)",
-          }}
+          style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.12)" }}
         />
         <button
           onClick={runSearch}
@@ -201,6 +297,41 @@ export default function Search() {
           Search
         </button>
       </div>
+
+      {/* Applied filter chips + confidence */}
+      <AnimatePresence>
+        {appliedFilters.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex flex-wrap items-center gap-2 mb-3"
+          >
+            <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)", fontFamily: "var(--app-font-mono)" }}>
+              Interpreted:
+            </span>
+            {appliedFilters.map((f, i) => (
+              <FilterChip key={i} filter={f} />
+            ))}
+            <ConfidenceBadge confidence={confidence} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Unrecognised terms warning */}
+      <AnimatePresence>
+        {unrecognizedTerms.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="text-xs mb-3 px-3 py-2 rounded"
+            style={{ background: "rgba(251,191,36,0.08)", color: "#FBBF24", border: "1px solid rgba(251,191,36,0.2)" }}
+          >
+            ⚠ Unrecognised terms ignored: {unrecognizedTerms.join(", ")}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Explicit filters */}
       <div className="sentinel-card p-4 mb-6">
@@ -259,27 +390,39 @@ export default function Search() {
             className="px-2.5 py-1.5 text-xs rounded text-white outline-none"
             style={{ background: "#222222", border: "1px solid rgba(255,255,255,0.1)" }}
           />
-          <label className="flex items-center gap-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
-            <input
-              type="checkbox"
-              checked={!!filters.duplicatesOnly}
-              onChange={(e) => applyFilters({ ...filters, duplicatesOnly: e.target.checked })}
-            />
-            Duplicates only
-          </label>
-          <button
-            onClick={() => setFilters({})}
-            className="text-xs"
-            style={{ color: "rgba(255,255,255,0.4)" }}
-          >
-            Clear filters
-          </button>
+          <input
+            placeholder="Entity / person / org…"
+            value={(filters as { mentionedEntity?: string }).mentionedEntity ?? ""}
+            onChange={(e) =>
+              applyFilters({ ...filters, mentionedEntity: e.target.value || undefined } as SearchFilters)
+            }
+            className="px-2.5 py-1.5 text-xs rounded text-white outline-none"
+            style={{ background: "#222222", border: "1px solid rgba(255,255,255,0.1)" }}
+          />
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-xs" style={{ color: "rgba(255,255,255,0.6)" }}>
+              <input
+                type="checkbox"
+                checked={!!filters.duplicatesOnly}
+                onChange={(e) => applyFilters({ ...filters, duplicatesOnly: e.target.checked })}
+              />
+              Duplicates only
+            </label>
+            <button
+              onClick={() => setFilters({})}
+              className="text-xs"
+              style={{ color: "rgba(255,255,255,0.4)" }}
+            >
+              Clear
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="flex gap-6">
         <div className="flex-1 min-w-0">
-          {data?.explanation && (
+          {/* NL explanation banner */}
+          {data?.explanation && mode === "lexical" && (
             <div
               className="text-xs mb-3 px-3 py-2 rounded"
               style={{ background: "rgba(96,165,250,0.08)", color: "#60A5FA", border: "1px solid rgba(96,165,250,0.2)" }}
@@ -295,7 +438,7 @@ export default function Search() {
                   ? "Searching…"
                   : mode === "semantic"
                   ? `${semanticResults.length} semantic results`
-                  : `${data?.total ?? 0} results`}
+                  : `${data?.total ?? 0} result${data?.total !== 1 ? "s" : ""}`}
               </span>
               {!showSaveInput ? (
                 <button
@@ -311,6 +454,11 @@ export default function Search() {
                     autoFocus
                     value={saveName}
                     onChange={(e) => setSaveName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && saveName) {
+                        createSavedSearch.mutate({ data: { name: saveName, query: committedQuery, filters } });
+                      }
+                    }}
                     placeholder="Name…"
                     className="px-2 py-1 text-xs rounded text-white outline-none"
                     style={{ background: "#222222", border: "1px solid rgba(255,255,255,0.1)" }}
@@ -336,41 +484,105 @@ export default function Search() {
           {/* Lexical results */}
           {mode === "lexical" && hasQuery && results.length > 0 && (
             <div className="rounded-lg overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-              {results.map((finding, idx) => (
-                <motion.div
-                  key={finding.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(idx * 0.02, 0.3) }}
-                  className="flex items-center justify-between px-4 py-3"
-                  style={{
-                    background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
-                    borderBottom: "1px solid rgba(255,255,255,0.04)",
-                  }}
-                >
-                  <div className="min-w-0 pr-4">
-                    <div className="text-sm font-medium truncate text-white">{finding.name}</div>
-                    <div
-                      className="text-xs truncate mt-0.5"
-                      style={{ color: "rgba(255,255,255,0.25)", fontFamily: "var(--app-font-mono)", fontSize: "0.7rem" }}
-                    >
-                      {finding.path}
-                    </div>
-                  </div>
-                  <div
-                    className="text-xs font-mono shrink-0"
-                    style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)" }}
+              {results.map((finding, idx) => {
+                const scored = finding as ScoredFinding;
+                const isExpanded = expandedRow === finding.id;
+                return (
+                  <motion.div
+                    key={finding.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                    style={{
+                      background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
+                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                    }}
                   >
-                    {finding.sizeBytes > 0 ? formatBytes(finding.sizeBytes) : "—"}
-                  </div>
-                </motion.div>
-              ))}
+                    <button
+                      onClick={() => setExpandedRow(isExpanded ? null : finding.id)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left"
+                    >
+                      <div className="min-w-0 pr-4 flex-1">
+                        <div className="text-sm font-medium truncate text-white">{finding.name}</div>
+                        <div
+                          className="text-xs truncate mt-0.5"
+                          style={{ color: "rgba(255,255,255,0.25)", fontFamily: "var(--app-font-mono)", fontSize: "0.7rem" }}
+                        >
+                          {finding.path}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {finding.aiCategory && (
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded hidden sm:inline"
+                            style={{ color: "#60A5FA", background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)" }}
+                          >
+                            {finding.aiCategory}
+                          </span>
+                        )}
+                        <span
+                          className="text-xs font-mono shrink-0"
+                          style={{ color: "rgba(255,255,255,0.4)", fontFamily: "var(--app-font-mono)", minWidth: 56, textAlign: "right" }}
+                        >
+                          {finding.sizeBytes > 0 ? formatBytes(finding.sizeBytes) : "—"}
+                        </span>
+                        {scored.relevanceScore !== undefined && (
+                          <RelevancePip score={scored.relevanceScore} />
+                        )}
+                      </div>
+                    </button>
+
+                    {/* Expanded detail row */}
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="px-4 pb-3"
+                          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
+                        >
+                          {scored.matchExplanation && (
+                            <div
+                              className="text-xs mt-2 px-2.5 py-2 rounded"
+                              style={{ color: "rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
+                            >
+                              {scored.matchExplanation}
+                            </div>
+                          )}
+                          {scored.matchedFactors?.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {scored.matchedFactors.map((f, fi) => (
+                                <span
+                                  key={fi}
+                                  className="text-xs px-1.5 py-0.5 rounded"
+                                  style={{ color: "#34D399", background: "rgba(52,211,153,0.07)", border: "1px solid rgba(52,211,153,0.2)" }}
+                                >
+                                  {f}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="flex gap-4 mt-2 text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>
+                            {finding.riskLevel && <span>Risk: <span style={{ color: finding.riskLevel === "high" || finding.riskLevel === "critical" ? "#F87171" : "rgba(255,255,255,0.5)" }}>{finding.riskLevel}</span></span>}
+                            {finding.type && <span>Type: {finding.type}</span>}
+                            {finding.extension && <span>.{finding.extension}</span>}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
             </div>
           )}
 
           {mode === "lexical" && hasQuery && !isFetching && results.length === 0 && (
-            <div className="text-center py-16 text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
-              No findings matched your search.
+            <div className="text-center py-16" style={{ color: "rgba(255,255,255,0.3)" }}>
+              <div className="text-sm mb-2">No findings matched your search.</div>
+              <div className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
+                Try a broader query or different keywords.
+              </div>
             </div>
           )}
 
@@ -428,10 +640,17 @@ export default function Search() {
           )}
 
           {mode === "semantic" && !!committedQuery && !semanticFetching && semanticResults.length === 0 && (
-            <div className="text-center py-16 text-sm" style={{ color: "rgba(255,255,255,0.3)" }}>
-              {semanticData?.semanticAvailable === false
-                ? "No embedding vectors found. Enable embeddings in Settings and rebuild the index."
-                : "No semantic matches found."}
+            <div className="text-center py-16" style={{ color: "rgba(255,255,255,0.3)" }}>
+              <div className="text-sm mb-2">
+                {semanticData?.semanticAvailable === false
+                  ? "No embedding vectors found."
+                  : "No semantic matches found."}
+              </div>
+              {semanticData?.semanticAvailable === false && (
+                <div className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
+                  Enable embeddings in Settings and rebuild the index.
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -508,13 +727,13 @@ export default function Search() {
                     setCommittedQuery(h.query);
                     setFilters(h.filters);
                   }}
-                  className="w-full text-left px-3 py-2 rounded text-xs truncate block"
+                  className="w-full text-left px-3 py-2 rounded text-xs block"
                   style={{ background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)" }}
                 >
-                  {h.query || "(filters only)"}
-                  <span className="ml-2" style={{ color: "rgba(255,255,255,0.3)" }}>
-                    {h.resultCount}
-                  </span>
+                  <div className="truncate">{h.query || "(filters only)"}</div>
+                  <div className="mt-0.5" style={{ color: "rgba(255,255,255,0.3)" }}>
+                    {h.resultCount} result{h.resultCount !== 1 ? "s" : ""}
+                  </div>
                 </button>
               ))}
             </div>

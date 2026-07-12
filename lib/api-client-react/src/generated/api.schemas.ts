@@ -515,6 +515,25 @@ export interface FindingsSummary {
   byType: FindingsSummaryByType;
 }
 
+export type AppliedFilterSource = typeof AppliedFilterSource[keyof typeof AppliedFilterSource];
+
+
+export const AppliedFilterSource = {
+  category: 'category',
+  size: 'size',
+  date: 'date',
+  status: 'status',
+  extension: 'extension',
+  entity: 'entity',
+  type: 'type',
+} as const;
+
+export interface AppliedFilter {
+  label: string;
+  value: string;
+  source: AppliedFilterSource;
+}
+
 /**
  * @nullable
  */
@@ -533,11 +552,13 @@ export interface SearchFilters {
   path?: string | null;
   /** @nullable */
   extension?: string | null;
+  extensions?: string[] | null;
   /** @nullable */
   category?: string | null;
   /** @nullable */
   aiCategory?: string | null;
   tags?: string[];
+  findingTypes?: string[] | null;
   /** @nullable */
   riskLevel?: SearchFiltersRiskLevel;
   /** @nullable */
@@ -551,14 +572,34 @@ export interface SearchFilters {
   /** @nullable */
   scanId?: number | null;
   duplicatesOnly?: boolean;
+  /**
+     * Filter to findings whose extracted entities contain this value
+     * @nullable
+     */
+  mentionedEntity?: string | null;
 }
+
+export type ScoredFinding = Finding & {
+  /** Hybrid relevance score from 0 (low) to 1 (high) */
+  relevanceScore: number;
+  /** Human-readable list of signals that contributed to this ranking */
+  matchedFactors: string[];
+  /** One-sentence explanation of why this result ranked where it did */
+  matchExplanation: string;
+};
 
 export interface SearchResults {
   query: string;
   filters: SearchFilters;
   /** Human-readable description of how the query was interpreted. */
   explanation: string;
-  findings: Finding[];
+  /** Interpreter confidence from 0 (nothing recognised) to 1 (fully structured query) */
+  confidence: number;
+  /** Structured list of filters extracted from the NL query, for UI chip display */
+  appliedFilters: AppliedFilter[];
+  /** Words in the query that were not mapped to any filter */
+  unrecognizedTerms: string[];
+  findings: ScoredFinding[];
   total: number;
 }
 
@@ -993,6 +1034,18 @@ dateFrom?: string;
 dateTo?: string;
 scanId?: number;
 duplicatesOnly?: boolean;
+/**
+ * Filter to findings whose extracted entities contain this value
+ */
+mentionedEntity?: string;
+/**
+ * Comma-separated list of extensions to filter by (e.g. "pdf,docx")
+ */
+extensions?: string;
+/**
+ * Comma-separated finding types to filter by
+ */
+findingTypes?: string;
 limit?: number;
 offset?: number;
 recordHistory?: boolean;

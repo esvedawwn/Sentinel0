@@ -40,6 +40,10 @@ function mapFinding(f: Awaited<ReturnType<typeof runSearch>>["findings"][number]
     aiSuggestedDestination: f.aiSuggestedDestination ?? null,
     aiSuggestedAction: f.aiSuggestedAction ?? null,
     aiProvider: f.aiProvider ?? null,
+    // Hybrid scoring fields (v2)
+    relevanceScore: f.relevanceScore,
+    matchedFactors: f.matchedFactors,
+    matchExplanation: f.matchExplanation,
   };
 }
 
@@ -51,7 +55,19 @@ router.get("/search", async (req, res): Promise<void> => {
   }
   const { q, limit, offset, recordHistory, ...filters } = params.data;
 
-  const result = await runSearch({ q, limit, offset, ...filters });
+  // Parse comma-separated list params that arrive as strings from query string
+  const extensionsRaw = (req.query.extensions as string | undefined)?.split(",").map((e) => e.trim()).filter(Boolean) ?? undefined;
+  const findingTypesRaw = (req.query.findingTypes as string | undefined)?.split(",").map((t) => t.trim()).filter(Boolean) ?? undefined;
+
+  const result = await runSearch({
+    q,
+    limit,
+    offset,
+    ...filters,
+    extensions: extensionsRaw,
+    findingTypes: findingTypesRaw,
+    mentionedEntity: (req.query.mentionedEntity as string | undefined) ?? undefined,
+  });
 
   if (recordHistory !== false) {
     await db.insert(searchHistoryTable).values({
@@ -65,6 +81,9 @@ router.get("/search", async (req, res): Promise<void> => {
     query: result.query,
     filters: result.filters,
     explanation: result.explanation,
+    confidence: result.confidence,
+    appliedFilters: result.appliedFilters,
+    unrecognizedTerms: result.unrecognizedTerms,
     findings: result.findings.map(mapFinding),
     total: result.total,
   });

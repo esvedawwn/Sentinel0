@@ -5,7 +5,8 @@
  * Sentinel file intelligence API
  * OpenAPI spec version: 0.1.0
  */
-import type { Finding } from './finding';
+import type { AppliedFilter } from './appliedFilter';
+import type { ScoredFinding } from './scoredFinding';
 import type { SearchFilters } from './searchFilters';
 
 export interface SearchResults {
@@ -13,6 +14,12 @@ export interface SearchResults {
   filters: SearchFilters;
   /** Human-readable description of how the query was interpreted. */
   explanation: string;
-  findings: Finding[];
+  /** Interpreter confidence from 0 (nothing recognised) to 1 (fully structured query) */
+  confidence: number;
+  /** Structured list of filters extracted from the NL query, for UI chip display */
+  appliedFilters: AppliedFilter[];
+  /** Words in the query that were not mapped to any filter */
+  unrecognizedTerms: string[];
+  findings: ScoredFinding[];
   total: number;
 }

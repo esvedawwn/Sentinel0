@@ -21,6 +21,18 @@ dateFrom?: string;
 dateTo?: string;
 scanId?: number;
 duplicatesOnly?: boolean;
+/**
+ * Filter to findings whose extracted entities contain this value
+ */
+mentionedEntity?: string;
+/**
+ * Comma-separated list of extensions to filter by (e.g. "pdf,docx")
+ */
+extensions?: string;
+/**
+ * Comma-separated finding types to filter by
+ */
+findingTypes?: string;
 limit?: number;
 offset?: number;
 recordHistory?: boolean;

@@ -721,6 +721,21 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: mentionedEntity
+          in: query
+          description: Filter to findings whose extracted entities contain this value
+          schema:
+            type: string
+        - name: extensions
+          in: query
+          description: Comma-separated list of extensions to filter by (e.g. "pdf,docx")
+          schema:
+            type: string
+        - name: findingTypes
+          in: query
+          description: Comma-separated finding types to filter by
+          schema:
+            type: string
         - name: limit
           in: query
           schema:
@@ -2081,6 +2096,18 @@ components:
           additionalProperties:
             type: integer
 
+    AppliedFilter:
+      type: object
+      required: [label, value, source]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+        source:
+          type: string
+          enum: [category, size, date, status, extension, entity, type]
+
     SearchFilters:
       type: object
       properties:
@@ -2088,6 +2115,11 @@ components:
           type: ["string", "null"]
         extension:
           type: ["string", "null"]
+        extensions:
+          type: array
+          items:
+            type: string
+          nullable: true
         category:
           type: ["string", "null"]
         aiCategory:
@@ -2096,6 +2128,11 @@ components:
           type: array
           items:
             type: string
+        findingTypes:
+          type: array
+          items:
+            type: string
+          nullable: true
         riskLevel:
           type: ["string", "null"]
           enum: [low, medium, high, critical, null]
@@ -2111,10 +2148,32 @@ components:
           type: ["integer", "null"]
         duplicatesOnly:
           type: boolean
+        mentionedEntity:
+          type: ["string", "null"]
+          description: Filter to findings whose extracted entities contain this value
+
+    ScoredFinding:
+      allOf:
+        - $ref: "#/components/schemas/Finding"
+        - type: object
+          required: [relevanceScore, matchedFactors, matchExplanation]
+          properties:
+            relevanceScore:
+              type: number
+              format: float
+              description: Hybrid relevance score from 0 (low) to 1 (high)
+            matchedFactors:
+              type: array
+              items:
+                type: string
+              description: Human-readable list of signals that contributed to this ranking
+            matchExplanation:
+              type: string
+              description: One-sentence explanation of why this result ranked where it did
 
     SearchResults:
       type: object
-      required: [query, filters, explanation, findings, total]
+      required: [query, filters, explanation, confidence, appliedFilters, unrecognizedTerms, findings, total]
       properties:
         query:
           type: string
@@ -2123,10 +2182,24 @@ components:
         explanation:
           type: string
           description: Human-readable description of how the query was interpreted.
+        confidence:
+          type: number
+          format: float
+          description: Interpreter confidence from 0 (nothing recognised) to 1 (fully structured query)
+        appliedFilters:
+          type: array
+          items:
+            $ref: "#/components/schemas/AppliedFilter"
+          description: Structured list of filters extracted from the NL query, for UI chip display
+        unrecognizedTerms:
+          type: array
+          items:
+            type: string
+          description: Words in the query that were not mapped to any filter
         findings:
           type: array
           items:
-            $ref: "#/components/schemas/Finding"
+            $ref: "#/components/schemas/ScoredFinding"
         total:
           type: integer
 

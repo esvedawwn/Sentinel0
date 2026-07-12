@@ -709,13 +709,16 @@ export const SearchQueryParams = zod.object({
   "dateTo": zod.coerce.string().optional(),
   "scanId": zod.coerce.number().optional(),
   "duplicatesOnly": zod.coerce.boolean().optional(),
+  "mentionedEntity": zod.coerce.string().optional().describe('Filter to findings whose extracted entities contain this value'),
+  "extensions": zod.coerce.string().optional().describe('Comma-separated list of extensions to filter by (e.g. \"pdf,docx\")'),
+  "findingTypes": zod.coerce.string().optional().describe('Comma-separated finding types to filter by'),
   "limit": zod.coerce.number().default(searchQueryLimitDefault),
   "offset": zod.coerce.number().default(searchQueryOffsetDefault),
   "recordHistory": zod.coerce.boolean().default(searchQueryRecordHistoryDefault)
 })
 
-export const searchResponseFindingsItemAiConfidenceMin = 0;
-export const searchResponseFindingsItemAiConfidenceMax = 100;
+export const searchResponseFindingsItemOneAiConfidenceMin = 0;
+export const searchResponseFindingsItemOneAiConfidenceMax = 100;
 
 
 
@@ -724,18 +727,28 @@ export const SearchResponse = zod.object({
   "filters": zod.object({
   "path": zod.string().nullish(),
   "extension": zod.string().nullish(),
+  "extensions": zod.array(zod.string()).nullish(),
   "category": zod.string().nullish(),
   "aiCategory": zod.string().nullish(),
   "tags": zod.array(zod.string()).optional(),
+  "findingTypes": zod.array(zod.string()).nullish(),
   "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
   "minSizeBytes": zod.number().nullish(),
   "maxSizeBytes": zod.number().nullish(),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scanId": zod.number().nullish(),
-  "duplicatesOnly": zod.boolean().optional()
+  "duplicatesOnly": zod.boolean().optional(),
+  "mentionedEntity": zod.string().nullish().describe('Filter to findings whose extracted entities contain this value')
 }),
   "explanation": zod.string().describe('Human-readable description of how the query was interpreted.'),
+  "confidence": zod.number().describe('Interpreter confidence from 0 (nothing recognised) to 1 (fully structured query)'),
+  "appliedFilters": zod.array(zod.object({
+  "label": zod.string(),
+  "value": zod.string(),
+  "source": zod.enum(['category', 'size', 'date', 'status', 'extension', 'entity', 'type'])
+})).describe('Structured list of filters extracted from the NL query, for UI chip display'),
+  "unrecognizedTerms": zod.array(zod.string()).describe('Words in the query that were not mapped to any filter'),
   "findings": zod.array(zod.object({
   "id": zod.number(),
   "scanId": zod.number(),
@@ -756,13 +769,17 @@ export const SearchResponse = zod.object({
   "createdAt": zod.string(),
   "aiCategory": zod.string().nullish().describe('High-level AI category (e.g. Legal, Tax, Photography, Software)'),
   "aiSubcategory": zod.string().nullish().describe('Optional finer-grained classification within the category'),
-  "aiConfidence": zod.number().min(searchResponseFindingsItemAiConfidenceMin).max(searchResponseFindingsItemAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
+  "aiConfidence": zod.number().min(searchResponseFindingsItemOneAiConfidenceMin).max(searchResponseFindingsItemOneAiConfidenceMax).nullish().describe('AI classification confidence 0–100'),
   "aiExplanation": zod.string().nullish().describe('Human-readable explanation of why this category was chosen'),
   "aiTags": zod.array(zod.string()).nullish().describe('Semantic tags assigned by the AI classifier'),
   "aiSuggestedDestination": zod.string().nullish().describe('Suggested folder\/location for organisation (display-only; never applied automatically)'),
   "aiSuggestedAction": zod.string().nullish().describe('Short human-readable description of the AI\'s suggested action'),
   "aiProvider": zod.string().nullish().describe('Identifier of the AI provider that produced this classification')
-})),
+}).and(zod.object({
+  "relevanceScore": zod.number().describe('Hybrid relevance score from 0 (low) to 1 (high)'),
+  "matchedFactors": zod.array(zod.string()).describe('Human-readable list of signals that contributed to this ranking'),
+  "matchExplanation": zod.string().describe('One-sentence explanation of why this result ranked where it did')
+}))),
   "total": zod.number()
 })
 
@@ -783,16 +800,19 @@ export const ListSearchHistoryResponse = zod.object({
   "filters": zod.object({
   "path": zod.string().nullish(),
   "extension": zod.string().nullish(),
+  "extensions": zod.array(zod.string()).nullish(),
   "category": zod.string().nullish(),
   "aiCategory": zod.string().nullish(),
   "tags": zod.array(zod.string()).optional(),
+  "findingTypes": zod.array(zod.string()).nullish(),
   "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
   "minSizeBytes": zod.number().nullish(),
   "maxSizeBytes": zod.number().nullish(),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scanId": zod.number().nullish(),
-  "duplicatesOnly": zod.boolean().optional()
+  "duplicatesOnly": zod.boolean().optional(),
+  "mentionedEntity": zod.string().nullish().describe('Filter to findings whose extracted entities contain this value')
 }),
   "resultCount": zod.number(),
   "createdAt": zod.string()
@@ -819,16 +839,19 @@ export const ListSavedSearchesResponse = zod.object({
   "filters": zod.object({
   "path": zod.string().nullish(),
   "extension": zod.string().nullish(),
+  "extensions": zod.array(zod.string()).nullish(),
   "category": zod.string().nullish(),
   "aiCategory": zod.string().nullish(),
   "tags": zod.array(zod.string()).optional(),
+  "findingTypes": zod.array(zod.string()).nullish(),
   "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
   "minSizeBytes": zod.number().nullish(),
   "maxSizeBytes": zod.number().nullish(),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scanId": zod.number().nullish(),
-  "duplicatesOnly": zod.boolean().optional()
+  "duplicatesOnly": zod.boolean().optional(),
+  "mentionedEntity": zod.string().nullish().describe('Filter to findings whose extracted entities contain this value')
 }),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -845,16 +868,19 @@ export const CreateSavedSearchBody = zod.object({
   "filters": zod.object({
   "path": zod.string().nullish(),
   "extension": zod.string().nullish(),
+  "extensions": zod.array(zod.string()).nullish(),
   "category": zod.string().nullish(),
   "aiCategory": zod.string().nullish(),
   "tags": zod.array(zod.string()).optional(),
+  "findingTypes": zod.array(zod.string()).nullish(),
   "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
   "minSizeBytes": zod.number().nullish(),
   "maxSizeBytes": zod.number().nullish(),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scanId": zod.number().nullish(),
-  "duplicatesOnly": zod.boolean().optional()
+  "duplicatesOnly": zod.boolean().optional(),
+  "mentionedEntity": zod.string().nullish().describe('Filter to findings whose extracted entities contain this value')
 })
 })
 
@@ -865,16 +891,19 @@ export const CreateSavedSearchResponse = zod.object({
   "filters": zod.object({
   "path": zod.string().nullish(),
   "extension": zod.string().nullish(),
+  "extensions": zod.array(zod.string()).nullish(),
   "category": zod.string().nullish(),
   "aiCategory": zod.string().nullish(),
   "tags": zod.array(zod.string()).optional(),
+  "findingTypes": zod.array(zod.string()).nullish(),
   "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
   "minSizeBytes": zod.number().nullish(),
   "maxSizeBytes": zod.number().nullish(),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scanId": zod.number().nullish(),
-  "duplicatesOnly": zod.boolean().optional()
+  "duplicatesOnly": zod.boolean().optional(),
+  "mentionedEntity": zod.string().nullish().describe('Filter to findings whose extracted entities contain this value')
 }),
   "createdAt": zod.string(),
   "updatedAt": zod.string()
@@ -894,16 +923,19 @@ export const UpdateSavedSearchBody = zod.object({
   "filters": zod.object({
   "path": zod.string().nullish(),
   "extension": zod.string().nullish(),
+  "extensions": zod.array(zod.string()).nullish(),
   "category": zod.string().nullish(),
   "aiCategory": zod.string().nullish(),
   "tags": zod.array(zod.string()).optional(),
+  "findingTypes": zod.array(zod.string()).nullish(),
   "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
   "minSizeBytes": zod.number().nullish(),
   "maxSizeBytes": zod.number().nullish(),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scanId": zod.number().nullish(),
-  "duplicatesOnly": zod.boolean().optional()
+  "duplicatesOnly": zod.boolean().optional(),
+  "mentionedEntity": zod.string().nullish().describe('Filter to findings whose extracted entities contain this value')
 })
 })
 
@@ -914,16 +946,19 @@ export const UpdateSavedSearchResponse = zod.object({
   "filters": zod.object({
   "path": zod.string().nullish(),
   "extension": zod.string().nullish(),
+  "extensions": zod.array(zod.string()).nullish(),
   "category": zod.string().nullish(),
   "aiCategory": zod.string().nullish(),
   "tags": zod.array(zod.string()).optional(),
+  "findingTypes": zod.array(zod.string()).nullish(),
   "riskLevel": zod.union([zod.literal('low'),zod.literal('medium'),zod.literal('high'),zod.literal('critical'),zod.literal(null)]).nullish(),
   "minSizeBytes": zod.number().nullish(),
   "maxSizeBytes": zod.number().nullish(),
   "dateFrom": zod.string().nullish(),
   "dateTo": zod.string().nullish(),
   "scanId": zod.number().nullish(),
-  "duplicatesOnly": zod.boolean().optional()
+  "duplicatesOnly": zod.boolean().optional(),
+  "mentionedEntity": zod.string().nullish().describe('Filter to findings whose extracted entities contain this value')
 }),
   "createdAt": zod.string(),
   "updatedAt": zod.string()

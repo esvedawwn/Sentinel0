@@ -12,11 +12,13 @@ export interface SearchFilters {
   path?: string | null;
   /** @nullable */
   extension?: string | null;
+  extensions?: string[] | null;
   /** @nullable */
   category?: string | null;
   /** @nullable */
   aiCategory?: string | null;
   tags?: string[];
+  findingTypes?: string[] | null;
   /** @nullable */
   riskLevel?: SearchFiltersRiskLevel;
   /** @nullable */
@@ -30,4 +32,9 @@ export interface SearchFilters {
   /** @nullable */
   scanId?: number | null;
   duplicatesOnly?: boolean;
+  /**
+     * Filter to findings whose extracted entities contain this value
+     * @nullable
+     */
+  mentionedEntity?: string | null;
 }

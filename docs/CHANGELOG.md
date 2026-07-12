@@ -7,6 +7,91 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.7.0-alpha] — 2026-07-12 — Enhanced NL Search, Hybrid Ranking, Entity Search, Search UI
+
+### Added
+
+#### Enhanced NL Interpreter (`ai/search.ts` v2)
+- Precise size expressions: "larger than 500 MB", "under 1 GB", "over 500 KB"
+  resolve to exact `minSizeBytes`/`maxSizeBytes` values.
+- Relative + absolute date parsing: "last week", "this month", "from June",
+  "in 2024", "last year" — all resolved against an injectable reference date
+  for deterministic test coverage.
+- Extension shortcuts: "PDFs" → `pdf`, "Word docs" → `docx`, "spreadsheets" → `xlsx/xls/csv`,
+  "Excel" → `xlsx`, plus explicit extension literals (`.csv`, `.json`, etc.).
+- Entity-mention patterns: "mentioning Ingrid", "related to Alpha Hair",
+  "files regarding Kennards", "everything about Ryde renovation" — extracts a
+  `mentionedEntity` string with original casing preserved.
+- Finding-type shortcuts: "duplicate", "installer", "archive", "lock file"
+  resolve to internal `FindingType` values.
+- `confidence` score (0–1) reflecting how many query words were interpreted.
+- `appliedFilters[]` — typed list of every inferred filter with `source`,
+  `label`, and `value`, shown as dismissible chips in the Search UI.
+- `unrecognizedTerms[]` — words the interpreter could not map to any filter.
+
+#### Hybrid Relevance Scoring (`searchService.ts` v2)
+- `scoreFindings()` — post-filter ranking of each result with:
+  - `relevanceScore` (0–1) clamped and sorted descending.
+  - `matchedFactors[]` — human-readable list of why each result ranked where it did.
+  - `matchExplanation` — full sentence combining match factors and AI classification.
+- Scoring weights: exact filename match (0.5), substring filename (0.35), term
+  coverage (0.25), path match (0.1/0.05), AI category match (0.15–0.2), AI
+  confidence bonus (0.05), duplicate status bonus (0.1), extension match (0.1).
+
+#### Entity Search
+- `SearchFilters.mentionedEntity` — filters findings via a `findingId` subquery
+  into `entitiesTable.value`, enabling NL queries like
+  "invoices mentioning Kennards" to surface only documents that contain that
+  entity reference in their extracted text.
+
+#### New filter fields
+- `extensions[]` — multi-extension filter (any-of semantics), populated by NL
+  interpretation or the explicit query param.
+- `findingTypes[]` — filter by one or more `FindingType` values simultaneously.
+- `mentionedEntity` — filter via entity subquery (NL or explicit param).
+
+#### OpenAPI contract
+- `/search` — new query params: `mentionedEntity`, `extensions` (comma-separated),
+  `findingTypes` (comma-separated).
+- New schemas: `AppliedFilter`, `ScoredFinding` (extends `Finding` with
+  `relevanceScore`, `matchedFactors`, `matchExplanation`).
+- `SearchResults` — new fields: `confidence`, `appliedFilters`, `unrecognizedTerms`.
+
+#### Search UI (`Search.tsx`)
+- Applied-filter chips displayed under the search bar with colour-coded sources
+  (category/date/size/extension/status/entity) and a confidence badge.
+- `⚠ Unrecognised terms` warning strip when the interpreter drops query words.
+- Relevance score pip (green/amber/dim) on each lexical result row.
+- Expandable result rows revealing `matchExplanation` and `matchedFactors` chips.
+- `AI category` badge on each result row (visible on wider screens).
+- `Entity / person / org…` filter input in the Filters panel.
+- Example queries shown for both Lexical+NL and Semantic modes.
+- History entries now show "N result(s)" count on a second line.
+- Save-search input now responds to Enter key.
+
+#### Tests
+- `ai/__tests__/search.test.ts` — 89-test suite covering: v1 compatibility,
+  domain-specific patterns, precise size parsing, extension shortcuts, date
+  parsing (relative + absolute), entity-mention patterns, confidence/applied-
+  filter reporting, compound multi-filter queries.
+- `search/__tests__/searchService.test.ts` — extended with `buildFilters`
+  (extensions, mentionedEntity, dateFrom/dateTo, confidence, overrides),
+  `shouldFallbackToPlainText` (entity/extension/findingType structured hits),
+  `filtersToWhereClause` (extensions[], findingTypes[], mentionedEntity,
+  duplicatesOnly, empty-entity skip), and `scoreFindings` (12 scenarios:
+  relevance range, sort order, matchedFactors, matchExplanation, AI category
+  and duplicate boosts).
+
+### Fixed
+- Codegen script now strips the stale `export * from './generated/types'`
+  re-export that Orval was regenerating into `lib/api-zod/src/index.ts` on every
+  run, causing TS2308 duplicate-export errors in `typecheck:libs`.
+- Entity-mention extraction now uses the original (non-lowercased) query string
+  to preserve the entity name's original capitalisation (e.g. `Kennards` not
+  `kennards`).
+
+---
+
 ## [v0.6.0-alpha] — 2026-07-10 — Unified Search, Findings Review Workflow, Document Extraction
 
 ### Added
