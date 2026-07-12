@@ -1,0 +1,50 @@
+sarahdawn@sarahs-MacBook-Pro Sentinel % pnpm desktop:build:server
+$ pnpm --filter @workspace/desktop run build:server
+$ node scripts/build-server.mjs
+Building server for target: aarch64-apple-darwin
+Bundling API server...
+
+  dist-sea/index.cjs                       2.2mb ⚠️
+  dist-sea/pino-worker.cjs               152.3kb
+  dist-sea/pino-file.cjs                 141.3kb
+  dist-sea/pino-pretty.cjs               113.6kb
+  dist-sea/thread-stream-worker.cjs        6.7kb
+  dist-sea/index.cjs.map                   3.9mb
+  dist-sea/pino-worker.cjs.map           258.4kb
+  dist-sea/pino-file.cjs.map             230.4kb
+  dist-sea/pino-pretty.cjs.map           206.2kb
+  dist-sea/thread-stream-worker.cjs.map   12.2kb
+
+⚡ Done in 127ms
+Generating SEA blob...
+Wrote single executable preparation blob to /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/dist-sea/sea-prep.blob
+Injecting blob into Node.js binary...
+Start injection of NODE_SEA_BLOB in /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/dist-sea/server-tmp...
+Error: Can't read and write to target executable
+node:internal/errors:983
+  const err = new Error(message);
+              ^
+
+Error: Command failed: npx postject /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/dist-sea/server-tmp NODE_SEA_BLOB /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/dist-sea/sea-prep.blob --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2 --macho-segment-name __NODE_SEA
+    at genericNodeError (node:internal/errors:983:15)
+    at wrappedFn (node:internal/errors:537:14)
+    at checkExecSyncError (node:child_process:916:11)
+    at execSync (node:child_process:988:15)
+    at file:///Users/sarahdawn/Developer/Sentinel/artifacts/desktop/scripts/build-server.mjs:94:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:681:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:117:5) {
+  status: 1,
+  signal: null,
+  output: [ null, null, null ],
+  pid: 80775,
+  stdout: null,
+  stderr: null
+}
+
+Node.js v22.23.1
+/Users/sarahdawn/Developer/Sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 build:server: `node scripts/build-server.mjs`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro Sentinel % 

@@ -104,6 +104,12 @@ const tmpBin = join(API_DIR, "dist-sea", `server-tmp${os.platform() === "win32" 
 
 copyFileSync(nodeExec, tmpBin);
 
+// Make writable — the Node binary is often copied read-only on macOS,
+// which causes postject to fail with "Can't read and write to target executable".
+if (os.platform() !== "win32") {
+  execSync(`chmod +w "${tmpBin}"`);
+}
+
 // Remove existing signature on macOS
 if (os.platform() === "darwin") {
   spawnSync("codesign", ["--remove-signature", tmpBin]);
