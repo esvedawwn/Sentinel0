@@ -1,0 +1,78 @@
+Fix the macOS SEA sidecar build based on the confirmed esbuild error.
+
+Confirmed error:
+
+Must use "outdir" when there are multiple input files
+
+Root cause:
+
+artifacts/api-server/build.mjs uses esbuild-plugin-pino. That plugin adds additional worker entry points, so esbuild cannot use:
+
+outfile: dist-sea/server.cjs
+
+The desktop build currently invokes:
+
+node ./build.mjs --format=cjs --outfile=dist-sea/server.cjs
+
+This must be corrected properly in the repository.
+
+Requirements:
+
+1. Modify artifacts/api-server/build.mjs so it supports:
+   --format=cjs
+   --outdir=dist-sea
+
+2. Do not use outfile for the Pino-enabled build because multiple outputs are generated.
+
+3. For the CJS SEA build:
+   - output all files into artifacts/api-server/dist-sea
+   - use outExtension so JavaScript files end in .cjs
+   - use stable entry names such as [name]
+   - ensure the main API entry is generated as:
+     artifacts/api-server/dist-sea/index.cjs
+
+4. Modify artifacts/desktop/scripts/build-server.mjs so it invokes:
+
+   node ./build.mjs --format=cjs --outdir=dist-sea
+
+5. Generate the SEA configuration with:
+
+   main:
+   artifacts/api-server/dist-sea/index.cjs
+
+6. Before generating the SEA blob, explicitly verify that index.cjs exists. If it does not, print a useful error and exit.
+
+7. Preserve all Pino worker outputs generated into dist-sea.
+
+8. Determine whether Pino worker files must be included beside the packaged sidecar binary at runtime. If required:
+   - copy them into the appropriate Tauri resources or binaries directory
+   - configure Tauri to package them
+   - resolve their runtime paths correctly
+
+9. Clean stale dist-sea output before every sidecar build.
+
+10. Do not remove logging or suppress the Pino plugin merely to bypass the error unless there is a documented desktop-safe logger replacement.
+
+11. Run:
+   pnpm desktop:build:server
+   pnpm desktop:check
+
+12. Add a regression check covering:
+   - index.cjs exists
+   - SEA blob exists
+   - final server-aarch64-apple-darwin binary exists
+   - required Pino worker resources exist
+
+13. Update docs/DESKTOP_RELEASE.md with the corrected flow.
+
+At completion provide:
+- exact files changed
+- generated CJS files
+- final SEA main path
+- Pino worker packaging approach
+- commands run
+- exact Mac commands to pull and retry
+
+Suggested commit message:
+
+fix(desktop): build SEA sidecar with multi-output Pino bundle

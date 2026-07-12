@@ -1,0 +1,5 @@
+{
+  "main": "/home/runner/workspace/artifacts/api-server/dist-sea/index.cjs",
+  "output": "/home/runner/workspace/artifacts/api-server/dist-sea/sea-prep.blob",
+  "disableExperimentalSEAWarning": true
+}

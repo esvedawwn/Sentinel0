@@ -13,7 +13,7 @@
  */
 
 import { execSync, spawnSync } from "child_process";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
+import { copyFileSync, mkdirSync, readdirSync, writeFileSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import os from "os";
@@ -37,18 +37,52 @@ console.log(`Building server for target: ${rustTarget}`);
 
 const outputBin = join(BINARIES_DIR, `server-${rustTarget}${os.platform() === "win32" ? ".exe" : ""}`);
 
-// ── 2. Bundle API server with esbuild (CJS, single file) ────────────────────
-console.log("Bundling API server...");
-mkdirSync(join(API_DIR, "dist-sea"), { recursive: true });
+// ── 2. Bundle API server with esbuild (CJS, multi-output via --outdir) ───────
+//
+// esbuild-plugin-pino generates multiple worker entry points in addition to the
+// main bundle, so --outfile cannot be used.  --outdir=dist-sea is required.
+// The plugin produces (all in dist-sea/):
+//   index.cjs              ← main bundle, used as the SEA main
+//   pino-worker.cjs
+//   thread-stream-worker.cjs
+//   pino-file.cjs
+//   pino-pretty.cjs
+//
+// At runtime the sidecar is spawned with NODE_ENV=production (see lib.rs),
+// which disables the pino-pretty transport in logger.ts.  Pino therefore never
+// spawns worker threads, so the worker .cjs files do NOT need to be co-located
+// with the sidecar binary in the Tauri bundle.  They are preserved in dist-sea/
+// for reference and potential future use, but are NOT copied to src-tauri/.
+//
+// build.mjs handles cleaning dist-sea/ before building.
+console.log("Bundling API server with esbuild (outdir=dist-sea)...");
 
 execSync(
-  `node ./build.mjs --format=cjs --outfile=dist-sea/server.cjs`,
+  `node ./build.mjs --format=cjs --outdir=dist-sea`,
   { cwd: API_DIR, stdio: "inherit" }
 );
 
+// Verify that the expected main entry point was generated.
+const seaMainCjs = join(API_DIR, "dist-sea", "index.cjs");
+if (!existsSync(seaMainCjs)) {
+  console.error(
+    `\nERROR: Expected SEA main was not generated: ${seaMainCjs}\n` +
+    "       Ensure artifacts/api-server/src/index.ts is the esbuild entry point\n" +
+    "       and that build.mjs uses --outdir=dist-sea.\n"
+  );
+  process.exit(1);
+}
+
+// Log all generated CJS files for confirmation.
+const generatedFiles = readdirSync(join(API_DIR, "dist-sea"))
+  .filter((f) => f.endsWith(".cjs"))
+  .sort();
+console.log("Generated CJS files in dist-sea/:");
+generatedFiles.forEach((f) => console.log("  " + f));
+
 // ── 3. Create SEA config ─────────────────────────────────────────────────────
 const seaConfig = {
-  main: join(API_DIR, "dist-sea", "server.cjs"),
+  main: join(API_DIR, "dist-sea", "index.cjs"),
   output: join(API_DIR, "dist-sea", "sea-prep.blob"),
   disableExperimentalSEAWarning: true,
 };

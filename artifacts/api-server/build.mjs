@@ -17,9 +17,28 @@ function getArg(name) {
 
 async function buildAll() {
   const requestedFormat = getArg("format") ?? "esm";
-  const requestedOutfile = getArg("outfile");
+  const requestedOutdir  = getArg("outdir");
+
+  // --outfile is NOT supported when esbuild-plugin-pino is active: the plugin
+  // generates multiple worker entry points (pino-worker, thread-stream-worker,
+  // pino-file, pino-pretty) which require outdir.  Use --outdir instead.
+  const legacyOutfile = getArg("outfile");
+  if (legacyOutfile) {
+    console.error(
+      "ERROR: --outfile is not compatible with esbuild-plugin-pino (multiple outputs).\n" +
+      "       Use --outdir=<dir> instead.  Example: --outdir=dist-sea"
+    );
+    process.exit(1);
+  }
 
   const isCJS = requestedFormat === "cjs";
+
+  // Resolve output directory: explicit --outdir wins, otherwise default to dist/
+  const distDir = requestedOutdir
+    ? path.resolve(artifactDir, requestedOutdir)
+    : path.resolve(artifactDir, "dist");
+
+  await rm(distDir, { recursive: true, force: true });
 
   const buildOptions = {
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
@@ -27,6 +46,11 @@ async function buildAll() {
     bundle: true,
     format: requestedFormat,
     logLevel: "info",
+
+    outdir: distDir,
+    outExtension: {
+      ".js": isCJS ? ".cjs" : ".mjs",
+    },
 
     external: [
       "*.node",
@@ -116,29 +140,6 @@ async function buildAll() {
       esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],
   };
-
-  if (requestedOutfile) {
-    const absoluteOutfile = path.resolve(artifactDir, requestedOutfile);
-
-    await rm(path.dirname(absoluteOutfile), {
-      recursive: true,
-      force: true,
-    });
-
-    buildOptions.outfile = absoluteOutfile;
-  } else {
-    const distDir = path.resolve(artifactDir, "dist");
-
-    await rm(distDir, {
-      recursive: true,
-      force: true,
-    });
-
-    buildOptions.outdir = distDir;
-    buildOptions.outExtension = {
-      ".js": isCJS ? ".cjs" : ".mjs",
-    };
-  }
 
   if (!isCJS) {
     buildOptions.banner = {

@@ -89,17 +89,66 @@ pnpm desktop:dev
 Sentinel.app/
 ├── Contents/
 │   ├── MacOS/
-│   │   └── Sentinel          ← Tauri/Rust executable
+│   │   ├── Sentinel                         ← Tauri/Rust executable
+│   │   └── server-aarch64-apple-darwin      ← bundled API server (Node.js SEA)
 │   ├── Resources/
-│   │   └── server-aarch64-apple-darwin   ← bundled API server (Node SEA)
+│   │   └── …                                ← Tauri resources (icons, etc.)
 │   └── Info.plist
 ```
 
 **At launch, Tauri:**
 1. Reads `app_data_dir` → `~/Library/Application Support/dev.sentinel.app/`
-2. Spawns the sidecar server on `PORT=38080` with `SENTINEL_DB_PATH=<data_dir>/sentinel.db`
+2. Spawns the sidecar server on `PORT=38080` with `SENTINEL_DB_PATH=<data_dir>/sentinel.db` and `NODE_ENV=production`
 3. Opens a native WebView window serving `dist/public/index.html`
 4. The frontend detects `window.__TAURI_INTERNALS__` and sets the API base URL to `http://localhost:38080`
+
+---
+
+## Node.js SEA sidecar build — how it works
+
+`pnpm desktop:build:server` runs `artifacts/desktop/scripts/build-server.mjs`, which:
+
+1. **Bundles** the Express server with esbuild (`--format=cjs --outdir=dist-sea`):
+   - Entry: `artifacts/api-server/src/index.ts`
+   - Output directory: `artifacts/api-server/dist-sea/`
+   - `esbuild-plugin-pino` generates multiple CJS files:
+
+     | File | Purpose |
+     |------|---------|
+     | `index.cjs` | **Main bundle — used as the SEA `main`** |
+     | `pino-worker.cjs` | Pino async-logging worker |
+     | `thread-stream-worker.cjs` | Thread-stream worker |
+     | `pino-file.cjs` | Pino file-transport worker |
+     | `pino-pretty.cjs` | Pino pretty-print transport |
+
+2. **Verifies** that `dist-sea/index.cjs` exists (exits with a descriptive error if not).
+
+3. **Generates** the SEA blob:
+   ```
+   sea-config.json  →  main: dist-sea/index.cjs
+                        output: dist-sea/sea-prep.blob
+   ```
+
+4. **Injects** the blob into a copy of the Node.js binary with `postject`.
+
+5. **Places** the final binary at:
+   ```
+   artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin
+   ```
+
+### Why `--outfile` cannot be used
+
+`esbuild-plugin-pino` adds extra worker entry points to the esbuild build graph. esbuild requires `outdir` (not `outfile`) whenever multiple outputs are produced. Using `--outfile` causes:
+
+```
+Must use "outdir" when there are multiple input files
+```
+
+### Why pino worker files are NOT bundled into the Tauri app
+
+`logger.ts` only configures the `pino-pretty` transport when `NODE_ENV !== "production"`. The Tauri sidecar is always spawned with `NODE_ENV=production` (set in `lib.rs`). In production mode pino writes plain JSON directly to stdout — no worker threads are spawned, so the worker `.cjs` files in `dist-sea/` do not need to be packaged into the app bundle.
+
+If a future change adds a production transport (e.g., file rotation), the workers would need to be co-located with the sidecar binary in `Contents/MacOS/`. At that point, list them as additional `externalBin` entries in `tauri.conf.json` (each named `binaries/<name>-<target-triple>` so Tauri copies them to `Contents/MacOS/`).
 
 ---
 

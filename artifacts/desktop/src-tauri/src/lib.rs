@@ -57,6 +57,11 @@ pub fn run() {
                 let (_rx, _child) = sidecar
                     .env("PORT", "38080")
                     .env("SENTINEL_DB_PATH", db_path)
+                    // Production mode disables the pino-pretty transport, so
+                    // the server logs plain JSON to stdout.  This means no
+                    // pino worker threads are spawned and no worker .cjs files
+                    // need to be bundled beside the SEA binary.
+                    .env("NODE_ENV", "production")
                     .spawn()
                     .expect("failed to spawn server sidecar");
 
