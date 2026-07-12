@@ -6,7 +6,9 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
-    "build:server": "node scripts/build-server.mjs"
+    "build:server": "node scripts/build-server.mjs",
+    "make-icons": "node scripts/make-icons.mjs",
+    "typecheck": "echo 'Desktop package has no TypeScript sources to check (Rust + shell scripts only).'"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",

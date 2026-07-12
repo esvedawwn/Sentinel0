@@ -1,0 +1,285 @@
+You are now acting as Release Engineering Lead for Sentinel.
+
+The application has reached feature-complete Desktop Alpha status.
+
+Your objective is NO LONGER to build new features.
+
+Your objective is to produce the FIRST installable desktop application that can run safely on macOS.
+
+Before making any changes:
+
+1. Audit the entire repository.
+2. Identify unfinished desktop tasks.
+3. Remove obsolete code, dead code and unused dependencies where safe.
+4. Do not redesign the application.
+5. Preserve existing functionality.
+
+──────────────────────────────────────
+
+RELEASE GOAL
+
+Produce a desktop application that I can install on my Apple Silicon Mac.
+
+The application should launch without Replit.
+
+The application should run entirely locally.
+
+The application should scan only approved folders.
+
+The application must remain Preview Mode only.
+
+No file modifications are permitted.
+
+──────────────────────────────────────
+
+DESKTOP
+
+Use the existing desktop implementation.
+
+If Tauri already exists:
+
+• finish configuring it.
+
+If another desktop architecture already exists:
+
+• complete that implementation instead.
+
+Do not migrate desktop frameworks unless absolutely necessary.
+
+──────────────────────────────────────
+
+RELEASE REQUIREMENTS
+
+The desktop application must:
+
+✓ launch locally
+
+✓ remember settings
+
+✓ remember approved folders
+
+✓ remember scan history
+
+✓ remember AI settings
+
+✓ remember search history
+
+✓ remember semantic index
+
+✓ run without internet
+
+✓ support Apple Silicon
+
+✓ support macOS Sonoma+
+
+✓ support dark mode
+
+✓ support Retina displays
+
+──────────────────────────────────────
+
+SCANNING
+
+Implement production desktop scanning.
+
+Requirements:
+
+• native folder picker
+
+• approved scan roots
+
+• cancellation
+
+• progress reporting
+
+• background scanning
+
+• no UI blocking
+
+• permission handling
+
+• symbolic-link protection
+
+• path validation
+
+• skip system folders
+
+• skip caches
+
+• skip build folders
+
+• skip node_modules
+
+──────────────────────────────────────
+
+DATABASE
+
+Store locally:
+
+• SQLite
+
+Persist:
+
+• findings
+
+• scans
+
+• duplicate hashes
+
+• AI categories
+
+• semantic tags
+
+• settings
+
+• approved folders
+
+• activity history
+
+• search history
+
+──────────────────────────────────────
+
+SEARCH
+
+The desktop build must include:
+
+• filename search
+
+• metadata search
+
+• natural-language search
+
+• semantic tags
+
+• AI categories
+
+• search explanations
+
+──────────────────────────────────────
+
+AI
+
+Keep cloud AI disabled by default.
+
+Local AI should remain operational.
+
+Never upload file contents automatically.
+
+Require explicit consent before any cloud request.
+
+──────────────────────────────────────
+
+SAFETY
+
+Preview Mode only.
+
+No:
+
+delete
+
+rename
+
+move
+
+archive
+
+quarantine
+
+No unrestricted filesystem access.
+
+Every path validated.
+
+Every action reversible in future versions.
+
+──────────────────────────────────────
+
+DESKTOP BUILD
+
+Produce working scripts:
+
+pnpm desktop:dev
+
+pnpm desktop:build
+
+pnpm desktop:check
+
+pnpm desktop:package
+
+──────────────────────────────────────
+
+MAC RELEASE
+
+Create a complete release guide.
+
+Include:
+
+installation
+
+development
+
+production build
+
+codesigning requirements
+
+Gatekeeper
+
+folder permissions
+
+database location
+
+logs
+
+updating
+
+uninstall
+
+troubleshooting
+
+──────────────────────────────────────
+
+QUALITY GATE
+
+Before completion automatically run:
+
+pnpm install
+
+pnpm run typecheck
+
+pnpm run lint
+
+pnpm run test
+
+pnpm run build
+
+pnpm desktop:check
+
+Fix every failure.
+
+──────────────────────────────────────
+
+FINAL OUTPUT
+
+Provide:
+
+✓ Release Notes
+
+✓ Version Number
+
+✓ Desktop Architecture
+
+✓ Files Changed
+
+✓ Build Commands
+
+✓ Expected location of Sentinel.app
+
+✓ Expected DMG location
+
+✓ Remaining known issues
+
+✓ Release checklist
+
+✓ Exact commands I must run on my Mac to generate the desktop application
+
+Do not stop until the repository is ready for local desktop compilation.

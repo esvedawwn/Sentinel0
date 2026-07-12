@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "identifier": "dev.sentinel.app",
   "build": {
-    "frontendDist": "../../sentinel/dist",
+    "frontendDist": "../../sentinel/dist/public",
     "devUrl": "http://localhost:18756",
-    "beforeBuildCommand": "pnpm --filter @workspace/sentinel run build"
+    "beforeBuildCommand": "PORT=18756 BASE_PATH=/ pnpm --filter @workspace/sentinel run build"
   },
   "app": {
     "withGlobalTauri": true,

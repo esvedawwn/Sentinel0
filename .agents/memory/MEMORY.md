@@ -8,6 +8,8 @@
 - [Zod direct dep in api-server](zod-dep-api-server.md) — route files that inline `z.object()` need `zod` as a direct dep in api-server/package.json; transitive via api-zod is not sufficient for TS resolution.
 - [Embeddings + Projects arch](embeddings-projects-arch.md) — local 128-dim hash embeddings, hybrid search, project clustering; all gated by userSettings; no files ever moved; see docs/semantic-search-and-projects.md.
 - [Tauri IPC + desktop bridge](tauri-desktop-bridge.md) — `window.__TAURI__.core.invoke` (withGlobalTauri:true), no npm deps; `isDesktop()`/`pickFolder()` are no-ops in browser.
+- [Tauri desktop build config](tauri-desktop-build.md) — frontendDist must be `dist/public` (Vite outputs there); beforeBuildCommand needs PORT=18756 BASE_PATH=/; detect desktop via `window.__TAURI_INTERNALS__` (Tauri v2).
+- [Project candidate scoring threshold](project-candidate-threshold.md) — folderProximity(0.25)+sharedAiCategory(0.10) alone = ~0.27, below CANDIDATE_THRESHOLD=0.35; tests must add shared semanticTags (weight 0.18) to push score to ~0.45.
 - [DB schema push required after changes](db-schema-push.md) — `pnpm --filter @workspace/db run push` must run before API server restarts after any schema edit, or live queries 500.
 - [NL interpreter entity casing](nl-entity-casing.md) — interpretSearchQuery lowercases the full query first; parseEntityMention must receive the original (pre-lowercased) query to preserve name capitalisation.
 - [Path safety raw-input traversal check](path-safety-traversal.md) — sanitiseScanInput must split raw input and check for ".." segments BEFORE calling path.normalize(); normalize resolves ".." so post-normalize checks always miss traversal.
