@@ -18,6 +18,10 @@ import {
   duplicateGroupsTable,
   duplicateGroupFilesTable,
   filesTable,
+  projectCandidatesTable,
+  projectCandidateFilesTable,
+  projectsTable,
+  projectFilesTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -218,6 +222,129 @@ async function seed() {
   }
 
   console.log(`Seeded ${scanSeeds.length} scans with findings, duplicates, AI classifications, and activity.`);
+
+  // ── Project Intelligence demo data ──────────────────────────────────────────
+
+  // Seed a set of findings that form coherent project clusters
+  const lastScan = await db
+    .select()
+    .from(scansTable)
+    .then((rows) => rows[rows.length - 1]);
+
+  if (lastScan) {
+    const projectFindings: Array<{ name: string; path: string; category: string; tag: string }> = [
+      // Cluster A — Brand Identity project
+      { name: "acme-logo-primary.svg", path: "/acme-project/brand/acme-logo-primary.svg", category: "Design", tag: "brand" },
+      { name: "acme-logo-dark.svg",    path: "/acme-project/brand/acme-logo-dark.svg",    category: "Design", tag: "brand" },
+      { name: "brand-guidelines.pdf",  path: "/acme-project/brand/brand-guidelines.pdf",  category: "Design", tag: "brand" },
+      { name: "colour-palette.ase",    path: "/acme-project/brand/colour-palette.ase",    category: "Design", tag: "brand" },
+      // Cluster B — Financial Documents project
+      { name: "invoice-2024-01.pdf",   path: "/acme-project/finance/invoice-2024-01.pdf", category: "Financial Documents", tag: "finance" },
+      { name: "invoice-2024-02.pdf",   path: "/acme-project/finance/invoice-2024-02.pdf", category: "Financial Documents", tag: "finance" },
+      { name: "budget-forecast.xlsx",  path: "/acme-project/finance/budget-forecast.xlsx", category: "Financial Documents", tag: "finance" },
+      { name: "annual-report.docx",    path: "/acme-project/finance/annual-report.docx",  category: "Financial Documents", tag: "finance" },
+    ];
+
+    const insertedFindings: { id: number; cluster: string }[] = [];
+    for (let i = 0; i < projectFindings.length; i++) {
+      const pf = projectFindings[i];
+      const cluster = i < 4 ? "brand" : "finance";
+      const [finding] = await db
+        .insert(findingsTable)
+        .values({
+          scanId: lastScan.id,
+          type: "large_file",
+          path: pf.path,
+          name: pf.name,
+          extension: pf.name.slice(pf.name.lastIndexOf(".")),
+          sizeBytes: 512_000 + i * 32_000,
+          findingStatus: "review",
+          riskLevel: "low",
+          reason: "Project intelligence demo file",
+          aiCategory: pf.category,
+          aiConfidence: 85,
+          aiExplanation: `Classified as ${pf.category} based on filename/extension heuristics.`,
+          aiProvider: "local-rule",
+          aiTags: [pf.tag, pf.category.toLowerCase()],
+          fileModifiedAt: daysAgo(14 - i),
+        })
+        .returning();
+      await db.insert(semanticTagsTable).values([
+        { findingId: finding.id, tag: pf.tag },
+        { findingId: finding.id, tag: pf.category.toLowerCase() },
+      ]);
+      insertedFindings.push({ id: finding.id, cluster });
+    }
+
+    // Candidate A — Brand Identity (pending, awaiting user approval)
+    const brandIds = insertedFindings.filter((f) => f.cluster === "brand").map((f) => f.id);
+    const [candidateA] = await db
+      .insert(projectCandidatesTable)
+      .values({
+        name: "Project: brand",
+        status: "pending",
+        score: 0.82,
+        signals: {
+          folderProximity: 1.0,
+          sharedTags: 0.9,
+          sharedEntities: 0.2,
+          filenameSimilarity: 0.4,
+          sharedAiCategory: 1.0,
+          dateProximity: 0.8,
+          semanticSimilarity: 0.0,
+        },
+        explanation: "Files share a common folder and overlapping semantic tags",
+      })
+      .returning();
+    await db.insert(projectCandidateFilesTable).values(
+      brandIds.map((findingId) => ({ candidateId: candidateA.id, findingId, contribution: 0.82 }))
+    );
+
+    // Candidate B — Financial Documents (also pending)
+    const financeIds = insertedFindings.filter((f) => f.cluster === "finance").map((f) => f.id);
+    const [candidateB] = await db
+      .insert(projectCandidatesTable)
+      .values({
+        name: "Project: finance",
+        status: "pending",
+        score: 0.79,
+        signals: {
+          folderProximity: 1.0,
+          sharedTags: 0.85,
+          sharedEntities: 0.1,
+          filenameSimilarity: 0.55,
+          sharedAiCategory: 1.0,
+          dateProximity: 0.7,
+          semanticSimilarity: 0.0,
+        },
+        explanation: "Files share a common folder, similar filenames, and same AI category",
+      })
+      .returning();
+    await db.insert(projectCandidateFilesTable).values(
+      financeIds.map((findingId) => ({ candidateId: candidateB.id, findingId, contribution: 0.79 }))
+    );
+
+    // Approve Candidate A → creates an active project for demo
+    const [project] = await db
+      .insert(projectsTable)
+      .values({
+        name: candidateA.name,
+        description: "Brand assets and guidelines for the Acme project.",
+        confidence: candidateA.score,
+        explanation: candidateA.explanation,
+        summary: `${brandIds.length} brand design files · ${(brandIds.length * 512).toFixed(0)} KB total`,
+      })
+      .returning();
+    await db.insert(projectFilesTable).values(
+      brandIds.map((findingId) => ({ projectId: project.id, findingId, addedBy: "auto" }))
+    );
+    await db
+      .update(projectCandidatesTable)
+      .set({ status: "approved", projectId: project.id, updatedAt: new Date() })
+      .where(eq(projectCandidatesTable.id, candidateA.id));
+
+    console.log(`Seeded 2 project candidates (1 approved → project #${project.id}, 1 pending) with ${projectFindings.length} demo findings.`);
+  }
 }
 
 seed()

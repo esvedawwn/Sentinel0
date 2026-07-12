@@ -95,6 +95,8 @@ import type {
   ScanInput,
   ScanRoot,
   SearchParams,
+  SearchProjects200,
+  SearchProjectsParams,
   SearchResults,
   SemanticSearchParams,
   SemanticSearchResponse,
@@ -5117,6 +5119,90 @@ export const useRemoveFileFromProject = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getRemoveFileFromProjectMutationOptions(options));
     }
+
+export const getSearchProjectsUrl = (params: SearchProjectsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/projects/search?${stringifiedParams}` : `/api/projects/search`
+}
+
+/**
+ * @summary Search projects by name, description, explanation, or linked file names
+ */
+export const searchProjects = async (params: SearchProjectsParams, options?: RequestInit): Promise<SearchProjects200> => {
+
+  return customFetch<SearchProjects200>(getSearchProjectsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getSearchProjectsQueryKey = (params?: SearchProjectsParams,) => {
+    return [
+    `/api/projects/search`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getSearchProjectsQueryOptions = <TData = Awaited<ReturnType<typeof searchProjects>>, TError = ErrorType<void>>(params: SearchProjectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getSearchProjectsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof searchProjects>>> = ({ signal }) => searchProjects(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof searchProjects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type SearchProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof searchProjects>>>
+export type SearchProjectsQueryError = ErrorType<void>
+
+
+/**
+ * @summary Search projects by name, description, explanation, or linked file names
+ */
+
+export function useSearchProjects<TData = Awaited<ReturnType<typeof searchProjects>>, TError = ErrorType<void>>(
+ params: SearchProjectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof searchProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getSearchProjectsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getSplitProjectUrl = (id: number,) => {
 

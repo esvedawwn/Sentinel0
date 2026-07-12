@@ -1554,6 +1554,32 @@ export const RemoveFileFromProjectResponse = zod.unknown()
 
 
 /**
+ * @summary Search projects by name, description, explanation, or linked file names
+ */
+
+
+
+export const SearchProjectsQueryParams = zod.object({
+  "q": zod.coerce.string().min(1)
+})
+
+export const SearchProjectsResponse = zod.object({
+  "query": zod.string(),
+  "results": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.enum(['active', 'archived', 'deleted']),
+  "confidence": zod.number(),
+  "explanation": zod.string().optional(),
+  "fileCount": zod.number(),
+  "matchContext": zod.string().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
  * @summary Split specific files out of a project into a new project
  */
 export const SplitProjectParams = zod.object({

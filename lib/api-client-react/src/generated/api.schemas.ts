@@ -890,6 +890,27 @@ export interface ProjectDetail {
   storageTotalBytes: number;
 }
 
+export type ProjectSearchResultStatus = typeof ProjectSearchResultStatus[keyof typeof ProjectSearchResultStatus];
+
+
+export const ProjectSearchResultStatus = {
+  active: 'active',
+  archived: 'archived',
+  deleted: 'deleted',
+} as const;
+
+export interface ProjectSearchResult {
+  id: number;
+  name: string;
+  description: string;
+  status: ProjectSearchResultStatus;
+  confidence: number;
+  explanation?: string;
+  fileCount: number;
+  matchContext?: string | null;
+  createdAt: string;
+}
+
 export type ProjectCandidateStatus = typeof ProjectCandidateStatus[keyof typeof ProjectCandidateStatus];
 
 
@@ -1211,6 +1232,18 @@ export type UpdateProjectBody = {
 
 export type AddFileToProjectBody = {
   findingId: number;
+};
+
+export type SearchProjectsParams = {
+/**
+ * @minLength 1
+ */
+q: string;
+};
+
+export type SearchProjects200 = {
+  query: string;
+  results: ProjectSearchResult[];
 };
 
 export type SplitProjectBody = {

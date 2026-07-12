@@ -9,6 +9,7 @@ import {
   splitProject,
   getProjectDetail,
   listCandidates,
+  searchProjects,
 } from "../projects/projectService.js";
 
 const router: IRouter = Router();
@@ -89,6 +90,18 @@ router.post("/projects/candidates/merge", async (req, res): Promise<void> => {
   } catch (err: unknown) {
     res.status(400).json({ error: err instanceof Error ? err.message : "Merge failed" });
   }
+});
+
+// ── Project search ────────────────────────────────────────────────────────────
+
+router.get("/projects/search", async (req, res): Promise<void> => {
+  const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
+  if (!q) {
+    res.status(400).json({ error: "Query parameter 'q' is required and must be non-empty" });
+    return;
+  }
+  const results = await searchProjects(q);
+  res.json({ query: q, results });
 });
 
 // ── Projects ──────────────────────────────────────────────────────────────────

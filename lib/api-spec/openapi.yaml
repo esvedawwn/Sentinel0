@@ -1560,6 +1560,36 @@ paths:
         "200":
           description: Removed
 
+  /projects/search:
+    get:
+      operationId: searchProjects
+      tags: [projects]
+      summary: Search projects by name, description, explanation, or linked file names
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [query, results]
+                properties:
+                  query:
+                    type: string
+                  results:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProjectSearchResult"
+        "400":
+          description: Missing or empty query
+
   /projects/{id}/split:
     post:
       operationId: splitProject
@@ -2662,6 +2692,32 @@ components:
             $ref: "#/components/schemas/ProjectTimelineEntry"
         storageTotalBytes:
           type: integer
+
+    ProjectSearchResult:
+      type: object
+      required: [id, name, description, status, confidence, fileCount, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [active, archived, deleted]
+        confidence:
+          type: number
+          format: float
+        explanation:
+          type: string
+        fileCount:
+          type: integer
+        matchContext:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
 
     ProjectCandidate:
       type: object

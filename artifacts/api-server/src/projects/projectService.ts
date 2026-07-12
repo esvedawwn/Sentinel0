@@ -27,7 +27,7 @@
  * Nothing reaches the filesystem — this is purely metadata grouping.
  */
 
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, or, sql } from "drizzle-orm";
 import {
   db,
   findingsTable,
@@ -740,6 +740,93 @@ export async function getProjectDetail(projectId: number): Promise<ProjectDetail
   const storageTotalBytes = files.reduce((s, f) => s + f.sizeBytes, 0);
 
   return { project, files, people, orgs, categories, timeline, storageTotalBytes };
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Project search
+// ────────────────────────────────────────────────────────────────────────────
+
+export interface ProjectSearchResult {
+  id: number;
+  name: string;
+  description: string;
+  status: string;
+  confidence: number;
+  explanation: string;
+  fileCount: number;
+  matchContext: string | null;
+  createdAt: string;
+}
+
+/**
+ * Search active projects by name, description, explanation, summary, or linked
+ * file names. Returns all active projects that contain the query string
+ * (case-insensitive) in any of those fields.
+ */
+export async function searchProjects(query: string): Promise<ProjectSearchResult[]> {
+  const q = `%${query.toLowerCase()}%`;
+
+  // Direct field matches (name / description / explanation / summary)
+  const directMatches = await db
+    .select()
+    .from(projectsTable)
+    .where(
+      and(
+        eq(projectsTable.status, "active"),
+        or(
+          sql`lower(${projectsTable.name}) like ${q}`,
+          sql`lower(coalesce(${projectsTable.description}, '')) like ${q}`,
+          sql`lower(coalesce(${projectsTable.explanation}, '')) like ${q}`,
+          sql`lower(coalesce(${projectsTable.summary}, '')) like ${q}`
+        )
+      )
+    );
+
+  const directIds = new Set(directMatches.map((p) => p.id));
+
+  // Linked file name matches
+  const fileMatches = await db
+    .select({ projectId: projectFilesTable.projectId })
+    .from(projectFilesTable)
+    .innerJoin(findingsTable, eq(projectFilesTable.findingId, findingsTable.id))
+    .innerJoin(projectsTable, and(
+      eq(projectFilesTable.projectId, projectsTable.id),
+      eq(projectsTable.status, "active")
+    ))
+    .where(sql`lower(${findingsTable.name}) like ${q}`);
+
+  const fileMatchIds = new Set(fileMatches.map((r) => r.projectId));
+
+  const allIds = [...new Set([...directIds, ...fileMatchIds])];
+  if (allIds.length === 0) return [];
+
+  const projects = await db
+    .select()
+    .from(projectsTable)
+    .where(inArray(projectsTable.id, allIds));
+
+  const fileLinks = await db
+    .select()
+    .from(projectFilesTable)
+    .where(inArray(projectFilesTable.projectId, allIds));
+
+  const countByProject = new Map<number, number>();
+  for (const f of fileLinks) {
+    countByProject.set(f.projectId, (countByProject.get(f.projectId) ?? 0) + 1);
+  }
+
+  return projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    status: p.status,
+    confidence: parseFloat(p.confidence.toFixed(3)),
+    explanation: p.explanation,
+    fileCount: countByProject.get(p.id) ?? 0,
+    matchContext:
+      fileMatchIds.has(p.id) && !directIds.has(p.id) ? "Matched via linked file" : null,
+    createdAt: p.createdAt?.toISOString() ?? new Date().toISOString(),
+  }));
 }
 
 /**
