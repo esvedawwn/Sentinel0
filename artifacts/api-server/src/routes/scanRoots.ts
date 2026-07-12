@@ -2,6 +2,7 @@ import { Router, type IRouter } from "express";
 import { db, scanRootsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { CreateScanRootBody, DeleteScanRootParams } from "@workspace/api-zod";
+import { sanitiseScanInput, checkNotSystemPath } from "../scanner/pathSafety.js";
 
 const router: IRouter = Router();
 
@@ -27,12 +28,27 @@ router.post("/scan-roots", async (req, res): Promise<void> => {
     return;
   }
 
-  const { path, label } = parsed.data;
+  const { path: rawPath, label } = parsed.data;
+
+  // Validate: no traversal, must be absolute
+  const sanitised = sanitiseScanInput(rawPath);
+  if (!sanitised.ok) {
+    res.status(400).json({ error: sanitised.reason });
+    return;
+  }
+  const normPath = (sanitised as import("../scanner/pathSafety.js").SafetyOkValue<string>).value;
+
+  // Validate: not a system-reserved directory
+  const sysCheck = checkNotSystemPath(normPath);
+  if (!sysCheck.ok) {
+    res.status(403).json({ error: sysCheck.reason });
+    return;
+  }
 
   const existing = await db
     .select()
     .from(scanRootsTable)
-    .where(eq(scanRootsTable.path, path));
+    .where(eq(scanRootsTable.path, normPath));
 
   if (existing.length > 0) {
     res.status(409).json({ error: "Path already registered as a scan root." });
@@ -41,7 +57,7 @@ router.post("/scan-roots", async (req, res): Promise<void> => {
 
   const [created] = await db
     .insert(scanRootsTable)
-    .values({ path, label: label ?? null })
+    .values({ path: normPath, label: label ?? null })
     .returning();
 
   res.status(201).json(mapScanRoot(created));

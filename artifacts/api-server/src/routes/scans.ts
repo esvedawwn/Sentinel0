@@ -1,11 +1,12 @@
 import path from "path";
 import fs from "fs/promises";
 import { Router, type IRouter } from "express";
-import { db, scansTable, activityTable } from "@workspace/db";
+import { db, scansTable, activityTable, scanRootsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { CreateScanBody, GetScanParams, CancelScanParams, ListScansQueryParams } from "@workspace/api-zod";
 import { runRealScan } from "../scanner/realScanner.js";
 import { simulateScan } from "../scanner/simulateScanner.js";
+import { sanitiseScanInput, checkNotSystemPath, validateAgainstApprovedRoots } from "../scanner/pathSafety.js";
 
 const router: IRouter = Router();
 
@@ -70,6 +71,34 @@ router.post("/scans", async (req, res): Promise<void> => {
       // Path doesn't exist — keep simulate mode
     }
   }
+
+  // ── Path safety validation for real scans ────────────────────────────────
+  if (mode === "real") {
+    // 1. Reject traversal sequences + require absolute path
+    const sanitised = sanitiseScanInput(scanPath);
+    if (!sanitised.ok) {
+      res.status(400).json({ error: sanitised.reason });
+      return;
+    }
+    scanPath = (sanitised as import("../scanner/pathSafety.js").SafetyOkValue<string>).value;
+
+    // 2. Block system-reserved directories
+    const sysCheck = checkNotSystemPath(scanPath);
+    if (!sysCheck.ok) {
+      res.status(403).json({ error: sysCheck.reason });
+      return;
+    }
+
+    // 3. Enforce approved-root policy
+    const roots = await db.select().from(scanRootsTable);
+    const approvedPaths = roots.map((r) => r.path);
+    const rootCheck = validateAgainstApprovedRoots(scanPath, approvedPaths);
+    if (!rootCheck.ok) {
+      res.status(403).json({ error: rootCheck.reason });
+      return;
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [scan] = await db
     .insert(scansTable)

@@ -10,3 +10,5 @@
 - [Tauri IPC + desktop bridge](tauri-desktop-bridge.md) — `window.__TAURI__.core.invoke` (withGlobalTauri:true), no npm deps; `isDesktop()`/`pickFolder()` are no-ops in browser.
 - [DB schema push required after changes](db-schema-push.md) — `pnpm --filter @workspace/db run push` must run before API server restarts after any schema edit, or live queries 500.
 - [NL interpreter entity casing](nl-entity-casing.md) — interpretSearchQuery lowercases the full query first; parseEntityMention must receive the original (pre-lowercased) query to preserve name capitalisation.
+- [Path safety raw-input traversal check](path-safety-traversal.md) — sanitiseScanInput must split raw input and check for ".." segments BEFORE calling path.normalize(); normalize resolves ".." so post-normalize checks always miss traversal.
+- [Privacy / clear-index endpoints](privacy-endpoints.md) — DELETE /settings/index|extracted-text|embeddings; GET /settings/index-location; SafetyResult types use separate SafetyOk/SafetyOkValue<T>/SafetyErr to avoid TS conditional-type inference issues.

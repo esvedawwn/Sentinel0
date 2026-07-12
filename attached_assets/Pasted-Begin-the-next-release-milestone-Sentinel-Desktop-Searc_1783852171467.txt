@@ -1,0 +1,286 @@
+Begin the next release milestone: Sentinel Desktop Search Alpha.
+
+GOAL
+
+Deliver a safe macOS desktop build that can:
+
+- run locally on the user’s Mac
+- scan only approved folders
+- persist indexed metadata
+- perform local hybrid search
+- interpret natural-language filters
+- remain preview-only
+- work without cloud AI
+
+Do not redesign the existing product.
+Do not remove the web version.
+Reuse the current React, TypeScript, Express, SQLite and desktop architecture.
+
+────────────────────────────────────────
+
+PART 1 — DESKTOP READINESS
+
+1. Audit the existing desktop package.
+2. Reuse Tauri if already configured.
+3. Prepare exact commands:
+   - pnpm desktop:dev
+   - pnpm desktop:build
+   - pnpm desktop:check
+4. Ensure the desktop app uses the existing Sentinel frontend.
+5. Keep any local API bound to 127.0.0.1 only.
+6. Do not expose the local API publicly.
+7. Do not require Replit after installation.
+8. Keep the web build working separately.
+
+────────────────────────────────────────
+
+PART 2 — SAFE LOCAL FILE ACCESS
+
+Implement explicit folder approval through a native folder picker.
+
+The app must not scan the Mac automatically.
+
+Allow users to approve:
+
+- Desktop
+- Documents
+- Downloads
+- iCloud Drive
+- custom folders
+- external drives
+
+Requirements:
+
+- store approved roots locally
+- show approved roots in Settings
+- allow access to be revoked
+- reject paths outside approved roots
+- prevent path traversal
+- prevent symlink escapes
+- skip system directories
+- skip node_modules, .git, dist, build, caches and app bundles
+- handle permission errors without crashing
+- support cancellation and progress
+- scanning must not block the UI
+
+────────────────────────────────────────
+
+PART 3 — LOCAL SEARCH INDEX
+
+Persist searchable metadata for approved files.
+
+Store:
+
+- path
+- filename
+- extension
+- size
+- created date
+- modified date
+- scan session
+- category
+- AI category
+- semantic tags
+- extracted entities
+- risk level
+- duplicate status
+- confidence
+- explanation
+
+Add indexes for:
+
+- filename
+- path
+- extension
+- modified date
+- category
+- tags
+- scan session
+
+Do not store raw file contents by default.
+
+────────────────────────────────────────
+
+PART 4 — HYBRID SEARCH
+
+Implement local search combining:
+
+1. exact filename match
+2. path match
+3. extension match
+4. category match
+5. AI category match
+6. semantic-tag match
+7. entity match
+8. extracted-text match when enabled
+9. vector similarity only if a local embeddings provider is already stable
+
+Return:
+
+- relevance score
+- match reasons
+- highlighted terms
+- category
+- tags
+- file metadata
+
+Search must work without internet access.
+
+────────────────────────────────────────
+
+PART 5 — NATURAL-LANGUAGE SEARCH
+
+Extend the local query interpreter to understand:
+
+- legal PDFs from June
+- renovation invoices
+- screenshots from last week
+- files larger than 500 MB
+- banking statements from 2025
+- duplicate installers
+- documents mentioning Ingrid
+- files related to Alpha Hair
+- Adobe lock files older than 30 days
+- project files modified this month
+
+Convert queries into structured filters.
+
+Display:
+
+- how the query was interpreted
+- confidence
+- unrecognised terms
+- editable filters
+
+────────────────────────────────────────
+
+PART 6 — SEARCH UI
+
+Build a desktop-ready unified search screen with:
+
+- global search bar
+- Command + K shortcut
+- keyboard navigation
+- filter chips
+- recent searches
+- saved searches
+- interpreted-query panel
+- result list
+- result preview pane
+- relevance score
+- match explanation
+- grouping by project, category and file type
+
+Do not allow destructive actions from search results.
+
+────────────────────────────────────────
+
+PART 7 — PRIVACY
+
+Mandatory:
+
+- local-only mode enabled by default
+- cloud AI disabled by default
+- no automatic file-content upload
+- no automatic OCR of the whole filesystem
+- sensitive files remain metadata-only unless approved
+- users can clear indexed metadata
+- users can remove extracted text
+- users can remove embeddings
+- show index location in Settings
+- show AI mode and privacy status
+
+────────────────────────────────────────
+
+PART 8 — SAFETY
+
+The release must remain preview-only.
+
+Do not implement:
+
+- permanent deletion
+- automatic moves
+- automatic renaming
+- automatic archival
+- unrestricted shell execution
+- unrestricted filesystem APIs
+
+Every path must be validated in the backend.
+
+All filesystem commands must be allowlisted.
+
+────────────────────────────────────────
+
+PART 9 — TESTING
+
+Add tests for:
+
+- approved-root validation
+- rejected path traversal
+- symlink escape rejection
+- permission denial
+- cancelled scan
+- search ranking
+- natural-language query interpretation
+- date filters
+- size filters
+- entity filters
+- local-only mode
+- cloud provider disabled
+- clearing the local index
+- preview-only enforcement
+
+Run:
+
+pnpm install
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run build
+pnpm desktop:check
+
+Fix all failures.
+
+If macOS compilation cannot run in Replit, do not claim that it passed.
+
+────────────────────────────────────────
+
+PART 10 — DOCUMENTATION
+
+Create or update:
+
+- docs/DESKTOP_ARCHITECTURE.md
+- docs/MAC_DESKTOP_BUILD.md
+- docs/SEARCH_ARCHITECTURE.md
+- docs/SEMANTIC_SEARCH.md
+- docs/AI_PRIVACY.md
+- docs/CHANGELOG.md
+- docs/BACKLOG.md
+
+The Mac build guide must include exact Apple Silicon setup and run commands.
+
+────────────────────────────────────────
+
+DELIVERABLE
+
+At completion provide:
+
+- files added
+- files changed
+- desktop architecture
+- folder-permission model
+- local database location
+- search ranking approach
+- privacy controls
+- commands run
+- tests passed
+- unverified macOS areas
+- exact Mac launch commands
+- expected .app output location
+- suggested commit message
+
+Suggested commit:
+
+feat(desktop-search): add safe local desktop indexing and hybrid search
+
+Begin now and work autonomously until this milestone is complete.

@@ -1127,6 +1127,47 @@ export const UpdateSettingsResponse = zod.object({
 
 
 /**
+ * @summary Path of the local SQLite database file
+ */
+export const GetIndexLocationResponse = zod.object({
+  "path": zod.string().describe('Absolute path (or default notation) of the local SQLite database file.')
+})
+
+
+/**
+ * @summary Clear all indexed scan metadata (findings, files, activity, AI classifications, semantic tags, duplicate groups, file hashes). Does not delete scan roots, user settings, search history, or any file on disk. Irreversible.
+
+ */
+export const ClearIndexResponse = zod.object({
+  "cleared": zod.array(zod.string()).describe('Names of the tables that were cleared.'),
+  "deletedCount": zod.number().optional().describe('Number of rows deleted (present on embeddings clear).'),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Clear all extracted text, entities, and embedding chunks. Useful for re-extraction or privacy. Irreversible.
+
+ */
+export const ClearExtractedTextResponse = zod.object({
+  "cleared": zod.array(zod.string()).describe('Names of the tables that were cleared.'),
+  "deletedCount": zod.number().optional().describe('Number of rows deleted (present on embeddings clear).'),
+  "message": zod.string()
+})
+
+
+/**
+ * @summary Clear only embedding vectors (embeddingChunks). Extracted text and entity records are preserved. Useful for freeing space.
+
+ */
+export const ClearEmbeddingsResponse = zod.object({
+  "cleared": zod.array(zod.string()).describe('Names of the tables that were cleared.'),
+  "deletedCount": zod.number().optional().describe('Number of rows deleted (present on embeddings clear).'),
+  "message": zod.string()
+})
+
+
+/**
  * Extraction is always per-file and on demand — there is no bulk/automatic mode. Fails with 409 if extraction is disabled in Settings for the required mode (OCR / cloud consent).
  * @summary Run text extraction (and OCR if applicable/enabled) for one finding, on demand
  */

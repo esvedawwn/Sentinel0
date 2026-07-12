@@ -33,6 +33,7 @@ import type {
   CategoryCount,
   ClearFindings200,
   ClearFindingsParams,
+  ClearIndexResponse,
   ClearSearchHistory200,
   CreateProjectBody,
   CreateScanRootInput,
@@ -61,6 +62,7 @@ import type {
   GetReportsScanHistoryParams,
   HealthStatus,
   IgnoreFindingInput,
+  IndexLocationResponse,
   IndexStats,
   InterpretSearchParams,
   ListActionQueue200,
@@ -3420,6 +3422,299 @@ export const useUpdateSettings = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateSettingsMutationOptions(options));
+    }
+
+export const getGetIndexLocationUrl = () => {
+
+
+
+
+  return `/api/settings/index-location`
+}
+
+/**
+ * @summary Path of the local SQLite database file
+ */
+export const getIndexLocation = async ( options?: RequestInit): Promise<IndexLocationResponse> => {
+
+  return customFetch<IndexLocationResponse>(getGetIndexLocationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIndexLocationQueryKey = () => {
+    return [
+    `/api/settings/index-location`
+    ] as const;
+    }
+
+
+export const getGetIndexLocationQueryOptions = <TData = Awaited<ReturnType<typeof getIndexLocation>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIndexLocation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIndexLocationQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIndexLocation>>> = ({ signal }) => getIndexLocation({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIndexLocation>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIndexLocationQueryResult = NonNullable<Awaited<ReturnType<typeof getIndexLocation>>>
+export type GetIndexLocationQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Path of the local SQLite database file
+ */
+
+export function useGetIndexLocation<TData = Awaited<ReturnType<typeof getIndexLocation>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIndexLocation>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIndexLocationQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getClearIndexUrl = () => {
+
+
+
+
+  return `/api/settings/index`
+}
+
+/**
+ * @summary Clear all indexed scan metadata (findings, files, activity, AI classifications, semantic tags, duplicate groups, file hashes). Does not delete scan roots, user settings, search history, or any file on disk. Irreversible.
+
+ */
+export const clearIndex = async ( options?: RequestInit): Promise<ClearIndexResponse> => {
+
+  return customFetch<ClearIndexResponse>(getClearIndexUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getClearIndexMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearIndex>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearIndex>>, TError,void, TContext> => {
+
+const mutationKey = ['clearIndex'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearIndex>>, void> = () => {
+
+
+          return  clearIndex(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearIndexMutationResult = NonNullable<Awaited<ReturnType<typeof clearIndex>>>
+
+    export type ClearIndexMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clear all indexed scan metadata (findings, files, activity, AI classifications, semantic tags, duplicate groups, file hashes). Does not delete scan roots, user settings, search history, or any file on disk. Irreversible.
+
+ */
+export const useClearIndex = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearIndex>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearIndex>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClearIndexMutationOptions(options));
+    }
+
+export const getClearExtractedTextUrl = () => {
+
+
+
+
+  return `/api/settings/extracted-text`
+}
+
+/**
+ * @summary Clear all extracted text, entities, and embedding chunks. Useful for re-extraction or privacy. Irreversible.
+
+ */
+export const clearExtractedText = async ( options?: RequestInit): Promise<ClearIndexResponse> => {
+
+  return customFetch<ClearIndexResponse>(getClearExtractedTextUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getClearExtractedTextMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearExtractedText>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearExtractedText>>, TError,void, TContext> => {
+
+const mutationKey = ['clearExtractedText'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearExtractedText>>, void> = () => {
+
+
+          return  clearExtractedText(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearExtractedTextMutationResult = NonNullable<Awaited<ReturnType<typeof clearExtractedText>>>
+
+    export type ClearExtractedTextMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clear all extracted text, entities, and embedding chunks. Useful for re-extraction or privacy. Irreversible.
+
+ */
+export const useClearExtractedText = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearExtractedText>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearExtractedText>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClearExtractedTextMutationOptions(options));
+    }
+
+export const getClearEmbeddingsUrl = () => {
+
+
+
+
+  return `/api/settings/embeddings`
+}
+
+/**
+ * @summary Clear only embedding vectors (embeddingChunks). Extracted text and entity records are preserved. Useful for freeing space.
+
+ */
+export const clearEmbeddings = async ( options?: RequestInit): Promise<ClearIndexResponse> => {
+
+  return customFetch<ClearIndexResponse>(getClearEmbeddingsUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getClearEmbeddingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearEmbeddings>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearEmbeddings>>, TError,void, TContext> => {
+
+const mutationKey = ['clearEmbeddings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearEmbeddings>>, void> = () => {
+
+
+          return  clearEmbeddings(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearEmbeddingsMutationResult = NonNullable<Awaited<ReturnType<typeof clearEmbeddings>>>
+
+    export type ClearEmbeddingsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Clear only embedding vectors (embeddingChunks). Extracted text and entity records are preserved. Useful for freeing space.
+
+ */
+export const useClearEmbeddings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearEmbeddings>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearEmbeddings>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getClearEmbeddingsMutationOptions(options));
     }
 
 export const getExtractFindingTextUrl = (id: number,) => {

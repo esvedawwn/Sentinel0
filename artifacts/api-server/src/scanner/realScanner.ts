@@ -136,7 +136,7 @@ export async function runRealScan(
     const [current] = await db.select().from(scansTable).where(eq(scansTable.id, scanId));
     if (!current || current.status === "cancelled") return;
 
-    for await (const entry of walkDirectory(rootPath, abortController.signal)) {
+    for await (const entry of walkDirectory(rootPath, abortController.signal, rootPath)) {
       const totalSeen = filesScanned + foldersScanned;
 
       if (totalSeen % CANCEL_CHECK_INTERVAL === 0 && totalSeen > 0) {

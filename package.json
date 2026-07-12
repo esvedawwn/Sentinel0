@@ -5,6 +5,9 @@
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
     "build": "pnpm run typecheck && PORT=3000 BASE_PATH=/ pnpm -r --filter !./artifacts/desktop --if-present run build",
+    "desktop:dev": "pnpm --filter @workspace/desktop run dev",
+    "desktop:build": "pnpm --filter @workspace/desktop run build",
+    "desktop:check": "pnpm --filter @workspace/sentinel run typecheck && echo 'Frontend TypeScript OK. Rust: cd artifacts/desktop && cargo check (requires Rust toolchain on macOS).'",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
     "test": "vitest run",

@@ -1029,6 +1029,66 @@ paths:
               schema:
                 $ref: "#/components/schemas/UserSettingsResponse"
 
+  /settings/index-location:
+    get:
+      operationId: getIndexLocation
+      tags: [settings]
+      summary: Path of the local SQLite database file
+      responses:
+        "200":
+          description: Index location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndexLocationResponse"
+
+  /settings/index:
+    delete:
+      operationId: clearIndex
+      tags: [settings]
+      summary: >
+        Clear all indexed scan metadata (findings, files, activity, AI
+        classifications, semantic tags, duplicate groups, file hashes).
+        Does not delete scan roots, user settings, search history, or any
+        file on disk. Irreversible.
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearIndexResponse"
+
+  /settings/extracted-text:
+    delete:
+      operationId: clearExtractedText
+      tags: [settings]
+      summary: >
+        Clear all extracted text, entities, and embedding chunks.
+        Useful for re-extraction or privacy. Irreversible.
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearIndexResponse"
+
+  /settings/embeddings:
+    delete:
+      operationId: clearEmbeddings
+      tags: [settings]
+      summary: >
+        Clear only embedding vectors (embeddingChunks). Extracted text
+        and entity records are preserved. Useful for freeing space.
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClearIndexResponse"
+
   /findings/{id}/extract:
     post:
       operationId: extractFindingText
@@ -2308,6 +2368,29 @@ components:
           type: string
           enum: [pending, dismissed]
         createdAt:
+          type: string
+
+    IndexLocationResponse:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: string
+          description: Absolute path (or default notation) of the local SQLite database file.
+
+    ClearIndexResponse:
+      type: object
+      required: [cleared, message]
+      properties:
+        cleared:
+          type: array
+          items:
+            type: string
+          description: Names of the tables that were cleared.
+        deletedCount:
+          type: integer
+          description: Number of rows deleted (present on embeddings clear).
+        message:
           type: string
 
     UserSettingsResponse:

@@ -702,6 +702,19 @@ export interface ActionQueueEntry {
   createdAt: string;
 }
 
+export interface IndexLocationResponse {
+  /** Absolute path (or default notation) of the local SQLite database file. */
+  path: string;
+}
+
+export interface ClearIndexResponse {
+  /** Names of the tables that were cleared. */
+  cleared: string[];
+  /** Number of rows deleted (present on embeddings clear). */
+  deletedCount?: number;
+  message: string;
+}
+
 export interface UserSettingsResponse {
   textExtractionEnabled: boolean;
   ocrEnabled: boolean;

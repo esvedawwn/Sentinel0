@@ -7,11 +7,16 @@ import {
   useCreateScanRoot,
   useDeleteScanRoot,
   useGetAIStatus,
+  useGetIndexLocation,
+  useClearIndex,
+  useClearExtractedText,
+  useClearEmbeddings,
   getGetAIStatusQueryKey,
   getGetSettingsQueryKey,
   getListScanRootsQueryKey,
+  getGetIndexLocationQueryKey,
 } from "@workspace/api-client-react";
-import { Trash2, FolderPlus } from "lucide-react";
+import { Trash2, FolderPlus, AlertTriangle, Database } from "lucide-react";
 import { isDesktop, pickFolder } from "@/lib/desktop";
 import { formatTimestamp } from "@/lib/utils";
 
@@ -551,6 +556,179 @@ function DetectionSection() {
   );
 }
 
+// ── Privacy / Danger Zone Section ────────────────────────────────────────────
+
+function DangerButton({
+  label,
+  confirm,
+  onClick,
+  loading,
+}: {
+  label: string;
+  confirm: string;
+  onClick: () => void;
+  loading: boolean;
+}) {
+  const [pending, setPending] = useState(false);
+
+  if (pending) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>{confirm}</span>
+        <button
+          onClick={() => { setPending(false); onClick(); }}
+          className="text-xs px-2 py-1 rounded font-mono"
+          style={{ background: "rgba(248,113,113,0.15)", color: "#F87171", border: "1px solid rgba(248,113,113,0.3)", fontFamily: "var(--app-font-mono)" }}
+        >
+          Confirm
+        </button>
+        <button
+          onClick={() => setPending(false)}
+          className="text-xs px-2 py-1 rounded font-mono"
+          style={{ background: "rgba(255,255,255,0.05)", color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.1)", fontFamily: "var(--app-font-mono)" }}
+        >
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setPending(true)}
+      disabled={loading}
+      className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-mono transition-colors"
+      style={{
+        background: "rgba(248,113,113,0.08)",
+        color: "#F87171",
+        border: "1px solid rgba(248,113,113,0.2)",
+        fontFamily: "var(--app-font-mono)",
+        opacity: loading ? 0.5 : 1,
+        cursor: loading ? "not-allowed" : "pointer",
+      }}
+    >
+      <AlertTriangle size={11} />
+      {loading ? "Clearing…" : label}
+    </button>
+  );
+}
+
+function PrivacyDangerSection() {
+  const queryClient = useQueryClient();
+
+  const { data: locationData } = useGetIndexLocation({
+    query: { queryKey: getGetIndexLocationQueryKey() },
+  });
+
+  const [clearMsg, setClearMsg] = useState<string | null>(null);
+
+  const clearIndex = useClearIndex({
+    mutation: {
+      onSuccess: (data) => {
+        setClearMsg(data.message);
+        queryClient.invalidateQueries();
+      },
+    },
+  });
+
+  const clearText = useClearExtractedText({
+    mutation: {
+      onSuccess: (data) => {
+        setClearMsg(data.message);
+        queryClient.invalidateQueries();
+      },
+    },
+  });
+
+  const clearEmbeddings = useClearEmbeddings({
+    mutation: {
+      onSuccess: (data) => {
+        setClearMsg(data.message);
+        queryClient.invalidateQueries();
+      },
+    },
+  });
+
+  return (
+    <div
+      className="rounded-lg px-5"
+      style={{ background: "#1A1A1A", border: "1px solid rgba(248,113,113,0.15)" }}
+    >
+      <SectionHeader title="Privacy & Index Management" />
+
+      {/* Index location */}
+      <SettingRow
+        label="Index Location"
+        description="SQLite database file that stores all indexed metadata. No file contents are ever stored here."
+      >
+        <div className="flex items-center gap-1.5" style={{ maxWidth: 280 }}>
+          <Database size={11} style={{ color: "#34D399", flexShrink: 0 }} />
+          <span
+            className="text-xs font-mono truncate"
+            title={locationData?.path}
+            style={{ color: "rgba(255,255,255,0.5)", fontFamily: "var(--app-font-mono)" }}
+          >
+            {locationData?.path ?? "Loading…"}
+          </span>
+        </div>
+      </SettingRow>
+
+      {/* Clear all indexed data */}
+      <SettingRow
+        label="Clear All Indexed Data"
+        description="Delete all findings, files, activity, AI classifications, duplicate groups, and file hashes. Scan roots and settings are preserved. Cannot be undone."
+      >
+        <DangerButton
+          label="Clear Index"
+          confirm="This will delete all scan results. Continue?"
+          loading={clearIndex.isPending}
+          onClick={() => clearIndex.mutate()}
+        />
+      </SettingRow>
+
+      {/* Clear extracted text */}
+      <SettingRow
+        label="Clear Extracted Text"
+        description="Delete all extracted plain text, detected entities, and embedding vectors. Findings are preserved. Useful for a fresh extraction run."
+      >
+        <DangerButton
+          label="Clear Extracted Text"
+          confirm="Delete all extracted text and embeddings?"
+          loading={clearText.isPending}
+          onClick={() => clearText.mutate()}
+        />
+      </SettingRow>
+
+      {/* Clear embeddings only */}
+      <SettingRow
+        label="Clear Embeddings Only"
+        description="Delete embedding vectors only — extracted text and entities are preserved. Useful for freeing space or switching embedding models."
+      >
+        <DangerButton
+          label="Clear Embeddings"
+          confirm="Delete all embedding vectors?"
+          loading={clearEmbeddings.isPending}
+          onClick={() => clearEmbeddings.mutate()}
+        />
+      </SettingRow>
+
+      {clearMsg && (
+        <div
+          className="text-xs py-2 pb-3 font-mono"
+          style={{ color: "#34D399", fontFamily: "var(--app-font-mono)" }}
+        >
+          ✓ {clearMsg}
+        </div>
+      )}
+
+      <p className="text-xs pb-4 pt-1" style={{ color: "rgba(255,255,255,0.2)" }}>
+        None of these actions delete, move, or rename any file on your disk. They only remove metadata
+        from the local index. Original files are always untouched.
+      </p>
+    </div>
+  );
+}
+
 // ── AI Diagnostics Panel ──────────────────────────────────────────────────────
 
 function AIDiagnosticsPanel() {
@@ -643,6 +821,7 @@ export default function Settings() {
         <ScanRootsSection />
         <ProcessingPrivacySection />
         <DetectionSection />
+        <PrivacyDangerSection />
         <AIDiagnosticsPanel />
 
         {/* About */}
