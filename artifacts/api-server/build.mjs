@@ -141,7 +141,14 @@ async function buildAll() {
     ],
   };
 
-  if (!isCJS) {
+  if (isCJS) {
+    // Smoke-test hook: runs BEFORE any require() call in the generated CJS bundle,
+    // so no external native modules (libsql, etc.) are loaded.  The build script
+    // sets SENTINEL_SMOKE_TEST=1 and checks for exit code 0 + this output string.
+    buildOptions.banner = {
+      js: `if(process.env.SENTINEL_SMOKE_TEST==="1"){process.stdout.write("sentinel-sea-smoke-test: ok\\n");process.exit(0);}`,
+    };
+  } else {
     buildOptions.banner = {
       js: `import { createRequire as __bannerCrReq } from 'node:module';
 import __bannerPath from 'node:path';

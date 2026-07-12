@@ -32,11 +32,29 @@ Verify: `rustc --version`
 
 ### 3. Node.js 22+ and pnpm
 
+> **Important — do NOT use Homebrew's Node.js for builds.**
+> Homebrew's `node@22` build strips the SEA fuse marker that the sidecar
+> packaging requires.  `pnpm desktop:build:server` downloads a pinned official
+> Node.js arm64 binary from nodejs.org automatically, so you do NOT need to
+> reinstall Node — but your shell's `node` must be v22+ to run pnpm scripts.
+
 ```bash
-# via nvm (recommended)
+# Recommended: install via nvm (uses official nodejs.org binaries)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.zshrc   # or ~/.bashrc / ~/.bash_profile
 nvm install 22
+nvm use 22
 npm install -g pnpm
 ```
+
+Alternatively — Volta:
+```bash
+curl https://get.volta.sh | bash
+volta install node@22 pnpm
+```
+
+If you keep Homebrew Node for other projects, the build script still works —
+it downloads and caches the official binary in `/tmp/` automatically.
 
 ### 4. Install repo dependencies
 
@@ -58,12 +76,21 @@ pnpm --filter @workspace/desktop run build:server
 ```
 
 This script (`artifacts/desktop/scripts/build-server.mjs`):
-1. Bundles the API server with esbuild → single CJS file
-2. Generates a SEA blob via `node --experimental-sea-config`
-3. Copies the current Node.js binary and injects the blob with `postject`
-4. Places the result at `artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin`
+1. Downloads and caches the official Node.js v22.16.0 arm64 binary from nodejs.org
+   (cached in `/tmp/` — only downloaded once)
+2. Preflight: verifies the SEA fuse marker is present in that binary
+3. Bundles the API server with esbuild → `dist-sea/index.cjs`
+4. Generates a SEA blob via `node --experimental-sea-config`
+5. Injects the blob using `postject` — any non-zero exit is **fatal** (no false success)
+6. Verifies injection succeeded (fuse marker present, binary size ≥ 5 MB)
+7. Re-signs the binary with an ad-hoc codesign
+8. Places the result at `src-tauri/binaries/server-aarch64-apple-darwin`
+9. Runs a smoke test (`SENTINEL_SMOKE_TEST=1`) — the binary must exit 0
 
-> **First run** — postject is installed automatically via npm if not present.
+> **Why an official binary?**  Homebrew's `node@22` strips the SEA fuse marker.
+> The build script always downloads from nodejs.org so Homebrew installs work fine.
+
+> **postject** is installed automatically via npx on first run.
 
 ### Verify
 
@@ -214,12 +241,17 @@ cargo check --manifest-path src-tauri/Cargo.toml
 
 | Problem | Fix |
 |---------|-----|
-| `server sidecar not found` | Run `pnpm --filter @workspace/desktop run build:server` first |
-| `postject: command not found` | `npm install -g postject` |
+| `server sidecar not found` | Run `pnpm desktop:build:server` first |
+| `Could not find the sentinel NODE_SEA_FUSE_...` | Homebrew Node.js detected — the build script auto-downloads the official binary. Re-run `pnpm desktop:build:server`. |
+| `FATAL: SEA fuse marker not found in cached binary` | Stale/corrupt cache — `rm -rf /tmp/sentinel-sea-node-*` then retry |
+| `Download failed for Node.js v22.16.0` | Version no longer exists on nodejs.org — update `SEA_NODE_VERSION` in `build-server.mjs` |
+| `Smoke test failed` | Binary did not execute — check stderr output; ensure codesign completed |
+| `postject exited with code 1` | Injection failed — see stdout for root cause; delete cache and retry |
 | `error: linker 'cc' not found` | `xcode-select --install` |
 | App opens but API fails | Check that port 38080 isn't in use (`lsof -i :38080`) |
-| Gatekeeper blocks app | Self-sign with `codesign --force --deep --sign - Sentinel.app` |
-| `SENTINEL_DB_PATH` not set | Set it in `src-tauri/lib.rs` sidecar spawn env (already done) |
+| Gatekeeper blocks app | `codesign --force --deep --sign - Sentinel.app` |
+| `SENTINEL_DB_PATH` not set | Already set in `src-tauri/lib.rs` sidecar spawn env |
+| Binary is < 5 MB | Blob not injected — delete `/tmp/sentinel-sea-inject-tmp` and rerun |
 
 ---
 

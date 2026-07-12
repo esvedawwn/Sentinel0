@@ -6,7 +6,7 @@
  */
 
 import { execSync, spawnSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import os from "os";
@@ -44,6 +44,22 @@ if (major >= 21) {
   pass(`Node.js ${nodeVersion} (≥ 21 required for Node SEA)`);
 } else {
   fail(`Node.js ${nodeVersion} — upgrade to 21+ for Node SEA (Single Executable Applications)`);
+}
+
+// Warn if running from Homebrew — Homebrew strips the SEA fuse marker.
+// build-server.mjs downloads an official binary independently, so this is
+// only a warning (the build will still succeed), but worth surfacing.
+{
+  const execPath = process.execPath;
+  if (execPath.includes("/homebrew/") || execPath.includes("/Homebrew/")) {
+    info(
+      `Node.js via Homebrew detected (${execPath}).\n` +
+      "     ·  Homebrew strips the SEA fuse — build-server.mjs downloads an\n" +
+      "     ·  official nodejs.org binary automatically.  Build will still work."
+    );
+  } else {
+    pass(`Node.js binary: ${execPath}`);
+  }
 }
 
 // ── pnpm ─────────────────────────────────────────────────────────────────────
@@ -151,6 +167,45 @@ if (presentWorkers.length > 0) {
   info("Pino worker files not yet built (run pnpm desktop:build:server to generate them)");
 }
 
+// ── Cached official Node.js binary (for SEA injection) ───────────────────────
+section("Cached official Node.js binary (nodejs.org, for SEA injection)");
+const SEA_NODE_VERSION = "22.16.0";
+const SEA_NODE_ARCH    = "darwin-arm64";
+const SEA_NODE_CACHE   = join(
+  os.tmpdir(),
+  `sentinel-sea-node-v${SEA_NODE_VERSION}-${SEA_NODE_ARCH}`
+);
+const SEA_NODE_BIN = join(
+  SEA_NODE_CACHE,
+  `node-v${SEA_NODE_VERSION}-${SEA_NODE_ARCH}`,
+  "bin",
+  "node"
+);
+const SEA_FUSE = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
+
+if (existsSync(SEA_NODE_BIN)) {
+  pass(`Cached at ${SEA_NODE_BIN}`);
+  // Verify fuse marker in cached binary
+  try {
+    const binBytes = readFileSync(SEA_NODE_BIN);
+    if (binBytes.indexOf(Buffer.from(SEA_FUSE)) !== -1) {
+      pass("SEA fuse marker present in cached binary");
+    } else {
+      fail(
+        `SEA fuse marker missing from cached binary — delete cache and retry:\n` +
+        `       rm -rf "${SEA_NODE_CACHE}"`
+      );
+    }
+  } catch {
+    info("Could not read cached binary for fuse check");
+  }
+} else {
+  info(
+    `Not yet downloaded — will be fetched automatically by pnpm desktop:build:server\n` +
+    `       (Node.js v${SEA_NODE_VERSION} ${SEA_NODE_ARCH} from nodejs.org)`
+  );
+}
+
 // ── Server binary ─────────────────────────────────────────────────────────────
 section("Server sidecar binary");
 const binariesDir = join(DESKTOP, "src-tauri", "binaries");
@@ -163,7 +218,32 @@ try {
 if (rustTarget) {
   const serverBin = join(binariesDir, `server-${rustTarget}`);
   if (existsSync(serverBin)) {
-    pass(`server-${rustTarget} found`);
+    // Check binary has a plausible size (a valid SEA binary is > 5 MB)
+    const sizeMB = statSync(serverBin).size / (1024 * 1024);
+    if (sizeMB < 5) {
+      fail(
+        `server-${rustTarget} exists but is suspiciously small (${sizeMB.toFixed(1)} MB).\n` +
+        "       It may be an incomplete or invalid SEA binary.\n" +
+        "       Run:  pnpm desktop:build:server  to rebuild."
+      );
+    } else {
+      pass(`server-${rustTarget} (${sizeMB.toFixed(0)} MB)`);
+    }
+    // Check SEA fuse is in the sidecar
+    try {
+      const binBytes = _readFileSync(serverBin);
+      if (binBytes.indexOf(Buffer.from(SEA_FUSE)) !== -1) {
+        pass("SEA fuse marker present in sidecar binary");
+      } else {
+        fail(
+          `SEA fuse marker missing from sidecar binary — the blob may not\n` +
+          "       have been injected correctly.\n" +
+          "       Run:  pnpm desktop:build:server  to rebuild."
+        );
+      }
+    } catch {
+      info("Could not read sidecar binary for fuse check");
+    }
   } else {
     fail(`server-${rustTarget} not found — run: pnpm desktop:build:server`);
   }

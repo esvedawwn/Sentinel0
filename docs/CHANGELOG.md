@@ -7,6 +7,51 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.7.1-alpha] — 2026-07-12 — Reliable macOS SEA sidecar packaging
+
+### Fixed
+
+#### macOS sidecar build (`artifacts/desktop/scripts/build-server.mjs`)
+- **Root cause confirmed**: Homebrew's `node@22` build strips the
+  `NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2` marker that postject
+  requires; the previous script silently continued after the injection failure
+  and copied an invalid binary into `src-tauri/binaries/`.
+- **Fix**: `build-server.mjs` now downloads an official Node.js v22.16.0
+  arm64 binary from nodejs.org into `/tmp/` (cached; only fetched once).
+  The user's globally-installed Node.js is no longer used as the injection
+  base, so Homebrew installs work transparently.
+- All failures (download, fuse preflight, postject, post-injection check,
+  smoke test) are now **fatal** — the script exits non-zero and never copies
+  an incomplete binary.
+- Stale sidecar is removed at build start (step 0) to prevent shipping an
+  artifact from a previous failed run.
+- Added 10-step progress output with clear error messages for each failure mode.
+
+#### Preflight & validation
+- Preflight check: verifies the SEA fuse marker is present in the downloaded
+  binary before invoking postject; `pnpm desktop:check` also verifies the
+  cached binary and the installed sidecar.
+- Post-injection check: reads the output binary and confirms the fuse marker
+  is still present, and that the file is > 5 MB (i.e. the blob was actually
+  injected, not just the raw Node.js binary copied).
+- Smoke test (`SENTINEL_SMOKE_TEST=1`): runs the produced sidecar and requires
+  exit 0 + expected stdout.  Implemented via a CJS banner injected by
+  `build.mjs` that fires before any native module (`@libsql/client`) loads.
+
+#### `artifacts/api-server/build.mjs`
+- CJS builds now get a banner that checks `SENTINEL_SMOKE_TEST` and exits 0
+  immediately, before any `require()` to native modules, enabling the smoke
+  test to work without the full libsql runtime available at build time.
+
+#### Documentation
+- `docs/MAC_DESKTOP_BUILD.md`: updated Node.js prerequisite section with
+  Homebrew warning, nvm/Volta instructions, and a note that the build script
+  handles the download automatically.  Updated Step 1 description and
+  troubleshooting table.
+- `docs/CHANGELOG.md`: this entry.
+
+---
+
 ## [v0.7.0-alpha] — 2026-07-12 — Enhanced NL Search, Hybrid Ranking, Entity Search, Search UI
 
 ### Added
