@@ -9,6 +9,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+#### Persistence (Sprint 3 — Full SQLite Persistence)
+
+- **`simulateScanner.ts` completely rewritten** — synthetic demo scan now
+  populates all six persistence tables in a single ~12-second, 10-step run:
+  - `files` — 400 records with real `scanId` FK, `path`, `category`, `status`,
+    `sizeBytes`, and `tags`.
+  - `findings` — 30 type findings (6 each of `zero_byte`, `large_file`,
+    `archive`, `installer`, `idlk_file`), each with `findingStatus`,
+    `riskLevel`, and AI-enriched columns.
+  - `duplicate_groups` — 5 groups with `hashValue`, `totalSizeBytes`,
+    `fileCount`, and `scanId`.
+  - `ai_classifications` — one append-only history row per finding via
+    `classifyWithAI`.
+  - `semantic_tags` — one row per AI tag per finding.
+  - `scan_roots` — upserted with `lastScanAt` / `lastScanId`.
+  - `activity` — `scan_completed` event at end of run.
+- **`realScanner.ts` — `filesTable` writes added** — the real filesystem
+  scanner now inserts every walked file into `filesTable` (with `scanId` FK)
+  in batches of 50, so the Analyse page is populated after a real scan.
+  Progress formula fixed: `Math.min(84, Math.floor(filesScanned /
+  (filesScanned + 500) * 85))` avoids premature 100 % on small directories.
+- **Startup interrupted-scan cleanup** (`index.ts`) — top-level `await` before
+  the HTTP server binds; any scan left `"running"` by a previous crash is
+  immediately flipped to `"failed"` with a human-readable `errorMessage`.
+- **`docs/PERSISTENCE.md`** — new document covering every table written during
+  a scan, the simulate vs real scanner write paths, the progress formula,
+  startup cleanup, and the DB push workflow.
+- **`FindingType` / `FindingStatus` / `RiskLevel` imports** — `simulateScanner`
+  now imports these union types from `@workspace/db` (re-exported via
+  `export * from "./schema"`) so `FindingTemplate.type` is narrowly typed and
+  Drizzle insert overloads resolve without casts.
+
 #### Desktop (Sprint 2 — Desktop Alpha)
 - **Tauri IPC commands** — `pick_folder` (native macOS folder-picker dialog via
   `tauri-plugin-dialog`) and `get_app_data_dir` (returns OS Application Support

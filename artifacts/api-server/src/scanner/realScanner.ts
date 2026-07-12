@@ -3,6 +3,7 @@ import {
   db,
   scansTable,
   findingsTable,
+  filesTable,
   activityTable,
   scanRootsTable,
   aiClassificationsTable,
@@ -34,6 +35,24 @@ export function riskLevelFor(finding: Pick<ScanFinding, "type" | "findingStatus"
   if (finding.type === "installer" || finding.type === "archive") return "medium";
   if (finding.type === "locked_file" || finding.type === "idlk_file") return "high";
   return "low";
+}
+
+/** Maps a file extension to a broad display category for the Analyse page. */
+function extensionToCategory(ext: string): string {
+  if ([".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".md", ".rtf", ".odt", ".csv", ".pages", ".numbers", ".key"].includes(ext)) return "Documents";
+  if ([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".raw", ".psd", ".ai", ".eps", ".heic", ".heif"].includes(ext)) return "Images";
+  if ([".mp4", ".mov", ".avi", ".mkv", ".m4v", ".wmv", ".flv", ".webm", ".mp3", ".wav", ".aac", ".flac", ".m4a", ".ogg", ".wma"].includes(ext)) return "Media";
+  if ([".ts", ".tsx", ".js", ".jsx", ".py", ".rb", ".go", ".rs", ".java", ".cpp", ".c", ".h", ".cs", ".php", ".sh", ".bash", ".zsh", ".sql", ".json", ".yaml", ".yml", ".toml", ".xml", ".html", ".css", ".scss", ".less"].includes(ext)) return "Code";
+  if ([".zip", ".tar", ".gz", ".bz2", ".rar", ".7z", ".xz", ".tgz"].includes(ext)) return "Archives";
+  if ([".dmg", ".pkg", ".exe", ".msi", ".deb", ".rpm", ".appimage", ".snap"].includes(ext)) return "Installers";
+  return "Other";
+}
+
+/** Maps a finding type to the file status shown in the Analyse view. */
+function findingTypeToFileStatus(type: string): "ready" | "review" | "action_required" | "corrupted" {
+  if (type === "zero_byte" || type === "empty_folder") return "corrupted";
+  if (type === "idlk_file" || type === "locked_file") return "action_required";
+  return "review";
 }
 
 /** Records/updates the scan root so it can be offered as a quick re-scan target. */
@@ -102,6 +121,15 @@ export async function runRealScan(
     if (tagRows.length > 0) {
       await db.insert(semanticTagsTable).values(tagRows).onConflictDoNothing();
     }
+  }
+
+  // Batch for filesTable — every walked file is indexed for the Analyse view.
+  const filesBatch: (typeof filesTable.$inferInsert)[] = [];
+
+  async function flushFiles() {
+    if (filesBatch.length === 0) return;
+    const toFlush = filesBatch.splice(0);
+    await db.insert(filesTable).values(toFlush);
   }
 
   try {
@@ -174,11 +202,13 @@ export async function runRealScan(
         const ext = path.extname(entry.name).toLowerCase();
 
         const finding = classifyFile(entry.path, entry.name, entry.sizeBytes, largeFileThreshold);
+        // Hoist aiResult so both the finding batch and the files batch can use it.
+        let aiResult: Awaited<ReturnType<typeof classifyWithAI>> | null = null;
+
         if (finding) {
           typeFindings.push(finding);
 
-          // AI classification for file findings
-          const aiResult = await classifyWithAI({
+          aiResult = await classifyWithAI({
             path: finding.path,
             name: finding.name,
             extension: finding.extension,
@@ -219,6 +249,21 @@ export async function runRealScan(
           });
         }
 
+        // Index every walked file in filesTable so the Analyse page shows a
+        // full inventory regardless of whether the file triggered a finding.
+        filesBatch.push({
+          scanId,
+          name: entry.name,
+          path: entry.path,
+          extension: ext,
+          sizeBytes: entry.sizeBytes,
+          category: aiResult ? aiResult.category : extensionToCategory(ext),
+          status: finding ? findingTypeToFileStatus(finding.type) : "ready",
+          tags: aiResult ? aiResult.tags : ([] as string[]),
+          fileCreatedAt: entry.createdAt,
+          fileModifiedAt: entry.modifiedAt,
+        });
+
         hashCandidates.push({
           path: entry.path,
           name: entry.name,
@@ -227,20 +272,22 @@ export async function runRealScan(
           modifiedAt: entry.modifiedAt,
         });
 
-        if (findingBatch.length >= BATCH_SIZE) {
-          await flushFindings();
-        }
+        if (findingBatch.length >= BATCH_SIZE) await flushFindings();
+        if (filesBatch.length >= BATCH_SIZE) await flushFiles();
 
         if (filesScanned % PROGRESS_UPDATE_INTERVAL === 0) {
-          const progressEstimate = Math.min(85, Math.round((bytesScanned / Math.max(bytesScanned, 1)) * 50) + Math.floor(filesScanned / 10));
+          // Estimate progress: saturates toward 85% asymptotically so the bar
+          // moves meaningfully even when total file count is unknown.
+          const progressEstimate = Math.min(84, Math.floor(filesScanned / (filesScanned + 500) * 85));
           await db.update(scansTable)
-            .set({ filesScanned, foldersScanned, bytesScanned, progressPercent: Math.min(progressEstimate, 85) })
+            .set({ filesScanned, foldersScanned, bytesScanned, progressPercent: progressEstimate })
             .where(eq(scansTable.id, scanId));
         }
       }
     }
 
     await flushFindings();
+    await flushFiles();
 
     // Staged duplicate detection: size -> extension (when helpful) -> SHA-256
     // hash, with cache reuse and cooperative cancellation. See

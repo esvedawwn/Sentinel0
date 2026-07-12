@@ -19,7 +19,24 @@ Items are ordered by priority within each category.
 - [ ] Command palette: fuzzy/scored matching instead of simple substring filter
 - [ ] Saved searches: allow editing an existing saved search's filters, not just re-running it
 
-## Sprint 3 Candidates
+## Sprint 3 — Completed
+
+- [x] Simulate scanner populates all persistence tables: `files` (with `scanId`
+      FK), `findings`, `duplicate_groups`, `ai_classifications`, `semantic_tags`,
+      `scan_roots`, `activity` (2026-07-12)
+- [x] Real scanner writes every walked file to `filesTable` with `scanId` FK so
+      the Analyse page is populated after a real scan (2026-07-12)
+- [x] Startup cleanup: any scan left `"running"` on server restart is marked
+      `"failed"` before the HTTP server binds (2026-07-12)
+- [x] `FindingType` / `FindingStatus` / `RiskLevel` properly imported from
+      `@workspace/db` — no more widened-string typecheck errors on Drizzle
+      insert overloads (2026-07-12)
+- [x] DB schema pushed to SQLite (`db push`) — `files`, `scans`, and all related
+      tables now match the Drizzle schema; "Failed query" errors resolved (2026-07-12)
+- [x] `docs/PERSISTENCE.md` written — covers all table writers, progress
+      formula, batch flush, startup cleanup, and schema push workflow (2026-07-12)
+
+## Sprint 3 Candidates (remaining)
 
 ### AI Intelligence
 - [ ] Connect `OpenAIProvider` — wire `OPENAI_API_KEY` from env, parse structured JSON response with Zod, cache results by (name, ext, sizeRange)

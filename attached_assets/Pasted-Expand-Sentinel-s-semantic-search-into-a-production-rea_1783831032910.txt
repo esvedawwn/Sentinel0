@@ -1,0 +1,265 @@
+Expand Sentinel's semantic search into a production-ready hybrid search system.
+
+Do not replace the existing search unless necessary. Extend it carefully.
+
+GOAL
+
+Allow users to search files by filename, metadata, extracted text, semantic meaning, entities, project relationships and natural-language intent.
+
+The system must remain useful offline and must not depend on cloud AI.
+
+PHASE 1 — SEARCH DATA MODEL
+
+Create strongly typed models for:
+
+- SearchQuery
+- SearchFilters
+- SearchResult
+- SearchExplanation
+- SearchSession
+- SearchHistoryItem
+- SearchSuggestion
+- SemanticMatch
+- EntityMatch
+- ProjectMatch
+
+SearchFilters should support:
+
+- filename
+- path
+- extensions
+- categories
+- AI categories
+- semantic tags
+- entities
+- project IDs
+- date ranges
+- minimum and maximum size
+- risk levels
+- duplicate status
+- scan session
+- confidence threshold
+
+PHASE 2 — LOCAL NATURAL-LANGUAGE INTERPRETER
+
+Implement a local rule-based query interpreter.
+
+It should understand phrases such as:
+
+- legal PDFs from June
+- renovation invoices
+- old Adobe lock files
+- files larger than 500 MB
+- duplicate installers
+- banking statements from 2025
+- screenshots from last week
+- files related to Alpha Hair
+- documents mentioning Ingrid
+- project files modified this month
+
+Convert each query into structured filters.
+
+Return:
+
+- interpreted filters
+- human-readable explanation
+- confidence
+- unrecognised terms
+
+Display how Sentinel interpreted the query and allow the user to edit the filters.
+
+PHASE 3 — HYBRID SEARCH ENGINE
+
+Implement hybrid ranking using:
+
+1. exact filename match
+2. path match
+3. extracted-text match
+4. tag match
+5. category match
+6. entity match
+7. project relationship match
+8. semantic vector similarity when available
+
+Create a weighted ranking system.
+
+Return a relevance score and explanation for each result.
+
+Example explanation:
+
+“This result ranked highly because the filename matched ‘invoice’, the file was classified as Renovation, and the extracted text mentions plumbing.”
+
+PHASE 4 — TEXT INDEX
+
+Index approved extracted text.
+
+Requirements:
+
+- do not index file contents unless text extraction is enabled
+- do not index sensitive documents automatically
+- support PDF, TXT, Markdown, CSV, JSON and common source-code files
+- store searchable text separately from metadata
+- allow users to remove indexed text
+- add index status and rebuild controls
+
+PHASE 5 — ENTITIES
+
+Extract and index:
+
+- people
+- organisations
+- dates
+- invoice numbers
+- case references
+- addresses
+- amounts
+- project names
+
+Allow searches such as:
+
+- documents mentioning Brad
+- invoices from Kennards
+- files related to Downing Centre
+- statements containing case reference 2023/0067581
+
+Use local deterministic extraction first.
+
+PHASE 6 — EMBEDDINGS
+
+Add an embeddings-provider abstraction.
+
+Providers:
+
+- LocalEmbeddingsProvider
+- OpenAICompatibleEmbeddingsProvider
+- DisabledProvider
+
+Requirements:
+
+- local provider preferred
+- cloud disabled by default
+- never embed content without permission
+- never send sensitive content automatically
+- chunk long documents safely
+- store embedding model and version
+- support index rebuild
+- support embedding deletion
+- support cancellation and progress
+
+PHASE 7 — PROJECT RELATIONSHIPS
+
+Search across project relationships.
+
+Allow queries such as:
+
+- everything related to Alpha Hair
+- all files for the Ryde renovation
+- court documents and correspondence from June
+- brand assets connected to a client
+
+Use:
+
+- shared entities
+- filename similarity
+- shared folders
+- semantic tags
+- extracted text
+- user-confirmed project membership
+
+PHASE 8 — SEARCH UI
+
+Build a unified search screen with:
+
+- global search bar
+- Command/Ctrl + K shortcut
+- filter chips
+- interpreted-query panel
+- result relevance score
+- match explanation
+- preview pane
+- search history
+- saved searches
+- recent searches
+- suggested searches
+- result grouping by project, category and file type
+
+Add keyboard navigation.
+
+PHASE 9 — CONVERSATIONAL REFINEMENT
+
+Support follow-up filters within the same search session.
+
+Examples:
+
+User: show renovation invoices
+User: only plumbing
+User: from the last six months
+User: exclude duplicates
+
+Store search-session context locally.
+
+PHASE 10 — PRIVACY AND SAFETY
+
+Mandatory:
+
+- semantic search must work in local-only mode
+- cloud providers disabled by default
+- no automatic file upload
+- sensitive documents require explicit approval
+- users can delete embeddings and extracted text
+- users can see what data is indexed
+- search never modifies files
+- all recommendations remain preview-only
+
+PHASE 11 — TESTING
+
+Add tests for:
+
+- query interpretation
+- date parsing
+- size parsing
+- category filters
+- entity filters
+- project filters
+- ranking
+- exact versus semantic matches
+- sensitive-content restrictions
+- local-only behaviour
+- provider fallback
+- search-session refinement
+- saved searches
+- embedding deletion
+
+PHASE 12 — DOCUMENTATION
+
+Create or update:
+
+- docs/SEARCH_ARCHITECTURE.md
+- docs/SEMANTIC_SEARCH.md
+- docs/AI_PRIVACY.md
+- docs/CHANGELOG.md
+- docs/BACKLOG.md
+
+At the end run:
+
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run build
+
+Fix all errors.
+
+Report:
+
+- files changed
+- search architecture
+- ranking model
+- privacy decisions
+- current offline capability
+- remaining embedding work
+- before/after test totals
+- suggested commit message
+
+Suggested commit message:
+
+feat(search): add hybrid semantic search and natural-language query interpretation
