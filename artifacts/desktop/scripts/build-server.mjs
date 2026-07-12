@@ -100,19 +100,24 @@ execSync(
 
 // ── 4. Copy Node.js binary and inject blob ───────────────────────────────────
 const nodeExec = process.execPath;
-const tmpBin = join(API_DIR, "dist-sea", `server-tmp${os.platform() === "win32" ? ".exe" : ""}`);
+
+// Use os.tmpdir() so we are never fighting permissions on the source binary's
+// original install location (Homebrew, NVM, etc. can make it read-only or signed
+// in a way that postject cannot overwrite even after chmod).
+const tmpBin = join(os.tmpdir(), `sentinel-server-tmp${os.platform() === "win32" ? ".exe" : ""}`);
 
 copyFileSync(nodeExec, tmpBin);
 
-// Make writable — the Node binary is often copied read-only on macOS,
-// which causes postject to fail with "Can't read and write to target executable".
+// Ensure the copy is fully writable+executable before injection.
 if (os.platform() !== "win32") {
-  execSync(`chmod +w "${tmpBin}"`);
+  execSync(`chmod 755 "${tmpBin}"`);
 }
 
-// Remove existing signature on macOS
+// Remove existing signature on macOS — use execSync (not spawnSync) so that a
+// failure is not silently swallowed; an un-removed signature will cause postject
+// to fail with "Can't read and write to target executable".
 if (os.platform() === "darwin") {
-  spawnSync("codesign", ["--remove-signature", tmpBin]);
+  execSync(`codesign --remove-signature "${tmpBin}"`);
 }
 
 // Install postject if needed
