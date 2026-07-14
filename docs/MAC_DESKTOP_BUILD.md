@@ -30,20 +30,18 @@ rustup target add x86_64-apple-darwin    # Intel (for universal binary)
 
 Verify: `rustc --version`
 
-### 3. Node.js 22+ and pnpm
+### 3. Node.js 18+ and pnpm
 
-> **Important — do NOT use Homebrew's Node.js for builds.**
-> Homebrew's `node@22` build strips the SEA fuse marker that the sidecar
-> packaging requires.  `pnpm desktop:build:server` downloads a pinned official
-> Node.js arm64 binary from nodejs.org automatically, so you do NOT need to
-> reinstall Node — but your shell's `node` must be v22+ to run pnpm scripts.
+Any Node.js distribution (Homebrew, nvm, Volta, official installer) works for
+running pnpm scripts.  The sidecar builder (`@yao-pkg/pkg`) downloads and
+caches its own Node.js 22 arm64 runtime in `~/.pkg-cache` — it does not use
+your locally installed Node.js at all.
 
 ```bash
-# Recommended: install via nvm (uses official nodejs.org binaries)
+# Recommended: nvm (easy version switching)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-source ~/.zshrc   # or ~/.bashrc / ~/.bash_profile
-nvm install 22
-nvm use 22
+source ~/.zshrc          # or ~/.bash_profile
+nvm install 22 && nvm use 22
 npm install -g pnpm
 ```
 
@@ -53,10 +51,12 @@ curl https://get.volta.sh | bash
 volta install node@22 pnpm
 ```
 
-If you keep Homebrew Node for other projects, the build script still works —
-it downloads and caches the official binary in `/tmp/` automatically.
+Or Homebrew (fine now that the build no longer needs the SEA fuse):
+```bash
+brew install node pnpm
+```
 
-### 4. Install repo dependencies
+### 4. Clone and install repo dependencies
 
 ```bash
 git clone <your-repo-url> sentinel
@@ -64,12 +64,24 @@ cd sentinel
 pnpm install
 ```
 
+> **First-time pnpm install note:**  
+> pnpm may prompt you to approve esbuild's build script:
+> ```
+> [ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@x.y.z
+> Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+> ```
+> If you see this, run:
+> ```bash
+> pnpm approve-builds   # select esbuild → confirm
+> pnpm install          # re-run to finish setup
+> ```
+
 ---
 
-## Step 1 — Build the Node.js SEA sidecar
+## Step 1 — Build the server sidecar
 
-The Express API server is packaged as a Node.js Single Executable Application
-(SEA) and bundled into the `.app` as a sidecar binary.
+The Express API server is packaged as a self-contained binary using
+**@yao-pkg/pkg** and bundled into the `.app` as a sidecar.
 
 ```bash
 pnpm --filter @workspace/desktop run build:server
@@ -251,7 +263,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 | App opens but API fails | Check that port 38080 isn't in use (`lsof -i :38080`) |
 | Gatekeeper blocks app | `codesign --force --deep --sign - Sentinel.app` |
 | `SENTINEL_DB_PATH` not set | Already set in `src-tauri/lib.rs` sidecar spawn env |
-| Binary is < 5 MB | Blob not injected — delete `/tmp/sentinel-sea-inject-tmp` and rerun |
+| Binary is < 30 MB | pkg may have failed silently — rerun `pnpm desktop:build:server` and check output |
 
 ---
 
@@ -266,11 +278,11 @@ Sentinel.app/
       _up_/                 ← Vite-built React frontend
     Frameworks/             ← WebKit2 (system-provided on macOS)
     MacOS/
-      server-aarch64-...    ← Node.js SEA sidecar (Express API)
+      server-aarch64-...    ← @yao-pkg/pkg sidecar (Express API + Node.js runtime)
 ```
 
 On launch, the Tauri shell:
-1. Spawns the SEA sidecar as a background process on `localhost:38080`
+1. Spawns the sidecar as a background process on `localhost:38080`
 2. Loads the React frontend in a native WebView
-3. Routes `POST /api/*` calls through to the sidecar
+3. Routes `GET|POST /api/*` calls through to the sidecar
 4. Exposes `pick_folder` and `get_app_data_dir` as Tauri IPC commands
