@@ -7,6 +7,52 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.7.2-alpha] — 2026-07-12 — Replace SEA/postject pipeline with @yao-pkg/pkg sidecar
+
+### Fixed
+
+#### macOS sidecar — root cause resolved
+- **Root cause**: the Node.js SEA/postject pipeline produces an arm64 binary that
+  segfaults on execution (`zsh: segmentation fault`), even when blob generation,
+  injection, fuse verification, and ad-hoc codesigning all report success.  This
+  is a fundamental incompatibility between Homebrew's Node.js build and the SEA
+  fuse mechanism, not a fixable configuration issue.
+
+#### New packaging approach: @yao-pkg/pkg
+- Replaced the SEA/postject pipeline in `build-server.mjs` with `@yao-pkg/pkg`
+  (community-maintained fork of vercel/pkg).
+- `@yao-pkg/pkg` bundles a precompiled Node.js 22 arm64 runtime (downloaded from
+  its own CDN, cached in `~/.pkg-cache`) directly into the binary.  No SEA fuse,
+  no postject, no external Node.js binary required.
+- Native `.node` modules (`@libsql/darwin-arm64`) are packaged as assets and
+  extracted to a temp directory at runtime — correctly handled by pkg.
+- Resulting binary is ~60–80 MB (full Node.js runtime embedded).
+
+#### Build validation (all failures are now fatal)
+- **Step 0**: removes any stale sidecar before build (prevents shipping old artifacts)
+- **Step 3**: runs `@yao-pkg/pkg`; any non-zero exit removes the output and fatal-exits
+- **Step 4**: verifies binary is > 30 MB (guards against silent pkg failure)
+- **Step 5**: smoke test — `SENTINEL_SMOKE_TEST=1 ./server` must print
+  `sentinel-sidecar-smoke-test: ok` and exit 0; binary is deleted on failure
+- **Step 6**: health check — starts sidecar on `127.0.0.1:38099` with a temp SQLite DB,
+  GETs `/api/healthz`, requires HTTP 200, shuts down the server
+
+#### Supporting changes
+- `artifacts/api-server/build.mjs`: smoke test banner output changed from
+  `sentinel-sea-smoke-test: ok` to `sentinel-sidecar-smoke-test: ok`
+- `artifacts/desktop/package.json`: added `@yao-pkg/pkg@^5.12.0` devDependency;
+  added `check` script (`node scripts/check-desktop-env.mjs`)
+- `artifacts/desktop/scripts/check-desktop-env.mjs`: removed SEA/fuse checks,
+  added pkg cache section, updated sidecar size threshold to > 30 MB
+
+#### Documentation
+- `docs/DESKTOP_RELEASE.md`: updated architecture, prerequisites, sidecar build
+  section, troubleshooting
+- `docs/MAC_DESKTOP_BUILD.md`: updated step 1 description and troubleshooting
+- `docs/CHANGELOG.md`: this entry
+
+---
+
 ## [v0.7.1-alpha] — 2026-07-12 — Reliable macOS SEA sidecar packaging
 
 ### Fixed

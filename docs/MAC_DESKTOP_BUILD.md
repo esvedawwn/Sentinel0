@@ -75,22 +75,22 @@ The Express API server is packaged as a Node.js Single Executable Application
 pnpm --filter @workspace/desktop run build:server
 ```
 
-This script (`artifacts/desktop/scripts/build-server.mjs`):
-1. Downloads and caches the official Node.js v22.16.0 arm64 binary from nodejs.org
-   (cached in `/tmp/` — only downloaded once)
-2. Preflight: verifies the SEA fuse marker is present in that binary
-3. Bundles the API server with esbuild → `dist-sea/index.cjs`
-4. Generates a SEA blob via `node --experimental-sea-config`
-5. Injects the blob using `postject` — any non-zero exit is **fatal** (no false success)
-6. Verifies injection succeeded (fuse marker present, binary size ≥ 5 MB)
-7. Re-signs the binary with an ad-hoc codesign
-8. Places the result at `src-tauri/binaries/server-aarch64-apple-darwin`
-9. Runs a smoke test (`SENTINEL_SMOKE_TEST=1`) — the binary must exit 0
+This script (`artifacts/desktop/scripts/build-server.mjs`) uses **@yao-pkg/pkg** to produce a self-contained executable:
 
-> **Why an official binary?**  Homebrew's `node@22` strips the SEA fuse marker.
-> The build script always downloads from nodejs.org so Homebrew installs work fine.
+1. Bundles the API server with esbuild → `dist-sea/index.cjs`
+2. Downloads a precompiled Node.js 22 arm64 runtime from pkg's CDN
+   (cached in `~/.pkg-cache` — only downloaded once, ~70 MB)
+3. Packages `index.cjs` + native modules into a single binary
+4. Validates: size check (> 30 MB), smoke test, HTTP health check
+5. Places the result at `src-tauri/binaries/server-aarch64-apple-darwin`
 
-> **postject** is installed automatically via npx on first run.
+> **Why not Node.js SEA/postject?**
+> Homebrew's `node@22` strips the SEA fuse marker so postject fails.
+> Even with an official Node.js binary the resulting binary segfaults on arm64 macOS.
+> `@yao-pkg/pkg` bundles its own verified Node.js runtime and handles native
+> modules (like `@libsql/darwin-arm64`) correctly.
+
+> **@yao-pkg/pkg** is installed automatically via npx on first run.
 
 ### Verify
 
@@ -242,11 +242,11 @@ cargo check --manifest-path src-tauri/Cargo.toml
 | Problem | Fix |
 |---------|-----|
 | `server sidecar not found` | Run `pnpm desktop:build:server` first |
-| `Could not find the sentinel NODE_SEA_FUSE_...` | Homebrew Node.js detected — the build script auto-downloads the official binary. Re-run `pnpm desktop:build:server`. |
-| `FATAL: SEA fuse marker not found in cached binary` | Stale/corrupt cache — `rm -rf /tmp/sentinel-sea-node-*` then retry |
-| `Download failed for Node.js v22.16.0` | Version no longer exists on nodejs.org — update `SEA_NODE_VERSION` in `build-server.mjs` |
-| `Smoke test failed` | Binary did not execute — check stderr output; ensure codesign completed |
-| `postject exited with code 1` | Injection failed — see stdout for root cause; delete cache and retry |
+| `zsh: segmentation fault` when running sidecar | Old SEA binary still in place — run `pnpm desktop:build:server` to rebuild with pkg |
+| pkg download fails on first run | Internet connectivity issue — retry `pnpm desktop:build:server` |
+| Smoke test fails | Binary didn't execute — check if macOS blocked it: `xattr -cr <binary>` |
+| Health check timeout | `@libsql/darwin-arm64.node` blocked by Gatekeeper: `xattr -cr <binary>` then retry |
+| `FATAL: @yao-pkg/pkg exited ...` | See stdout — usually a missing module; ensure `pnpm install` ran |
 | `error: linker 'cc' not found` | `xcode-select --install` |
 | App opens but API fails | Check that port 38080 isn't in use (`lsof -i :38080`) |
 | Gatekeeper blocks app | `codesign --force --deep --sign - Sentinel.app` |

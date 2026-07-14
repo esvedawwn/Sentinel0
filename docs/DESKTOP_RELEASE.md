@@ -2,7 +2,7 @@
 
 > **Version:** 0.1.0-alpha  
 > **Target platform:** macOS 13 Ventura+ (Apple Silicon · Intel)  
-> **Architecture:** Tauri v2 · Node.js SEA sidecar · SQLite local DB
+> **Architecture:** Tauri v2 · @yao-pkg/pkg sidecar · SQLite local DB
 
 ---
 
@@ -10,7 +10,13 @@
 
 ```bash
 # 1. Install prerequisites (once)
-brew install node@22 pnpm imagemagick
+# Node.js: use nvm or volta — any version ≥ 18 works for running scripts.
+# @yao-pkg/pkg downloads its own Node.js 22 runtime automatically.
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.zshrc && nvm install 22
+npm install -g pnpm
+# Or: brew install pnpm  (Homebrew pnpm is fine — only Node.js from Homebrew was problematic)
+brew install imagemagick
 curl https://sh.rustup.rs -sSf | sh
 rustup target add aarch64-apple-darwin
 xcode-select --install   # if not already installed
@@ -40,7 +46,7 @@ pnpm desktop:build
 
 | Requirement | Version | Install |
 |-------------|---------|---------|
-| Node.js | ≥ 21 (for Node SEA) | `brew install node@22` |
+| Node.js | ≥ 18 (for pnpm scripts) | nvm, volta, or any distribution |
 | pnpm | ≥ 9 | `corepack enable pnpm` |
 | Rust + Cargo | stable | `curl https://sh.rustup.rs -sSf \| sh` |
 | Apple Silicon target | — | `rustup target add aarch64-apple-darwin` |
@@ -75,7 +81,7 @@ pnpm desktop:dev
 |--------|-------------|
 | `pnpm desktop:check` | Verify environment (Rust, Node, icons, sidecar binary) |
 | `pnpm desktop:icons` | Regenerate all icon sizes from `src-tauri/icons/icon.png` |
-| `pnpm desktop:build:server` | Compile the Express API as a Node.js SEA binary → `src-tauri/binaries/server-<target>` |
+| `pnpm desktop:build:server` | Compile the Express API as a self-contained binary via @yao-pkg/pkg → `src-tauri/binaries/server-<target>` |
 | `pnpm desktop:build` | Build the frontend, compile Rust, bundle → `.app` + `.dmg` |
 | `pnpm desktop:package` | Full pipeline: `desktop:build:server` + `desktop:build` |
 | `pnpm desktop:vite` | Start Vite on port 18756 (dev only) |
@@ -90,7 +96,7 @@ Sentinel.app/
 ├── Contents/
 │   ├── MacOS/
 │   │   ├── Sentinel                         ← Tauri/Rust executable
-│   │   └── server-aarch64-apple-darwin      ← bundled API server (Node.js SEA)
+│   │   └── server-aarch64-apple-darwin      ← bundled API server (@yao-pkg/pkg)
 │   ├── Resources/
 │   │   └── …                                ← Tauri resources (icons, etc.)
 │   └── Info.plist
@@ -104,7 +110,7 @@ Sentinel.app/
 
 ---
 
-## Node.js SEA sidecar build — how it works
+## Sidecar build — how it works
 
 `pnpm desktop:build:server` runs `artifacts/desktop/scripts/build-server.mjs`, which:
 
@@ -115,40 +121,50 @@ Sentinel.app/
 
      | File | Purpose |
      |------|---------|
-     | `index.cjs` | **Main bundle — used as the SEA `main`** |
+     | `index.cjs` | **Main bundle — pkg entry point** |
      | `pino-worker.cjs` | Pino async-logging worker |
      | `thread-stream-worker.cjs` | Thread-stream worker |
      | `pino-file.cjs` | Pino file-transport worker |
      | `pino-pretty.cjs` | Pino pretty-print transport |
 
-2. **Verifies** that `dist-sea/index.cjs` exists (exits with a descriptive error if not).
+2. **Packages** with `@yao-pkg/pkg`:
+   - Downloads a precompiled Node.js 22 arm64 runtime from pkg's CDN (cached in `~/.pkg-cache`)
+   - Snapshots `dist-sea/index.cjs` and all pino worker CJS files into the binary
+   - Packages native `.node` files (e.g. `@libsql/darwin-arm64.node`) as assets that are
+     extracted to a temp directory at runtime
+   - Output: a single self-contained `~60–80 MB` Mach-O arm64 executable
 
-3. **Generates** the SEA blob:
-   ```
-   sea-config.json  →  main: dist-sea/index.cjs
-                        output: dist-sea/sea-prep.blob
-   ```
+3. **Validates**:
+   - Binary size > 30 MB (guards against a silent pkg failure)
+   - Smoke test: `SENTINEL_SMOKE_TEST=1 ./server` → must print `sentinel-sidecar-smoke-test: ok` and exit 0
+   - Health check: starts the server on a temp port, GETs `/api/healthz`, requires HTTP 200
 
-4. **Injects** the blob into a copy of the Node.js binary with `postject`.
-
-5. **Places** the final binary at:
+4. **Places** the final binary at:
    ```
    artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin
    ```
 
-### Why `--outfile` cannot be used
+### Why @yao-pkg/pkg instead of Node.js SEA/postject
 
-`esbuild-plugin-pino` adds extra worker entry points to the esbuild build graph. esbuild requires `outdir` (not `outfile`) whenever multiple outputs are produced. Using `--outfile` causes:
+The Node SEA pipeline (node --experimental-sea-config + postject) has been abandoned for this project because:
+- Homebrew's `node@22` strips the SEA fuse marker — postject fails
+- Even with an official Node.js binary, the resulting binary segfaults on arm64 macOS
+- `@yao-pkg/pkg` bundles a full, verified Node.js 22 runtime and handles native modules correctly
 
+### Native module handling
+
+`@libsql/darwin-arm64` (SQLite bindings) is a native `.node` addon.  
+pkg packages it as an asset: the binary extracts it to a temp directory on first run.  
+On macOS, if Gatekeeper blocks the extracted `.node` file:
+```bash
+xattr -cr artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin
 ```
-Must use "outdir" when there are multiple input files
-```
 
-### Why pino worker files are NOT bundled into the Tauri app
+### Pino workers
 
-`logger.ts` only configures the `pino-pretty` transport when `NODE_ENV !== "production"`. The Tauri sidecar is always spawned with `NODE_ENV=production` (set in `lib.rs`). In production mode pino writes plain JSON directly to stdout — no worker threads are spawned, so the worker `.cjs` files in `dist-sea/` do not need to be packaged into the app bundle.
-
-If a future change adds a production transport (e.g., file rotation), the workers would need to be co-located with the sidecar binary in `Contents/MacOS/`. At that point, list them as additional `externalBin` entries in `tauri.conf.json` (each named `binaries/<name>-<target-triple>` so Tauri copies them to `Contents/MacOS/`).
+`logger.ts` only loads the `pino-pretty` transport when `NODE_ENV !== "production"`.
+The sidecar is always spawned with `NODE_ENV=production` (set in `lib.rs`), so pino workers
+are never executed at runtime. They are included in the snapshot for completeness.
 
 ---
 
@@ -255,6 +271,10 @@ Tauri's `tauri-plugin-updater` is included in `Cargo.toml`. To wire up auto-upda
 | Gatekeeper blocks launch | Right-click → Open, or codesign with a Developer ID cert |
 | Full Disk Access dialog never appeared | Grant manually in System Settings → Privacy & Security |
 | `server-<target>` binary not found at build time | Run `pnpm desktop:build:server` |
+| `zsh: segmentation fault` running the sidecar | Old SEA binary — run `pnpm desktop:build:server` to rebuild with pkg |
+| Gatekeeper blocks native `.node` extraction | `xattr -cr artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin` |
+| Health check timeout: libsql fails to load | Gatekeeper blocked extracted `.node` — try the xattr fix above |
+| pkg download fails (first run) | Check internet connectivity; retry `pnpm desktop:build:server` |
 | Cargo build fails: `error[E0432]` | Run `rustup update` |
 | Icons missing | Run `pnpm desktop:icons` |
 

@@ -6,7 +6,7 @@
  */
 
 import { execSync, spawnSync } from "child_process";
-import { existsSync, readFileSync, statSync } from "fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import os from "os";
@@ -40,27 +40,14 @@ if (platform !== "darwin") {
 section("Node.js");
 const nodeVersion = process.version;
 const [major] = nodeVersion.replace("v", "").split(".").map(Number);
-if (major >= 21) {
-  pass(`Node.js ${nodeVersion} (≥ 21 required for Node SEA)`);
+if (major >= 18) {
+  pass(`Node.js ${nodeVersion}`);
 } else {
-  fail(`Node.js ${nodeVersion} — upgrade to 21+ for Node SEA (Single Executable Applications)`);
+  fail(`Node.js ${nodeVersion} — upgrade to 18+ to run pnpm scripts`);
 }
-
-// Warn if running from Homebrew — Homebrew strips the SEA fuse marker.
-// build-server.mjs downloads an official binary independently, so this is
-// only a warning (the build will still succeed), but worth surfacing.
-{
-  const execPath = process.execPath;
-  if (execPath.includes("/homebrew/") || execPath.includes("/Homebrew/")) {
-    info(
-      `Node.js via Homebrew detected (${execPath}).\n` +
-      "     ·  Homebrew strips the SEA fuse — build-server.mjs downloads an\n" +
-      "     ·  official nodejs.org binary automatically.  Build will still work."
-    );
-  } else {
-    pass(`Node.js binary: ${execPath}`);
-  }
-}
+// @yao-pkg/pkg downloads its own Node.js runtime, so the user's installed
+// Node.js distribution (Homebrew, nvm, etc.) does not affect the sidecar build.
+info(`Node.js binary: ${process.execPath}`);
 
 // ── pnpm ─────────────────────────────────────────────────────────────────────
 section("pnpm");
@@ -167,47 +154,34 @@ if (presentWorkers.length > 0) {
   info("Pino worker files not yet built (run pnpm desktop:build:server to generate them)");
 }
 
-// ── Cached official Node.js binary (for SEA injection) ───────────────────────
-section("Cached official Node.js binary (nodejs.org, for SEA injection)");
-const SEA_NODE_VERSION = "22.16.0";
-const SEA_NODE_ARCH    = "darwin-arm64";
-const SEA_NODE_CACHE   = join(
-  os.tmpdir(),
-  `sentinel-sea-node-v${SEA_NODE_VERSION}-${SEA_NODE_ARCH}`
-);
-const SEA_NODE_BIN = join(
-  SEA_NODE_CACHE,
-  `node-v${SEA_NODE_VERSION}-${SEA_NODE_ARCH}`,
-  "bin",
-  "node"
-);
-const SEA_FUSE = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
-
-if (existsSync(SEA_NODE_BIN)) {
-  pass(`Cached at ${SEA_NODE_BIN}`);
-  // Verify fuse marker in cached binary
+// ── @yao-pkg/pkg cache ────────────────────────────────────────────────────────
+section("@yao-pkg/pkg Node.js runtime cache (~/.pkg-cache)");
+const pkgCacheDir = join(os.homedir(), ".pkg-cache");
+if (existsSync(pkgCacheDir)) {
   try {
-    const binBytes = readFileSync(SEA_NODE_BIN);
-    if (binBytes.indexOf(Buffer.from(SEA_FUSE)) !== -1) {
-      pass("SEA fuse marker present in cached binary");
+    const entries = readdirSync(pkgCacheDir);
+    const node22 = entries.filter((e) => e.includes("node22") || e.includes("v22"));
+    if (node22.length > 0) {
+      pass(`pkg cache found — Node.js 22 runtime cached (${node22.join(", ")})`);
     } else {
-      fail(
-        `SEA fuse marker missing from cached binary — delete cache and retry:\n` +
-        `       rm -rf "${SEA_NODE_CACHE}"`
+      info(
+        "pkg cache exists but no Node.js 22 runtime found.\n" +
+        "       First run of pnpm desktop:build:server will download it (~70 MB)."
       );
     }
   } catch {
-    info("Could not read cached binary for fuse check");
+    info(`pkg cache at ${pkgCacheDir}`);
   }
 } else {
   info(
-    `Not yet downloaded — will be fetched automatically by pnpm desktop:build:server\n` +
-    `       (Node.js v${SEA_NODE_VERSION} ${SEA_NODE_ARCH} from nodejs.org)`
+    "pkg cache not yet created (~/.pkg-cache).\n" +
+    "       First run of pnpm desktop:build:server will download the Node.js 22\n" +
+    "       runtime (~70 MB).  Subsequent runs use the cache."
   );
 }
 
 // ── Server binary ─────────────────────────────────────────────────────────────
-section("Server sidecar binary");
+section("Server sidecar binary (@yao-pkg/pkg compiled)");
 const binariesDir = join(DESKTOP, "src-tauri", "binaries");
 
 let rustTarget = null;
@@ -218,31 +192,27 @@ try {
 if (rustTarget) {
   const serverBin = join(binariesDir, `server-${rustTarget}`);
   if (existsSync(serverBin)) {
-    // Check binary has a plausible size (a valid SEA binary is > 5 MB)
+    // A valid pkg binary includes the full Node.js runtime — expect > 30 MB.
     const sizeMB = statSync(serverBin).size / (1024 * 1024);
-    if (sizeMB < 5) {
+    if (sizeMB < 30) {
       fail(
-        `server-${rustTarget} exists but is suspiciously small (${sizeMB.toFixed(1)} MB).\n` +
-        "       It may be an incomplete or invalid SEA binary.\n" +
+        `server-${rustTarget} is suspiciously small (${sizeMB.toFixed(1)} MB — expected > 30 MB).\n` +
+        "       This may be an old SEA binary or a failed pkg build.\n" +
         "       Run:  pnpm desktop:build:server  to rebuild."
       );
     } else {
       pass(`server-${rustTarget} (${sizeMB.toFixed(0)} MB)`);
     }
-    // Check SEA fuse is in the sidecar
+    // Verify it is an arm64 Mach-O executable
     try {
-      const binBytes = _readFileSync(serverBin);
-      if (binBytes.indexOf(Buffer.from(SEA_FUSE)) !== -1) {
-        pass("SEA fuse marker present in sidecar binary");
+      const fileOut = execSync(`file "${serverBin}"`, { encoding: "utf8" }).trim();
+      if (fileOut.includes("arm64") || fileOut.includes("Mach-O")) {
+        pass(`Binary type: ${fileOut.split(":")[1]?.trim()}`);
       } else {
-        fail(
-          `SEA fuse marker missing from sidecar binary — the blob may not\n` +
-          "       have been injected correctly.\n" +
-          "       Run:  pnpm desktop:build:server  to rebuild."
-        );
+        fail(`Unexpected binary format: ${fileOut}`);
       }
     } catch {
-      info("Could not read sidecar binary for fuse check");
+      info("Could not run `file` to check binary format");
     }
   } else {
     fail(`server-${rustTarget} not found — run: pnpm desktop:build:server`);

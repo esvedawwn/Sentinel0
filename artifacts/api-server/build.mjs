@@ -146,7 +146,7 @@ async function buildAll() {
     // so no external native modules (libsql, etc.) are loaded.  The build script
     // sets SENTINEL_SMOKE_TEST=1 and checks for exit code 0 + this output string.
     buildOptions.banner = {
-      js: `if(process.env.SENTINEL_SMOKE_TEST==="1"){process.stdout.write("sentinel-sea-smoke-test: ok\\n");process.exit(0);}`,
+      js: `if(process.env.SENTINEL_SMOKE_TEST==="1"){process.stdout.write("sentinel-sidecar-smoke-test: ok\\n");process.exit(0);}`,
     };
   } else {
     buildOptions.banner = {

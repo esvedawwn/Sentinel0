@@ -14,3 +14,4 @@
 - [NL interpreter entity casing](nl-entity-casing.md) — interpretSearchQuery lowercases the full query first; parseEntityMention must receive the original (pre-lowercased) query to preserve name capitalisation.
 - [Path safety raw-input traversal check](path-safety-traversal.md) — sanitiseScanInput must split raw input and check for ".." segments BEFORE calling path.normalize(); normalize resolves ".." so post-normalize checks always miss traversal.
 - [Privacy / clear-index endpoints](privacy-endpoints.md) — DELETE /settings/index|extracted-text|embeddings; GET /settings/index-location; SafetyResult types use separate SafetyOk/SafetyOkValue<T>/SafetyErr to avoid TS conditional-type inference issues.
+- [Desktop sidecar packaging](desktop-sidecar-pkg.md) — SEA/postject abandoned; @yao-pkg/pkg is the only confirmed approach for arm64 macOS; Homebrew node strips SEA fuse causing segfault regardless of injection success.

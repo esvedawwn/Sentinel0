@@ -1,0 +1,63 @@
+The generated macOS sidecar binary still crashes immediately.
+
+Confirmed manual test:
+
+SENTINEL_SMOKE_TEST=1 artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin
+
+Result:
+
+zsh: segmentation fault
+
+This proves the current Node SEA/postject pipeline is producing an invalid executable, even though blob generation, injection, fuse verification and ad-hoc signing report success.
+
+Stop using the custom Node SEA/postject pipeline for this desktop release.
+
+Replace it with the supported Tauri Node sidecar approach.
+
+Preferred implementation:
+
+1. Use @yao-pkg/pkg to compile the bundled API server into a self-contained arm64 macOS executable, following Tauri’s official Node.js sidecar guidance.
+2. Keep the Tauri externalBin integration.
+3. Preserve the required filename:
+   artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin
+4. Remove the SEA blob, postject, fuse injection and custom Node runtime download steps.
+5. Keep the API server bound only to 127.0.0.1.
+6. Keep SQLite, search, AI classification and project intelligence intact.
+7. Ensure Pino worker files and any required runtime assets are handled by the chosen packager.
+8. If native dependencies cannot be embedded by pkg:
+   - document them
+   - package them as Tauri resources where supported
+   - resolve them relative to the application resource directory
+9. Add a deterministic smoke-test command:
+   SENTINEL_SMOKE_TEST=1 server-aarch64-apple-darwin
+   It must print:
+   sentinel-sidecar-smoke-test: ok
+   and exit 0.
+10. Add a full local health test that starts the sidecar on a temporary localhost port, calls /api/healthz, then shuts it down.
+11. Ensure every build or test failure is fatal.
+12. Remove invalid output binaries when a build fails.
+13. Update:
+   - artifacts/desktop/scripts/build-server.mjs
+   - artifacts/desktop/scripts/check-desktop-env.mjs
+   - artifacts/desktop/package.json
+   - docs/MAC_DESKTOP_BUILD.md
+   - docs/DESKTOP_RELEASE.md
+   - docs/CHANGELOG.md
+14. Add or update root scripts:
+   - pnpm desktop:build:server
+   - pnpm desktop:check
+   - pnpm desktop:dev
+   - pnpm desktop:package
+15. Run all validations available in Replit:
+   - pnpm run typecheck
+   - pnpm run lint
+   - pnpm run test
+   - pnpm run build
+16. Clearly state that final arm64 macOS compilation and execution must still be verified on the Mac.
+
+Do not claim success based only on file existence.
+The packaged binary must execute successfully.
+
+Suggested commit:
+
+fix(desktop): replace unstable Node SEA pipeline with supported Tauri sidecar packaging

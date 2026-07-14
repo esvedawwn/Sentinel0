@@ -1,42 +1,39 @@
 /**
- * Builds the API server as a standalone Node.js SEA sidecar for Tauri bundling.
+ * build-server.mjs — packages the Express API as a self-contained macOS arm64
+ * binary using @yao-pkg/pkg.
  *
- * WHY we download an official Node.js binary instead of using process.execPath:
- *   Homebrew's node@22 build strips the SEA fuse marker
- *   (NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2) that postject requires.
- *   Only official builds from nodejs.org embed this marker.  We download the
- *   official arm64 tarball once, cache it in os.tmpdir(), and use THAT binary
- *   as the injection base — regardless of what Node.js the user has installed.
+ * WHY @yao-pkg/pkg instead of Node.js SEA/postject:
+ *   The SEA pipeline requires a Node.js binary that contains the SEA fuse
+ *   marker (NODE_SEA_FUSE_...).  Homebrew's node@22 strips this marker so
+ *   postject fails.  Even when an official binary is used and injection reports
+ *   success the resulting binary segfaults on arm64 macOS.
+ *
+ *   @yao-pkg/pkg (community-maintained fork of vercel/pkg) downloads a
+ *   precompiled Node.js runtime from its own CDN (cached in ~/.pkg-cache),
+ *   snapshots the application JS into the binary, and packages native .node
+ *   files as assets that are extracted to a temp directory at runtime.  No
+ *   SEA fuse, no postject, no external Node.js binary required.
  *
  * Steps:
- *   0. Remove any stale sidecar binary so a failed build never ships an old artifact
- *   1. Download / use cached official Node.js arm64 (pinned version)
- *   2. Preflight: verify SEA fuse marker is present in the official binary
- *   3. Bundle the Express server with esbuild → dist-sea/index.cjs
- *   4. Generate the SEA blob (node --experimental-sea-config)
- *   5. Copy the official binary, strip its signature, inject the blob with postject
- *   6. Treat postject non-zero exit as FATAL — never copy an invalid binary
- *   7. Post-injection: verify fuse marker is still present in the output binary
- *   8. Re-sign with an ad-hoc codesign signature
- *   9. Copy to src-tauri/binaries/ with the correct Rust target-triple suffix
- *  10. Smoke test: run the sidecar with SENTINEL_SMOKE_TEST=1 and require exit 0
+ *   0. Remove stale sidecar binary
+ *   1. Bundle API server with esbuild → artifacts/api-server/dist-sea/index.cjs
+ *   2. Write pkg-config.json (scripts + assets for pino workers)
+ *   3. Run @yao-pkg/pkg → self-contained node22-macos-arm64 binary
+ *   4. Verify binary exists and is plausible size (> 30 MB)
+ *   5. Smoke test  — SENTINEL_SMOKE_TEST=1 → print sentinel-sidecar-smoke-test: ok, exit 0
+ *   6. Health check — start sidecar on localhost, GET /api/healthz, require 200, shut down
  *
- * Requirements: Rust, curl, tar, codesign (macOS), pnpm
+ * Requirements: Rust, pnpm, curl (pkg CDN download on first run)
  *
- * Pinned runtime:  Node.js v22.16.0 darwin-arm64 (nodejs.org official build)
- *   Update SEA_NODE_VERSION to upgrade the sidecar runtime.
- *
- * Usage:  pnpm --filter @workspace/desktop run build:server
- *         (or via root alias: pnpm desktop:build:server)
+ * Usage:  pnpm desktop:build:server
  */
 
-import { execSync, spawnSync } from "child_process";
+import { execSync, spawnSync, spawn } from "child_process";
 import {
   copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
-  readFileSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -52,24 +49,6 @@ const DESKTOP   = join(__dirname, "..");
 const BIN_DIR   = join(DESKTOP, "src-tauri", "binaries");
 const DIST_SEA  = join(API_DIR, "dist-sea");
 
-// ── Pinned Node.js runtime ────────────────────────────────────────────────────
-// Source: https://nodejs.org/dist/  (official builds — NOT Homebrew)
-// Homebrew strips the SEA fuse marker; always use nodejs.org builds here.
-// Update this constant when upgrading the sidecar runtime.
-const SEA_NODE_VERSION = "22.16.0";
-const SEA_NODE_ARCH    = "darwin-arm64";
-const SEA_NODE_CACHE   = join(
-  os.tmpdir(),
-  `sentinel-sea-node-v${SEA_NODE_VERSION}-${SEA_NODE_ARCH}`
-);
-const SEA_NODE_BIN = join(
-  SEA_NODE_CACHE,
-  `node-v${SEA_NODE_VERSION}-${SEA_NODE_ARCH}`,
-  "bin",
-  "node"
-);
-const SEA_FUSE = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function fatal(msg) {
   console.error(`\nFATAL: ${msg}\n`);
@@ -82,18 +61,18 @@ function step(n, total, msg) {
 
 // ── Platform guard ────────────────────────────────────────────────────────────
 if (os.platform() !== "darwin") {
-  fatal(
-    "This build script targets macOS (darwin) only.\n" +
-    "       Linux / Windows support requires a separate download URL and binary name."
-  );
+  fatal("This build script targets macOS (darwin) only.");
 }
 if (os.arch() !== "arm64") {
   fatal(
-    "This script targets Apple Silicon (arm64).\n" +
-    `       Detected: ${os.arch()}.  For Intel Macs, set SEA_NODE_ARCH=darwin-x64 and\n` +
-    "       update SEA_NODE_VERSION / download URL accordingly."
+    `This script targets Apple Silicon (arm64). Detected: ${os.arch()}.\n` +
+    "       For Intel Macs, change PKG_TARGET to node22-macos-x64."
   );
 }
+
+// pkg target — @yao-pkg/pkg downloads its own Node.js runtime so this is
+// independent of the user's locally installed Node.js version or distribution.
+const PKG_TARGET = "node22-macos-arm64";
 
 // ── Rust target triple ────────────────────────────────────────────────────────
 let rustTarget;
@@ -106,14 +85,15 @@ try {
 if (!rustTarget) fatal("Could not parse Rust target triple from `rustc -vV`.");
 
 console.log(`\nSentinel sidecar build`);
-console.log(`  Rust target  : ${rustTarget}`);
-console.log(`  Node runtime : v${SEA_NODE_VERSION} ${SEA_NODE_ARCH} (official build)`);
-console.log(`  Output       : src-tauri/binaries/server-${rustTarget}`);
+console.log(`  Packaging  : @yao-pkg/pkg`);
+console.log(`  Pkg target : ${PKG_TARGET}`);
+console.log(`  Rust target: ${rustTarget}`);
+console.log(`  Output     : src-tauri/binaries/server-${rustTarget}`);
 
 const outputBin = join(BIN_DIR, `server-${rustTarget}`);
 
 // ── Step 0: Remove stale sidecar ─────────────────────────────────────────────
-step(0, 10, "Removing stale sidecar (if any)");
+step(0, 6, "Removing stale sidecar (if any)");
 if (existsSync(outputBin)) {
   rmSync(outputBin);
   console.log(`  Removed: ${outputBin}`);
@@ -121,71 +101,8 @@ if (existsSync(outputBin)) {
   console.log("  Nothing to remove");
 }
 
-// ── Step 1: Download / verify cached official Node.js binary ─────────────────
-step(1, 10, `Fetching official Node.js v${SEA_NODE_VERSION} ${SEA_NODE_ARCH}`);
-
-if (existsSync(SEA_NODE_BIN)) {
-  console.log(`  Using cache: ${SEA_NODE_BIN}`);
-} else {
-  const tarName = `node-v${SEA_NODE_VERSION}-${SEA_NODE_ARCH}.tar.gz`;
-  const tarUrl  = `https://nodejs.org/dist/v${SEA_NODE_VERSION}/${tarName}`;
-  const tarPath = join(os.tmpdir(), tarName);
-
-  console.log(`  Downloading: ${tarUrl}`);
-  mkdirSync(SEA_NODE_CACHE, { recursive: true });
-
-  try {
-    execSync(
-      `curl -L --fail --progress-bar --retry 3 --retry-delay 2 -o "${tarPath}" "${tarUrl}"`,
-      { stdio: "inherit" }
-    );
-  } catch {
-    fatal(
-      `Download failed for Node.js v${SEA_NODE_VERSION}.\n` +
-      `       URL: ${tarUrl}\n` +
-      `       If that version no longer exists, update SEA_NODE_VERSION in\n` +
-      `       artifacts/desktop/scripts/build-server.mjs and retry.\n` +
-      `       Available versions: https://nodejs.org/dist/`
-    );
-  }
-
-  execSync(`tar xzf "${tarPath}" -C "${SEA_NODE_CACHE}"`, { stdio: "inherit" });
-
-  if (!existsSync(SEA_NODE_BIN)) {
-    fatal(
-      `Expected binary not found after extraction: ${SEA_NODE_BIN}\n` +
-      `       The tarball may have a different internal layout.`
-    );
-  }
-  console.log(`  Cached at: ${SEA_NODE_BIN}`);
-}
-
-// Verify architecture of downloaded binary
-const fileOut = execSync(`file "${SEA_NODE_BIN}"`, { encoding: "utf8" }).trim();
-if (!fileOut.includes("arm64")) {
-  fatal(
-    `Downloaded binary does not appear to be arm64:\n       ${fileOut}\n` +
-    `       Delete the cache and retry: rm -rf "${SEA_NODE_CACHE}"`
-  );
-}
-console.log(`  Arch confirmed: ${fileOut.split(":")[1]?.trim()}`);
-
-// ── Step 2: Preflight — SEA fuse marker check ─────────────────────────────────
-step(2, 10, "Preflight: verifying SEA fuse marker in official binary");
-{
-  const binBytes = readFileSync(SEA_NODE_BIN);
-  if (binBytes.indexOf(Buffer.from(SEA_FUSE)) === -1) {
-    fatal(
-      `SEA fuse marker not found in ${SEA_NODE_BIN}.\n` +
-      `       This should not happen with an official nodejs.org build.\n` +
-      `       Delete the cache and retry: rm -rf "${SEA_NODE_CACHE}"`
-    );
-  }
-  console.log(`  ✓ ${SEA_FUSE}`);
-}
-
-// ── Step 3: Bundle API server ─────────────────────────────────────────────────
-step(3, 10, "Bundling API server with esbuild (format=cjs, outdir=dist-sea)");
+// ── Step 1: Bundle API server with esbuild ────────────────────────────────────
+step(1, 6, "Bundling API server with esbuild (format=cjs, outdir=dist-sea)");
 execSync(`node ./build.mjs --format=cjs --outdir=dist-sea`, {
   cwd: API_DIR,
   stdio: "inherit",
@@ -194,136 +111,114 @@ execSync(`node ./build.mjs --format=cjs --outdir=dist-sea`, {
 const seaMainCjs = join(DIST_SEA, "index.cjs");
 if (!existsSync(seaMainCjs)) {
   fatal(
-    `Expected SEA entry not found after build: ${seaMainCjs}\n` +
-    `       Verify that artifacts/api-server/src/index.ts is the esbuild entry point.`
+    `Expected entry not found after build: ${seaMainCjs}\n` +
+    "       Verify that artifacts/api-server/src/index.ts is the esbuild entry."
   );
 }
 const cjsFiles = readdirSync(DIST_SEA).filter((f) => f.endsWith(".cjs")).sort();
-console.log("  Generated CJS files:");
+console.log("  CJS files in dist-sea/:");
 cjsFiles.forEach((f) => console.log(`    ${f}`));
 
-// ── Step 4: Generate SEA blob ─────────────────────────────────────────────────
-step(4, 10, "Generating SEA blob");
-const blobPath = join(DIST_SEA, "sea-prep.blob");
-const seaConfigPath = join(DIST_SEA, "sea-config.json");
-writeFileSync(
-  seaConfigPath,
-  JSON.stringify(
-    {
-      main:                          seaMainCjs,
-      output:                        blobPath,
-      disableExperimentalSEAWarning: true,
-    },
-    null,
-    2
-  )
-);
+// ── Step 2: Write pkg-config.json ─────────────────────────────────────────────
+step(2, 6, "Writing pkg-config.json");
+// Include all generated .cjs worker files as scripts so pino's
+// path.join(__dirname, './pino-worker.cjs') references resolve correctly
+// inside the snapshot, even though NODE_ENV=production disables the
+// pino-pretty transport (workers are never spawned in production).
+const pkgConfig = {
+  scripts: cjsFiles
+    .filter((f) => f !== "index.cjs")
+    .map((f) => join("dist-sea", f)),
+  assets: [],
+};
+const pkgConfigPath = join(API_DIR, "pkg-config.json");
+writeFileSync(pkgConfigPath, JSON.stringify(pkgConfig, null, 2));
+console.log(`  Config: ${pkgConfigPath}`);
+console.log(`  Scripts: ${pkgConfig.scripts.join(", ") || "(none)"}`);
 
-execSync(`node --experimental-sea-config dist-sea/sea-config.json`, {
-  cwd: API_DIR,
-  stdio: "inherit",
-});
+// ── Step 3: Run @yao-pkg/pkg ──────────────────────────────────────────────────
+// Downloads pkg-cache node22 binary on first run (~70 MB, cached in ~/.pkg-cache).
+// Subsequent runs use the cached runtime.
+step(3, 6, `Running @yao-pkg/pkg (target: ${PKG_TARGET})`);
+console.log("  First run downloads the Node.js runtime — this may take a minute.");
 
-if (!existsSync(blobPath)) fatal(`SEA blob not created: ${blobPath}`);
-const blobSizeKB = Math.round(statSync(blobPath).size / 1024);
-console.log(`  ✓ Blob: ${blobPath} (${blobSizeKB} KB)`);
+mkdirSync(BIN_DIR, { recursive: true });
 
-// ── Step 5: Copy official binary → tmp, strip signature ──────────────────────
-step(5, 10, "Preparing injection base (copy + strip codesign)");
-const tmpBin = join(os.tmpdir(), "sentinel-sea-inject-tmp");
-
-copyFileSync(SEA_NODE_BIN, tmpBin);
-execSync(`chmod 755 "${tmpBin}"`);
-execSync(`codesign --remove-signature "${tmpBin}"`, { stdio: "inherit" });
-console.log(`  Injection base: ${tmpBin}`);
-
-// ── Step 6: Inject blob with postject — fatal on non-zero exit ────────────────
-step(6, 10, "Injecting SEA blob with postject");
-const postjectResult = spawnSync(
+const pkgResult = spawnSync(
   "npx",
   [
-    "--yes", "postject",
-    tmpBin,
-    "NODE_SEA_BLOB",
-    blobPath,
-    "--sentinel-fuse", SEA_FUSE,
-    "--macho-segment-name", "__NODE_SEA",
+    "--yes", "@yao-pkg/pkg@5",
+    join("dist-sea", "index.cjs"),
+    "--target", PKG_TARGET,
+    "--output", outputBin,
+    "--compress", "GZip",
+    "--config", "pkg-config.json",
   ],
-  { encoding: "utf8", stdio: "inherit" }
+  { cwd: API_DIR, encoding: "utf8", stdio: "inherit" }
 );
 
-if (postjectResult.error) {
-  fatal(`postject could not be launched: ${postjectResult.error.message}`);
+if (pkgResult.error) {
+  if (existsSync(outputBin)) rmSync(outputBin);
+  fatal(`@yao-pkg/pkg could not be launched: ${pkgResult.error.message}`);
 }
-if (postjectResult.status !== 0) {
-  // Clean up the tmp file so there is no chance of an invalid binary being
-  // picked up by a subsequent step.
-  try { rmSync(tmpBin); } catch { /* ignore */ }
+if (pkgResult.status !== 0) {
+  if (existsSync(outputBin)) rmSync(outputBin);
   fatal(
-    `postject exited with code ${postjectResult.status}.\n` +
-    `       The SEA blob was NOT injected.  No sidecar was produced.\n` +
-    `       Common causes:\n` +
-    `         • Node.js binary lacks the SEA fuse (should not happen with the\n` +
-    `           official binary — delete the cache and retry).\n` +
-    `         • Binary is still code-signed (codesign --remove-signature failed).\n` +
-    `         • postject version incompatible with Node.js v${SEA_NODE_VERSION}.`
+    `@yao-pkg/pkg exited with code ${pkgResult.status}.\n` +
+    "       No sidecar binary was produced.\n" +
+    "       Common causes:\n" +
+    "         • Network error downloading the Node.js runtime (~70 MB, first run only)\n" +
+    "         • Module not found: check that pnpm install was run in the repo root\n" +
+    "         • Unsupported target: verify @yao-pkg/pkg supports node22-macos-arm64"
   );
 }
-console.log("  ✓ postject exited 0");
 
-// ── Step 7: Post-injection verification ──────────────────────────────────────
-step(7, 10, "Verifying injection (fuse present in output binary)");
-{
-  const injected = readFileSync(tmpBin);
-  if (injected.indexOf(Buffer.from(SEA_FUSE)) === -1) {
-    try { rmSync(tmpBin); } catch { /* ignore */ }
-    fatal(
-      "Post-injection check failed: SEA fuse marker not found in the output binary.\n" +
-      "       Injection may have silently corrupted the binary.\n" +
-      "       Delete the cache and retry: rm -rf \"${SEA_NODE_CACHE}\""
-    );
-  }
-  const sizeKB = Math.round(statSync(tmpBin).size / 1024);
-  if (sizeKB < 5_000) {
-    fatal(
-      `Output binary is suspiciously small (${sizeKB} KB — expected > 5 000 KB).\n` +
-      "       The blob may not have been injected correctly."
-    );
-  }
-  console.log(`  ✓ Fuse marker confirmed in output binary (size: ${sizeKB} KB)`);
+// ── Step 4: Verify binary ─────────────────────────────────────────────────────
+step(4, 6, "Verifying binary");
+if (!existsSync(outputBin)) {
+  fatal(`Binary not found after pkg: ${outputBin}`);
 }
-
-// ── Step 8: Re-sign with ad-hoc signature ────────────────────────────────────
-step(8, 10, "Re-signing with ad-hoc codesign");
-execSync(`codesign --sign - "${tmpBin}"`, { stdio: "inherit" });
-console.log("  ✓ Ad-hoc codesign applied");
-
-// ── Step 9: Install sidecar ───────────────────────────────────────────────────
-step(9, 10, `Installing sidecar → ${outputBin}`);
-mkdirSync(BIN_DIR, { recursive: true });
-copyFileSync(tmpBin, outputBin);
+const sizeMB = statSync(outputBin).size / (1024 * 1024);
+if (sizeMB < 30) {
+  rmSync(outputBin);
+  fatal(
+    `Binary is too small (${sizeMB.toFixed(1)} MB — expected > 30 MB).\n` +
+    "       pkg may have failed silently. Check output above."
+  );
+}
 execSync(`chmod +x "${outputBin}"`);
-console.log(`  ✓ ${outputBin}`);
+console.log(`  ✓ ${outputBin} (${sizeMB.toFixed(0)} MB)`);
 
-// ── Step 10: Smoke test ───────────────────────────────────────────────────────
-// SENTINEL_SMOKE_TEST=1 triggers an early-exit banner injected by build.mjs into
-// the CJS bundle, which runs BEFORE any external require() (including @libsql).
-// This proves the SEA binary executes without crashing.
-step(10, 10, "Smoke test (SENTINEL_SMOKE_TEST=1)");
+// Verify it is an arm64 Mach-O executable
+const fileOut = execSync(`file "${outputBin}"`, { encoding: "utf8" }).trim();
+if (!fileOut.includes("arm64") && !fileOut.includes("Mach-O")) {
+  rmSync(outputBin);
+  fatal(`Binary does not appear to be a valid arm64 Mach-O executable:\n  ${fileOut}`);
+}
+console.log(`  ✓ ${fileOut.split(":")[1]?.trim()}`);
+
+// ── Step 5: Smoke test ────────────────────────────────────────────────────────
+// The CJS banner injected by build.mjs fires before any require() call,
+// so no native module (.node file) is loaded.  This proves the binary
+// executes without crashing and the JS entry point is intact.
+step(5, 6, "Smoke test (SENTINEL_SMOKE_TEST=1)");
 const smokeResult = spawnSync(outputBin, [], {
   env:      { ...process.env, SENTINEL_SMOKE_TEST: "1" },
   encoding: "utf8",
-  timeout:  15_000,
+  timeout:  20_000,
   cwd:      ROOT,
 });
 
 if (smokeResult.error) {
+  rmSync(outputBin);
   fatal(
-    `Smoke test could not launch: ${smokeResult.error.message}\n` +
-    `       Binary: ${outputBin}`
+    `Smoke test could not launch binary: ${smokeResult.error.message}\n` +
+    "       Possible cause: macOS Gatekeeper blocked the unsigned binary.\n" +
+    `       Try: xattr -cr "${outputBin}" then re-run.`
   );
 }
 if (smokeResult.status !== 0) {
+  rmSync(outputBin);
   fatal(
     `Smoke test exited with code ${smokeResult.status}.\n` +
     `  stdout: ${smokeResult.stdout?.trim()}\n` +
@@ -331,22 +226,128 @@ if (smokeResult.status !== 0) {
   );
 }
 const smokeOut = (smokeResult.stdout ?? "").trim();
-if (!smokeOut.includes("sentinel-sea-smoke-test: ok")) {
+if (!smokeOut.includes("sentinel-sidecar-smoke-test: ok")) {
+  rmSync(outputBin);
   fatal(
     `Smoke test did not print expected output.\n` +
-    `  Expected: "sentinel-sea-smoke-test: ok"\n` +
+    `  Expected: "sentinel-sidecar-smoke-test: ok"\n` +
     `  Got:      "${smokeOut}"`
   );
 }
 console.log(`  ✓ ${smokeOut}`);
 
+// ── Step 6: Health check ──────────────────────────────────────────────────────
+// Starts the sidecar on a temporary port with a temp SQLite DB, calls
+// /api/healthz, verifies 200, then shuts the server down.
+// Requires the native @libsql/darwin-arm64.node to be extracted and loaded.
+// If macOS Gatekeeper blocks the extracted .node file, this step will fail with
+// a clear error message explaining how to resolve it.
+step(6, 6, "Health check (start → GET /api/healthz → shut down)");
+
+const HEALTH_PORT = 38099;
+const HEALTH_DB   = join(os.tmpdir(), "sentinel-health-check.db");
+
+await new Promise((resolve, reject) => {
+  const proc = spawn(outputBin, [], {
+    env: {
+      ...process.env,
+      PORT:               String(HEALTH_PORT),
+      SENTINEL_DB_PATH:   HEALTH_DB,
+      NODE_ENV:           "production",
+      HOST:               "127.0.0.1",
+    },
+    cwd:   ROOT,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+  let stdout = "";
+  let stderr = "";
+  let settled = false;
+
+  proc.stdout.on("data", (d) => { stdout += d.toString(); });
+  proc.stderr.on("data", (d) => { stderr += d.toString(); });
+
+  proc.on("error", (err) => {
+    if (!settled) {
+      settled = true;
+      reject(new Error(`Sidecar process error: ${err.message}`));
+    }
+  });
+
+  proc.on("exit", (code, signal) => {
+    if (!settled) {
+      settled = true;
+      reject(
+        new Error(
+          `Sidecar exited unexpectedly (code=${code}, signal=${signal}).\n` +
+          `  stdout: ${stdout.slice(-800)}\n` +
+          `  stderr: ${stderr.slice(-800)}`
+        )
+      );
+    }
+  });
+
+  // Poll /api/healthz up to 30 seconds
+  const POLL_MS    = 750;
+  const MAX_POLLS  = 40;
+  let   polls      = 0;
+
+  const poll = async () => {
+    polls++;
+    try {
+      const resp = await fetch(`http://127.0.0.1:${HEALTH_PORT}/api/healthz`, {
+        signal: AbortSignal.timeout(2000),
+      });
+
+      if (!resp.ok) {
+        proc.kill("SIGTERM");
+        settled = true;
+        reject(new Error(`Health check returned HTTP ${resp.status} — expected 200`));
+        return;
+      }
+
+      const body = await resp.text().catch(() => "");
+      settled = true;
+      proc.kill("SIGTERM");
+      resolve(body);
+    } catch {
+      // Not ready yet
+      if (polls >= MAX_POLLS) {
+        proc.kill("SIGTERM");
+        settled = true;
+        reject(
+          new Error(
+            `Server did not respond on port ${HEALTH_PORT} after ${(POLL_MS * MAX_POLLS) / 1000}s.\n` +
+            `  stdout: ${stdout.slice(-800)}\n` +
+            `  stderr: ${stderr.slice(-800)}\n\n` +
+            "       Possible causes:\n" +
+            "         • macOS blocked the extracted @libsql/darwin-arm64.node file (Gatekeeper)\n" +
+            `           Fix: xattr -cr "${outputBin}" and rebuild\n` +
+            "         • Native module extraction failed: check stderr above\n" +
+            "         • Port 38099 is in use: lsof -i :38099"
+          )
+        );
+      } else {
+        setTimeout(poll, POLL_MS);
+      }
+    }
+  };
+
+  setTimeout(poll, POLL_MS);
+});
+
+console.log(`  ✓ GET http://127.0.0.1:${HEALTH_PORT}/api/healthz → 200`);
+// Clean up temp DB
+try { rmSync(HEALTH_DB, { force: true }); } catch { /* ignore */ }
+
 // ── Done ──────────────────────────────────────────────────────────────────────
 console.log(`
 ✅  Sidecar build complete
-    Binary : ${outputBin}
-    Runtime: Node.js v${SEA_NODE_VERSION} ${SEA_NODE_ARCH} (nodejs.org official)
+    Binary  : ${outputBin}
+    Size    : ${(statSync(outputBin).size / (1024 * 1024)).toFixed(0)} MB
+    Packager: @yao-pkg/pkg  (node22-macos-arm64)
 
 Next steps:
-    pnpm desktop:check          — verify full environment
-    pnpm desktop:build          — build Sentinel.app + .dmg
+    pnpm desktop:check     — verify full environment
+    pnpm desktop:build     — build Sentinel.app + .dmg
 `);
