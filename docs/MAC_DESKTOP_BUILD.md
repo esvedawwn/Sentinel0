@@ -254,12 +254,14 @@ cargo check --manifest-path src-tauri/Cargo.toml
 | Problem | Fix |
 |---------|-----|
 | `server sidecar not found` | Run `pnpm desktop:build:server` first |
+| App crashes immediately on launch | Check terminal output — if you see `unknown field 'all'` or `PluginInitialization("shell", ...)`, you have a stale binary built from old config. Pull latest, rebuild with `pnpm desktop:build`. |
 | `zsh: segmentation fault` when running sidecar | Old SEA binary still in place — run `pnpm desktop:build:server` to rebuild with pkg |
 | pkg download fails on first run | Internet connectivity issue — retry `pnpm desktop:build:server` |
 | Smoke test fails | Binary didn't execute — check if macOS blocked it: `xattr -cr <binary>` |
 | Health check timeout | `@libsql/darwin-arm64.node` blocked by Gatekeeper: `xattr -cr <binary>` then retry |
 | `FATAL: @libsql/darwin-arm64 is not installed` | Should no longer happen — step 2.5 auto-installs it. If it does, run `pnpm install` then retry |
 | `FATAL: @yao-pkg/pkg exited ...` | See stdout — usually a missing module; ensure `pnpm install` ran |
+| `@rollup/rollup-darwin-arm64` not found | Run `pnpm install` — the lockfile now includes darwin packages; a missing module means pnpm install was skipped |
 | `error: linker 'cc' not found` | `xcode-select --install` |
 | App opens but API fails | Check that port 38080 isn't in use (`lsof -i :38080`) |
 | Gatekeeper blocks app | `codesign --force --deep --sign - Sentinel.app` |

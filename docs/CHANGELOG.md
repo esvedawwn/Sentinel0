@@ -7,6 +7,33 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.7.4-alpha] — 2026-07-14 — Fix Tauri shell plugin crash on macOS launch
+
+### Fixed
+
+#### `artifacts/desktop/src-tauri/tauri.conf.json`
+- **Root cause**: `plugins.shell` block contained `"all": false` and `"scope": [...]`,
+  which are Tauri v1 fields.  The `tauri-plugin-shell` v2 deserializer only accepts
+  `"open"` under `plugins.shell`, so the app panicked immediately on launch with
+  `PluginInitialization("shell", "Error deserializing 'plugins.shell' within your Tauri
+  configuration: unknown field 'all', expected 'open'")`.
+- **Fix**: removed the entire `plugins.shell` block.  The sidecar is already declared
+  in `bundle.externalBin: ["binaries/server"]`; no further plugin config is needed.
+  Sidecar execution is gated by capability permissions, not by `plugins.shell.scope`.
+
+#### `artifacts/desktop/src-tauri/capabilities/default.json`
+- Removed `shell:allow-open` (Sentinel never opens external URLs or files via the
+  shell plugin).
+- Added `shell:allow-spawn` and `shell:allow-kill` alongside the existing
+  `shell:allow-execute` so all sidecar lifecycle operations are explicitly permitted.
+
+#### `artifacts/desktop/src-tauri/src/lib.rs`
+- Replaced the terminal `.expect("error while running tauri application")` with
+  `unwrap_or_else` that logs the error to stderr and exits with code 1, so plugin
+  configuration errors are human-readable rather than producing an opaque panic.
+
+---
+
 ## [v0.7.3-alpha] — 2026-07-14 — Fix @libsql/darwin-arm64 MODULE_NOT_FOUND in pkg binary
 
 ### Fixed

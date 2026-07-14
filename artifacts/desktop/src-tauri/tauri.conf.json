@@ -35,19 +35,5 @@
       "icons/icon.ico"
     ],
     "externalBin": ["binaries/server"]
-  },
-  "plugins": {
-    "shell": {
-      "all": false,
-      "open": false,
-      "scope": [
-        {
-          "name": "server",
-          "cmd": "binaries/server",
-          "args": true,
-          "sidecar": true
-        }
-      ]
-    }
   }
 }
