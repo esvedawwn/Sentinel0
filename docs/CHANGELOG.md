@@ -7,6 +7,31 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [v0.7.3-alpha] — 2026-07-14 — Fix @libsql/darwin-arm64 MODULE_NOT_FOUND in pkg binary
+
+### Fixed
+
+#### `artifacts/desktop/scripts/build-server.mjs` — step 2.5 added
+- **Root cause**: `@libsql/client` selects its native binding with a fully dynamic
+  `require(mod)` where `mod = '@libsql/${platform}-${arch}'` is assembled at runtime.
+  pkg cannot statically detect this pattern, so it never included `@libsql/darwin-arm64`
+  in the binary snapshot.  Additionally, pnpm stores packages in a nested virtual store
+  (`.pnpm/`) whose symlinks pkg does not traverse for native `.node` files.
+- **Fix**: new step 2.5 copies every resolvable `@libsql/*` package into
+  `dist-sea/node_modules/` as real files (using `cpSync` with `dereference:true` to
+  follow and expand all pnpm symlinks).  pkg then resolves the full chain
+  `index.cjs → @libsql/client → @libsql/darwin-arm64 → darwin-arm64.node` through
+  normal Node.js resolution from the bundle's own directory, and automatically detects
+  and packages the `.node` file as a snapshot asset extracted at runtime.
+- Staging directory (`dist-sea/node_modules/`) is cleaned at step 0 (before esbuild)
+  and removed again immediately after pkg finishes, so it never pollutes the workspace.
+- All `@libsql/*` packages not available on the build platform (e.g. `linux-x64-gnu`
+  on macOS arm64) are silently skipped.
+- Build is fatal if `@libsql/darwin-arm64` is not resolvable (likely means
+  `pnpm install` has not been run).
+
+---
+
 ## [v0.7.2-alpha] — 2026-07-12 — Replace SEA/postject pipeline with @yao-pkg/pkg sidecar
 
 ### Fixed

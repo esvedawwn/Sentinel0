@@ -1,0 +1,235 @@
+        Warn Waiting for your frontend dev server to start on http://localhost:18756/...
+/Users/sarahdawn/Developer/Sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 dev: `tauri dev`
+Command failed with signal "SIGINT"
+[ELIFECYCLE] Command failed.
+
+sarahdawn@sarahs-MacBook-Pro Sentinel % cd ~/Developer/Sentinel
+sarahdawn@sarahs-MacBook-Pro Sentinel % git fetch origin
+sarahdawn@sarahs-MacBook-Pro Sentinel % git reset --hard origin/main
+HEAD is now at c727607 Update macOS build process to reliably package the server sidecar
+sarahdawn@sarahs-MacBook-Pro Sentinel % git clean -fd
+Removing artifacts/desktop/src-tauri/binaries/
+sarahdawn@sarahs-MacBook-Pro Sentinel % grep -n -E "@yao-pkg|postject|experimental-sea" \
+artifacts/desktop/scripts/build-server.mjs
+6: *   (NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2) that postject requires.
+16: *   4. Generate the SEA blob (node --experimental-sea-config)
+17: *   5. Copy the official binary, strip its signature, inject the blob with postject
+18: *   6. Treat postject non-zero exit as FATAL — never copy an invalid binary
+222:execSync(`node --experimental-sea-config dist-sea/sea-config.json`, {
+240:// ── Step 6: Inject blob with postject — fatal on non-zero exit ────────────────
+241:step(6, 10, "Injecting SEA blob with postject");
+242:const postjectResult = spawnSync(
+245:    "--yes", "postject",
+255:if (postjectResult.error) {
+256:  fatal(`postject could not be launched: ${postjectResult.error.message}`);
+258:if (postjectResult.status !== 0) {
+263:    `postject exited with code ${postjectResult.status}.\n` +
+269:    `         • postject version incompatible with Node.js v${SEA_NODE_VERSION}.`
+272:console.log("  ✓ postject exited 0");
+sarahdawn@sarahs-MacBook-Pro Sentinel % git status
+git log -3 --oneline
+grep -n -E "@yao-pkg|postject|experimental-sea" artifacts/desktop/scripts/build-server.mjs
+On branch main
+Your branch is up to date with 'origin/main'.
+
+nothing to commit, working tree clean
+c727607 (HEAD -> main, origin/main, origin/HEAD) Update macOS build process to reliably package the server sidecar
+ec9c6ec Add check for Node.js binary compatibility for packaging
+0c26440 Fix file permission issues when injecting SEA blob
+6: *   (NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2) that postject requires.
+16: *   4. Generate the SEA blob (node --experimental-sea-config)
+17: *   5. Copy the official binary, strip its signature, inject the blob with postject
+18: *   6. Treat postject non-zero exit as FATAL — never copy an invalid binary
+222:execSync(`node --experimental-sea-config dist-sea/sea-config.json`, {
+240:// ── Step 6: Inject blob with postject — fatal on non-zero exit ────────────────
+241:step(6, 10, "Injecting SEA blob with postject");
+242:const postjectResult = spawnSync(
+245:    "--yes", "postject",
+255:if (postjectResult.error) {
+256:  fatal(`postject could not be launched: ${postjectResult.error.message}`);
+258:if (postjectResult.status !== 0) {
+263:    `postject exited with code ${postjectResult.status}.\n` +
+269:    `         • postject version incompatible with Node.js v${SEA_NODE_VERSION}.`
+272:console.log("  ✓ postject exited 0");
+sarahdawn@sarahs-MacBook-Pro Sentinel % cd ~/Developer/Sentinel
+git fetch origin
+git reset --hard origin/main
+git clean -fd
+remote: Enumerating objects: 39, done.
+remote: Counting objects: 100% (39/39), done.
+remote: Compressing objects: 100% (7/7), done.
+remote: Total 21 (delta 13), reused 21 (delta 13), pack-reused 0 (from 0)
+Unpacking objects: 100% (21/21), 20.15 KiB | 687.00 KiB/s, done.
+From https://github.com/esvedawwn/sentinel
+   c727607..cfc9de2  main       -> origin/main
+HEAD is now at cfc9de2 Replace unstable Node SEA pipeline with @yao-pkg/pkg sidecar
+sarahdawn@sarahs-MacBook-Pro Sentinel % grep -n -E "@yao-pkg|postject|experimental-sea" \
+artifacts/desktop/scripts/build-server.mjs
+3: * binary using @yao-pkg/pkg.
+5: * WHY @yao-pkg/pkg instead of Node.js SEA/postject:
+8: *   postject fails.  Even when an official binary is used and injection reports
+11: *   @yao-pkg/pkg (community-maintained fork of vercel/pkg) downloads a
+15: *   SEA fuse, no postject, no external Node.js binary required.
+21: *   3. Run @yao-pkg/pkg → self-contained node22-macos-arm64 binary
+73:// pkg target — @yao-pkg/pkg downloads its own Node.js runtime so this is
+88:console.log(`  Packaging  : @yao-pkg/pkg`);
+139:// ── Step 3: Run @yao-pkg/pkg ──────────────────────────────────────────────────
+142:step(3, 6, `Running @yao-pkg/pkg (target: ${PKG_TARGET})`);
+150:    "--yes", "@yao-pkg/pkg@5",
+162:  fatal(`@yao-pkg/pkg could not be launched: ${pkgResult.error.message}`);
+167:    `@yao-pkg/pkg exited with code ${pkgResult.status}.\n` +
+172:    "         • Unsupported target: verify @yao-pkg/pkg supports node22-macos-arm64"
+348:    Packager: @yao-pkg/pkg  (node22-macos-arm64)
+sarahdawn@sarahs-MacBook-Pro Sentinel % pnpm install
+Scope: all 10 workspace projects
+✓ Lockfile passes supply-chain policies (751 entries in 2.6s)
+Lockfile is up to date, resolution step is skipped
+Packages: +62
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 62, reused 0, downloaded 62, added 62, done
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 36ms
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.3
+
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+sarahdawn@sarahs-MacBook-Pro Sentinel % pnpm desktop:build:server
+Scope: all 10 workspace projects
+✓ Lockfile passes supply-chain policies (verified 6s ago)
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 37ms
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.3
+
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+[ERROR] Command failed with exit code 1: pnpm install
+
+pnpm: Command failed with exit code 1: pnpm install
+    at getFinalError (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:36343:14)
+    at makeError (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:38650:21)
+    at getSyncResult (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:40494:10)
+    at spawnSubprocessSync (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:40454:14)
+    at execaCoreSync (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:40384:23)
+    at callBoundExeca (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:42912:23)
+    at boundExeca (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:42889:49)
+    at sync (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:43044:14)
+    at runPnpmCli (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:247932:5)
+    at runDepsStatusCheck (file:///opt/homebrew/Cellar/pnpm/11.12.0/libexec/lib/node_modules/pnpm/dist/pnpm.mjs:249680:7)
+sarahdawn@sarahs-MacBook-Pro Sentinel % cd ~/Developer/Sentinel
+sarahdawn@sarahs-MacBook-Pro Sentinel % pnpm approve-builds
+✔ Choose which packages to build (Press <space> to select, <a> to toggle all, <i
+> to invert selection) esbuild
+✔ The next packages will now be built: esbuild.
+Do you approve? Yes
+node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild: Running postinstall script, done in 1s
+sarahdawn@sarahs-MacBook-Pro Sentinel % pnpm install
+Scope: all 10 workspace projects
+Already up to date
+Done in 383ms using pnpm v11.12.0
+sarahdawn@sarahs-MacBook-Pro Sentinel % pnpm desktop:build:server
+$ pnpm --filter @workspace/desktop run build:server
+$ node scripts/build-server.mjs
+
+Sentinel sidecar build
+  Packaging  : @yao-pkg/pkg
+  Pkg target : node22-macos-arm64
+  Rust target: aarch64-apple-darwin
+  Output     : src-tauri/binaries/server-aarch64-apple-darwin
+
+[0/6] Removing stale sidecar (if any)
+  Nothing to remove
+
+[1/6] Bundling API server with esbuild (format=cjs, outdir=dist-sea)
+
+  dist-sea/index.cjs                       2.2mb ⚠️
+  dist-sea/pino-worker.cjs               152.4kb
+  dist-sea/pino-file.cjs                 141.4kb
+  dist-sea/pino-pretty.cjs               113.7kb
+  dist-sea/thread-stream-worker.cjs        6.8kb
+  dist-sea/index.cjs.map                   3.9mb
+  dist-sea/pino-worker.cjs.map           258.4kb
+  dist-sea/pino-file.cjs.map             230.4kb
+  dist-sea/pino-pretty.cjs.map           206.2kb
+  dist-sea/thread-stream-worker.cjs.map   12.2kb
+
+⚡ Done in 186ms
+  CJS files in dist-sea/:
+    index.cjs
+    pino-file.cjs
+    pino-pretty.cjs
+    pino-worker.cjs
+    thread-stream-worker.cjs
+
+[2/6] Writing pkg-config.json
+  Config: /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/pkg-config.json
+  Scripts: dist-sea/pino-file.cjs, dist-sea/pino-pretty.cjs, dist-sea/pino-worker.cjs, dist-sea/thread-stream-worker.cjs
+
+[3/6] Running @yao-pkg/pkg (target: node22-macos-arm64)
+  First run downloads the Node.js runtime — this may take a minute.
+> pkg@5.16.1
+compression:  GZip
+> Fetching base Node.js binaries to PKG_CACHE_PATH
+  fetched-v22.10.0-macos-arm64        [====================] 100%
+
+> Warning Cannot resolve 'mod'
+  /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/dist-sea/index.cjs
+  Dynamic require may fail at run time, because the requested file
+  is unknown at compilation time and not included into executable.
+  Use a string literal as an argument for 'require', or leave it
+  as is and specify the resolved file name in 'scripts' option.
+> Warning Cannot resolve 'modulePath'
+  /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/dist-sea/pino-worker.cjs
+  Dynamic require may fail at run time, because the requested file
+  is unknown at compilation time and not included into executable.
+  Use a string literal as an argument for 'require', or leave it
+  as is and specify the resolved file name in 'scripts' option.
+> Warning Cannot resolve 'modulePath'
+  /Users/sarahdawn/Developer/Sentinel/artifacts/api-server/dist-sea/thread-stream-worker.cjs
+  Dynamic require may fail at run time, because the requested file
+  is unknown at compilation time and not included into executable.
+  Use a string literal as an argument for 'require', or leave it
+  as is and specify the resolved file name in 'scripts' option.
+
+[4/6] Verifying binary
+  ✓ /Users/sarahdawn/Developer/Sentinel/artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin (66 MB)
+  ✓ Mach-O 64-bit executable arm64
+
+[5/6] Smoke test (SENTINEL_SMOKE_TEST=1)
+  ✓ sentinel-sidecar-smoke-test: ok
+
+[6/6] Health check (start → GET /api/healthz → shut down)
+file:///Users/sarahdawn/Developer/Sentinel/artifacts/desktop/scripts/build-server.mjs:281
+        new Error(
+        ^
+
+Error: Sidecar exited unexpectedly (code=1, signal=null).
+  stdout: 
+  stderr: rnal/modules/cjs/loader:1079:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:315:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:218:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1344:12)
+    at Module.require (pkg/prelude/bootstrap.js:1851:31)
+    at require (node:internal/modules/helpers:141:16)
+    at Object.<anonymous> (/snapshot/Sentinel/node_modules/.pnpm/@libsql+client@0.17.4/node_modules/@libsql/client/lib-cjs/node.js:18:18)
+    at Module._compile (pkg/prelude/bootstrap.js:1930:22) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/snapshot/Sentinel/node_modules/.pnpm/@libsql+client@0.17.4/node_modules/@libsql/client/lib-cjs/node.js',
+    '/snapshot/Sentinel/artifacts/api-server/dist-sea/index.cjs'
+  ],
+  pkg: true
+}
+
+Node.js v22.10.0
+
+    at ChildProcess.<anonymous> (file:///Users/sarahdawn/Developer/Sentinel/artifacts/desktop/scripts/build-server.mjs:281:9)
+    at ChildProcess.emit (node:events:519:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+Node.js v22.23.1
+/Users/sarahdawn/Developer/Sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 build:server: `node scripts/build-server.mjs`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro Sentinel % 
