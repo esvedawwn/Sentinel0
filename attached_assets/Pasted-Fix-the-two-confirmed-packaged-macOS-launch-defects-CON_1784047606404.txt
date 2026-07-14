@@ -1,0 +1,109 @@
+Fix the two confirmed packaged macOS launch defects.
+
+CONFIRMED DEFECT 1 — TAURI SHELL CONFIGURATION
+
+The packaged app crashes immediately with:
+
+PluginInitialization(
+  "shell",
+  "Error deserializing 'plugins.shell' within your Tauri configuration:
+  unknown field `all`, expected `open`"
+)
+
+The current Tauri configuration still contains:
+
+"plugins": {
+  "shell": {
+    "all": false
+  }
+}
+
+The `all` property is invalid even when false.
+
+Requirements:
+
+1. Search every Tauri configuration file for plugins.shell and "all":
+   - artifacts/desktop/src-tauri/tauri.conf.json
+   - artifacts/desktop/src-tauri/tauri.*.conf.json
+   - artifacts/desktop/src-tauri/capabilities/*.json
+   - generated configuration sources
+
+2. Completely remove the unsupported `all` property.
+
+3. If shell.open is genuinely required, configure only:
+   "plugins": {
+     "shell": {
+       "open": true
+     }
+   }
+
+4. If shell.open is not required, remove the plugins.shell configuration entirely.
+
+5. Keep sidecar execution permission narrowly defined through Tauri v2 capabilities.
+   Do not enable unrestricted shell access.
+
+6. Add a validation step that fails the build if any Tauri shell configuration contains an `all` property.
+
+CONFIRMED DEFECT 2 — DATABASE INITIALISATION ORDER
+
+The bundled sidecar launches and listens on port 38080, but logs:
+
+SQLITE_ERROR: no such table: scans
+
+It attempts to run cleanupInterruptedScans before the SQLite schema has been initialised.
+
+Requirements:
+
+1. Locate application startup and database initialisation code.
+
+2. Ensure startup order is:
+
+   a. Resolve application data directory
+   b. Create the directory
+   c. Open SQLite database
+   d. Run all migrations / schema initialisation
+   e. Verify required tables exist
+   f. Only then run cleanupInterruptedScans
+   g. Start accepting API requests
+
+3. The database should be stored in:
+   ~/Library/Application Support/dev.sentinel.app/sentinel.db
+
+4. On a brand-new installation, create every required table automatically.
+
+5. Do not treat an empty database as a fatal application error.
+
+6. Add a schema-version or migrations table.
+
+7. Add a startup test using a completely empty temporary database and verify:
+   - migrations run
+   - scans table exists
+   - cleanupInterruptedScans succeeds
+   - /api/healthz returns 200
+
+8. Add a packaged application launch test that:
+   - launches Sentinel.app
+   - keeps it alive for at least 10 seconds
+   - confirms the main window exists
+   - confirms the sidecar is listening
+   - confirms database migrations completed
+
+9. Replace recoverable startup unwrap/expect calls with clear logging where practical.
+
+10. Run:
+    pnpm run typecheck
+    pnpm run lint
+    pnpm run test
+    pnpm desktop:build:server
+    pnpm desktop:build
+
+11. Update:
+    docs/MAC_DESKTOP_BUILD.md
+    docs/DESKTOP_RELEASE.md
+    docs/CHANGELOG.md
+
+Do not claim completion unless the newly packaged Sentinel.app launches on macOS with a blank Application Support database.
+
+Suggested commit:
+
+fix(desktop): correct shell config and initialise database before startup

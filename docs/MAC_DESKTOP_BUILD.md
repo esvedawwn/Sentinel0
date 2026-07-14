@@ -254,7 +254,8 @@ cargo check --manifest-path src-tauri/Cargo.toml
 | Problem | Fix |
 |---------|-----|
 | `server sidecar not found` | Run `pnpm desktop:build:server` first |
-| App crashes immediately on launch | Check terminal output — if you see `unknown field 'all'` or `PluginInitialization("shell", ...)`, you have a stale binary built from old config. Pull latest, rebuild with `pnpm desktop:build`. |
+| App crashes immediately on launch | You have a stale binary built before the config fix. Run `git pull && pnpm desktop:build` to rebuild. |
+| `SQLITE_ERROR: no such table: scans` | Fresh database with no schema — this is now fixed. Pull latest and rebuild: `git pull && pnpm desktop:build:server && pnpm desktop:build`. |
 | `zsh: segmentation fault` when running sidecar | Old SEA binary still in place — run `pnpm desktop:build:server` to rebuild with pkg |
 | pkg download fails on first run | Internet connectivity issue — retry `pnpm desktop:build:server` |
 | Smoke test fails | Binary didn't execute — check if macOS blocked it: `xattr -cr <binary>` |

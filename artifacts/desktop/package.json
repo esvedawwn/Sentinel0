@@ -5,9 +5,10 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "node scripts/check-tauri-config.mjs && tauri build",
     "build:server": "node scripts/build-server.mjs",
     "check": "node scripts/check-desktop-env.mjs",
+    "check:tauri-config": "node scripts/check-tauri-config.mjs",
     "make-icons": "node scripts/make-icons.mjs",
     "typecheck": "echo 'Desktop package has no TypeScript sources to check (Rust + shell scripts only).'"
   },

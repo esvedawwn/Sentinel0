@@ -10,6 +10,7 @@
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
+    "codegen:migrations": "drizzle-kit generate --config ./drizzle.config.ts && node scripts/codegen-migrations.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },

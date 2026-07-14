@@ -15,10 +15,11 @@ function getDbPath(): string {
 const dbPath = getDbPath();
 mkdirSync(path.dirname(dbPath), { recursive: true });
 
-const client = createClient({
+export const client = createClient({
   url: `file:${dbPath}`,
 });
 
 export const db = drizzle({ client, schema });
 
+export { runMigrations } from "./migrate";
 export * from "./schema";
