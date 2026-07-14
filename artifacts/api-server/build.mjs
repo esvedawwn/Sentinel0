@@ -71,13 +71,18 @@ async function buildAll() {
       "dtrace-provider",
       "isolated-vm",
       "lightningcss",
-      "@libsql/client",
+      // @libsql/client and libsql are intentionally NOT external so esbuild
+      // bundles their JS into index.cjs.  The dynamic platform require inside
+      // libsql/index.js — require(`@libsql/${target}`) — must resolve from the
+      // bundle's own directory (dist-sea/) at runtime, not from the pnpm store
+      // path deep in the snapshot, so pkg can find the staged .node file.
+      // The platform packages below remain external so that dynamic require
+      // is preserved in the bundle and resolved at runtime by pkg.
       "@libsql/linux-x64-gnu",
       "@libsql/linux-arm64-gnu",
       "@libsql/darwin-arm64",
       "@libsql/darwin-x64",
       "@libsql/win32-x64-msvc",
-      "libsql",
       "pg-native",
       "oracledb",
       "mongodb-client-encryption",

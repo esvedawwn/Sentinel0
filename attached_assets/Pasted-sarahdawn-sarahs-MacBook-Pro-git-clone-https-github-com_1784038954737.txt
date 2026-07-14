@@ -1,0 +1,288 @@
+sarahdawn@sarahs-MacBook-Pro ~ % git clone https://github.com/esvedawwn/Sentinel0.git sentinel 
+Cloning into 'sentinel'...
+warning: You appear to have cloned an empty repository.
+sarahdawn@sarahs-MacBook-Pro ~ % cd sentinel
+sarahdawn@sarahs-MacBook-Pro sentinel % git clone https://github.com/esvedawwn/sentinel0.git sentinel
+cd sentinel
+pnpm install
+Cloning into 'sentinel'...
+remote: Enumerating objects: 1414, done.
+remote: Counting objects: 100% (1414/1414), done.
+remote: Compressing objects: 100% (680/680), done.
+remote: Total 1414 (delta 677), reused 1414 (delta 677), pack-reused 0 (from 0)
+Receiving objects: 100% (1414/1414), 4.97 MiB | 4.05 MiB/s, done.
+Resolving deltas: 100% (677/677), done.
+Scope: all 10 workspace projects
+✓ Lockfile passes supply-chain policies (751 entries in 3.5s)
+Lockfile is up to date, resolution step is skipped
+Packages: +728
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 728, reused 728, downloaded 0, added 728, done
+
+dependencies:
++ @replit/connectors-sdk 0.4.1
+
+devDependencies:
++ @eslint/js 10.0.1
++ @testing-library/jest-dom 6.9.1
++ @testing-library/react 16.3.2
++ @vitejs/plugin-react 5.2.0
++ @vitest/coverage-v8 4.1.10
++ eslint 10.6.0
++ eslint-plugin-react-hooks 7.1.1
++ jsdom 29.1.1
++ prettier 3.8.4
++ typescript 5.9.3
++ typescript-eslint 8.63.0
++ vitest 4.1.10
+
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 40ms
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.3
+
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm approve-builds
+✔ Choose which packages to build (Press <space> to select, <a> to toggle all, <i
+> to invert selection) esbuild
+✔ The next packages will now be built: esbuild.
+Do you approve? Yes
+node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild: Running postinstall script, done in 630ms
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm install
+Scope: all 10 workspace projects
+✓ Lockfile passes supply-chain policies (verified 55s ago)
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 36ms
+Done in 931ms using pnpm v11.12.0
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm desktop:build:server
+$ pnpm --filter @workspace/desktop run build:server
+$ node scripts/build-server.mjs
+
+Sentinel sidecar build
+  Packaging  : @yao-pkg/pkg
+  Pkg target : node22-macos-arm64
+  Rust target: aarch64-apple-darwin
+  Output     : src-tauri/binaries/server-aarch64-apple-darwin
+
+[0/7] Removing stale sidecar (if any)
+  Nothing to remove
+
+[1/7] Bundling API server with esbuild (format=cjs, outdir=dist-sea)
+
+  dist-sea/index.cjs                       2.2mb ⚠️
+  dist-sea/pino-worker.cjs               152.4kb
+  dist-sea/pino-file.cjs                 141.4kb
+  dist-sea/pino-pretty.cjs               113.7kb
+  dist-sea/thread-stream-worker.cjs        6.8kb
+  dist-sea/index.cjs.map                   3.9mb
+  dist-sea/pino-worker.cjs.map           258.4kb
+  dist-sea/pino-file.cjs.map             230.4kb
+  dist-sea/pino-pretty.cjs.map           206.2kb
+  dist-sea/thread-stream-worker.cjs.map   12.2kb
+
+⚡ Done in 126ms
+  CJS files in dist-sea/:
+    index.cjs
+    pino-file.cjs
+    pino-pretty.cjs
+    pino-worker.cjs
+    thread-stream-worker.cjs
+
+[2/7] Writing pkg-config.json
+  Scripts: dist-sea/pino-file.cjs, dist-sea/pino-pretty.cjs, dist-sea/pino-worker.cjs, dist-sea/thread-stream-worker.cjs
+
+[2.5/7] Staging @libsql/* packages into dist-sea/node_modules/
+
+FATAL: @libsql/darwin-arm64 is not installed in this workspace.
+       Run:  pnpm install  then retry.
+
+/Users/sarahdawn/sentinel/sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 build:server: `node scripts/build-server.mjs`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro sentinel % cd sentinel
+cd: no such file or directory: sentinel
+sarahdawn@sarahs-MacBook-Pro sentinel % git pull
+remote: Enumerating objects: 18, done.
+remote: Counting objects: 100% (18/18), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 10 (delta 7), reused 10 (delta 7), pack-reused 0 (from 0)
+Unpacking objects: 100% (10/10), 3.79 KiB | 298.00 KiB/s, done.
+From https://github.com/esvedawwn/sentinel0
+   d980287..8525202  main       -> origin/main
+Updating d980287..8525202
+Fast-forward
+ artifacts/desktop/scripts/build-server.mjs         |  57 ++++++++++-
+ ...ro-git-clone-https-github-com_1784035900566.txt | 104 +++++++++++++++++++++
+ docs/MAC_DESKTOP_BUILD.md                          |   1 +
+ 3 files changed, 159 insertions(+), 3 deletions(-)
+ create mode 100644 attached_assets/Pasted-sarahdawn-sarahs-MacBook-Pro-git-clone-https-github-com_1784035900566.txt
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm desktop:build:server
+$ pnpm --filter @workspace/desktop run build:server
+$ node scripts/build-server.mjs
+
+Sentinel sidecar build
+  Packaging  : @yao-pkg/pkg
+  Pkg target : node22-macos-arm64
+  Rust target: aarch64-apple-darwin
+  Output     : src-tauri/binaries/server-aarch64-apple-darwin
+
+[0/7] Removing stale sidecar (if any)
+  Nothing to remove
+
+[1/7] Bundling API server with esbuild (format=cjs, outdir=dist-sea)
+
+  dist-sea/index.cjs                       2.2mb ⚠️
+  dist-sea/pino-worker.cjs               152.4kb
+  dist-sea/pino-file.cjs                 141.4kb
+  dist-sea/pino-pretty.cjs               113.7kb
+  dist-sea/thread-stream-worker.cjs        6.8kb
+  dist-sea/index.cjs.map                   3.9mb
+  dist-sea/pino-worker.cjs.map           258.4kb
+  dist-sea/pino-file.cjs.map             230.4kb
+  dist-sea/pino-pretty.cjs.map           206.2kb
+  dist-sea/thread-stream-worker.cjs.map   12.2kb
+
+⚡ Done in 149ms
+  CJS files in dist-sea/:
+    index.cjs
+    pino-file.cjs
+    pino-pretty.cjs
+    pino-worker.cjs
+    thread-stream-worker.cjs
+
+[2/7] Writing pkg-config.json
+  Scripts: dist-sea/pino-file.cjs, dist-sea/pino-pretty.cjs, dist-sea/pino-worker.cjs, dist-sea/thread-stream-worker.cjs
+
+[2.5/7] Staging @libsql/* packages into dist-sea/node_modules/
+
+FATAL: Neither @libsql/darwin-arm64 nor libsql is resolvable from the API server.
+       Ensure pnpm install ran successfully in the repo root, then retry.
+
+/Users/sarahdawn/sentinel/sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 build:server: `node scripts/build-server.mjs`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro sentinel % git pull
+remote: Enumerating objects: 14, done.
+remote: Counting objects: 100% (14/14), done.
+remote: Compressing objects: 100% (3/3), done.
+remote: Total 8 (delta 5), reused 8 (delta 5), pack-reused 0 (from 0)
+Unpacking objects: 100% (8/8), 3.38 KiB | 314.00 KiB/s, done.
+From https://github.com/esvedawwn/sentinel0
+   8525202..170d3bf  main       -> origin/main
+Updating 8525202..170d3bf
+Fast-forward
+ artifacts/desktop/scripts/build-server.mjs         | 154 +++++++++------------
+ ...ktop-scripts-build-server-mjs_1784036455908.txt |  53 +++++++
+ 2 files changed, 122 insertions(+), 85 deletions(-)
+ create mode 100644 attached_assets/Pasted-Fast-forward-artifacts-desktop-scripts-build-server-mjs_1784036455908.txt
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm desktop:build:server
+$ pnpm --filter @workspace/desktop run build:server
+$ node scripts/build-server.mjs
+
+Sentinel sidecar build
+  Packaging  : @yao-pkg/pkg
+  Pkg target : node22-macos-arm64
+  Rust target: aarch64-apple-darwin
+  Output     : src-tauri/binaries/server-aarch64-apple-darwin
+
+[0/7] Removing stale sidecar (if any)
+  Nothing to remove
+
+[1/7] Bundling API server with esbuild (format=cjs, outdir=dist-sea)
+
+  dist-sea/index.cjs                       2.2mb ⚠️
+  dist-sea/pino-worker.cjs               152.4kb
+  dist-sea/pino-file.cjs                 141.4kb
+  dist-sea/pino-pretty.cjs               113.7kb
+  dist-sea/thread-stream-worker.cjs        6.8kb
+  dist-sea/index.cjs.map                   3.9mb
+  dist-sea/pino-worker.cjs.map           258.4kb
+  dist-sea/pino-file.cjs.map             230.4kb
+  dist-sea/pino-pretty.cjs.map           206.2kb
+  dist-sea/thread-stream-worker.cjs.map   12.2kb
+
+⚡ Done in 207ms
+  CJS files in dist-sea/:
+    index.cjs
+    pino-file.cjs
+    pino-pretty.cjs
+    pino-worker.cjs
+    thread-stream-worker.cjs
+
+[2/7] Writing pkg-config.json
+  Scripts: dist-sea/pino-file.cjs, dist-sea/pino-pretty.cjs, dist-sea/pino-worker.cjs, dist-sea/thread-stream-worker.cjs
+
+[2.5/7] Staging @libsql/darwin-arm64 into dist-sea/node_modules/
+  libsql version: 0.5.29
+  ✓ staged from pnpm store → dist-sea/node_modules/@libsql/darwin-arm64/
+  Config written: /Users/sarahdawn/sentinel/sentinel/artifacts/api-server/pkg-config.json
+  Assets: dist-sea/node_modules/@libsql/darwin-arm64/**
+
+[3/7] Running @yao-pkg/pkg (target: node22-macos-arm64)
+  First run downloads the Node.js runtime — this may take a minute.
+> pkg@5.16.1
+compression:  GZip
+> Warning Cannot resolve 'mod'
+  /Users/sarahdawn/sentinel/sentinel/artifacts/api-server/dist-sea/index.cjs
+  Dynamic require may fail at run time, because the requested file
+  is unknown at compilation time and not included into executable.
+  Use a string literal as an argument for 'require', or leave it
+  as is and specify the resolved file name in 'scripts' option.
+> Warning Cannot resolve 'modulePath'
+  /Users/sarahdawn/sentinel/sentinel/artifacts/api-server/dist-sea/pino-worker.cjs
+  Dynamic require may fail at run time, because the requested file
+  is unknown at compilation time and not included into executable.
+  Use a string literal as an argument for 'require', or leave it
+  as is and specify the resolved file name in 'scripts' option.
+> Warning Cannot resolve 'modulePath'
+  /Users/sarahdawn/sentinel/sentinel/artifacts/api-server/dist-sea/thread-stream-worker.cjs
+  Dynamic require may fail at run time, because the requested file
+  is unknown at compilation time and not included into executable.
+  Use a string literal as an argument for 'require', or leave it
+  as is and specify the resolved file name in 'scripts' option.
+
+[4/7] Verifying binary
+  ✓ /Users/sarahdawn/sentinel/sentinel/artifacts/desktop/src-tauri/binaries/server-aarch64-apple-darwin (69 MB)
+  ✓ Mach-O 64-bit executable arm64
+
+[5/7] Smoke test (SENTINEL_SMOKE_TEST=1)
+  ✓ sentinel-sidecar-smoke-test: ok
+
+[6/7] Health check (start → GET /api/healthz → shut down)
+file:///Users/sarahdawn/sentinel/sentinel/artifacts/desktop/scripts/build-server.mjs:414
+        new Error(
+        ^
+
+Error: Sidecar exited unexpectedly (code=1, signal=null).
+  stdout: 
+  stderr: rnal/modules/cjs/loader:1079:27)
+    at TracingChannel.traceSync (node:diagnostics_channel:315:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:218:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1344:12)
+    at Module.require (pkg/prelude/bootstrap.js:1851:31)
+    at require (node:internal/modules/helpers:141:16)
+    at Object.<anonymous> (/snapshot/sentinel/node_modules/.pnpm/@libsql+client@0.17.4/node_modules/@libsql/client/lib-cjs/node.js:18:18)
+    at Module._compile (pkg/prelude/bootstrap.js:1930:22) {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [
+    '/snapshot/sentinel/node_modules/.pnpm/@libsql+client@0.17.4/node_modules/@libsql/client/lib-cjs/node.js',
+    '/snapshot/sentinel/artifacts/api-server/dist-sea/index.cjs'
+  ],
+  pkg: true
+}
+
+Node.js v22.10.0
+
+    at ChildProcess.<anonymous> (file:///Users/sarahdawn/sentinel/sentinel/artifacts/desktop/scripts/build-server.mjs:414:9)
+    at ChildProcess.emit (node:events:519:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:293:12)
+
+Node.js v22.23.1
+/Users/sarahdawn/sentinel/sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 build:server: `node scripts/build-server.mjs`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro sentinel % 
