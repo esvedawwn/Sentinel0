@@ -47,6 +47,7 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   statSync,
@@ -213,11 +214,61 @@ for (const pkg of LIBSQL_PKGS) {
   }
 }
 
+// ── @libsql/darwin-arm64 not in pnpm store? Auto-install it. ─────────────────
+// The pnpm lockfile is generated on Linux (Replit), so @libsql/darwin-arm64 is
+// never locked and `pnpm install` on macOS silently skips it.  We detect this
+// here and fetch the correct version directly via npm into a temp dir, then
+// copy it into the staging tree — no manual step required.
 if (!nativePkgPath) {
-  fatal(
-    "@libsql/darwin-arm64 is not installed in this workspace.\n" +
-    "       Run:  pnpm install  then retry."
+  // Read the installed libsql version — it ships the native binding and its
+  // version always matches @libsql/darwin-arm64.
+  let libsqlVersion;
+  try {
+    const libsqlManifest = apiResolve.resolve("libsql/package.json");
+    libsqlVersion = JSON.parse(readFileSync(libsqlManifest, "utf8")).version;
+  } catch {
+    fatal(
+      "Neither @libsql/darwin-arm64 nor libsql is resolvable from the API server.\n" +
+      "       Ensure pnpm install ran successfully in the repo root, then retry."
+    );
+  }
+
+  console.log(
+    `  @libsql/darwin-arm64 not in pnpm store (lockfile was generated on Linux).\n` +
+    `  Auto-installing @libsql/darwin-arm64@${libsqlVersion} via npm…`
   );
+
+  const tmpNpmDir = join(DIST_SEA, "tmp-npm-native");
+  mkdirSync(tmpNpmDir, { recursive: true });
+  try {
+    execSync(
+      `npm install @libsql/darwin-arm64@${libsqlVersion} --prefer-offline`,
+      { cwd: tmpNpmDir, stdio: "inherit" }
+    );
+  } catch (err) {
+    rmSync(tmpNpmDir, { recursive: true, force: true });
+    fatal(
+      `npm install @libsql/darwin-arm64@${libsqlVersion} failed.\n` +
+      `  ${err.message}\n` +
+      "       Check your internet connection and retry."
+    );
+  }
+
+  const installedNative = join(tmpNpmDir, "node_modules", "@libsql", "darwin-arm64");
+  if (!existsSync(installedNative)) {
+    rmSync(tmpNpmDir, { recursive: true, force: true });
+    fatal(
+      `npm install ran but @libsql/darwin-arm64 was not found at:\n` +
+      `  ${installedNative}\n` +
+      "       This is unexpected — check npm output above."
+    );
+  }
+
+  nativePkgPath = join(stagingDir, "@libsql", "darwin-arm64");
+  mkdirSync(nativePkgPath, { recursive: true });
+  cpSync(installedNative, nativePkgPath, { recursive: true, force: true, dereference: true });
+  rmSync(tmpNpmDir, { recursive: true, force: true });
+  console.log(`  ✓ @libsql/darwin-arm64@${libsqlVersion}  →  dist-sea/node_modules/@libsql/darwin-arm64/`);
 }
 
 // Find the .node binary inside the staged package and add it to assets.

@@ -1,0 +1,104 @@
+sarahdawn@sarahs-MacBook-Pro ~ % git clone https://github.com/esvedawwn/Sentinel0.git sentinel 
+Cloning into 'sentinel'...
+warning: You appear to have cloned an empty repository.
+sarahdawn@sarahs-MacBook-Pro ~ % cd sentinel
+sarahdawn@sarahs-MacBook-Pro sentinel % git clone https://github.com/esvedawwn/sentinel0.git sentinel
+cd sentinel
+pnpm install
+Cloning into 'sentinel'...
+remote: Enumerating objects: 1414, done.
+remote: Counting objects: 100% (1414/1414), done.
+remote: Compressing objects: 100% (680/680), done.
+remote: Total 1414 (delta 677), reused 1414 (delta 677), pack-reused 0 (from 0)
+Receiving objects: 100% (1414/1414), 4.97 MiB | 4.05 MiB/s, done.
+Resolving deltas: 100% (677/677), done.
+Scope: all 10 workspace projects
+✓ Lockfile passes supply-chain policies (751 entries in 3.5s)
+Lockfile is up to date, resolution step is skipped
+Packages: +728
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 728, reused 728, downloaded 0, added 728, done
+
+dependencies:
++ @replit/connectors-sdk 0.4.1
+
+devDependencies:
++ @eslint/js 10.0.1
++ @testing-library/jest-dom 6.9.1
++ @testing-library/react 16.3.2
++ @vitejs/plugin-react 5.2.0
++ @vitest/coverage-v8 4.1.10
++ eslint 10.6.0
++ eslint-plugin-react-hooks 7.1.1
++ jsdom 29.1.1
++ prettier 3.8.4
++ typescript 5.9.3
++ typescript-eslint 8.63.0
++ vitest 4.1.10
+
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 40ms
+[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild@0.27.3
+
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm approve-builds
+✔ Choose which packages to build (Press <space> to select, <a> to toggle all, <i
+> to invert selection) esbuild
+✔ The next packages will now be built: esbuild.
+Do you approve? Yes
+node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild: Running postinstall script, done in 630ms
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm install
+Scope: all 10 workspace projects
+✓ Lockfile passes supply-chain policies (verified 55s ago)
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_use…
+└─ Done in 36ms
+Done in 931ms using pnpm v11.12.0
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm desktop:build:server
+$ pnpm --filter @workspace/desktop run build:server
+$ node scripts/build-server.mjs
+
+Sentinel sidecar build
+  Packaging  : @yao-pkg/pkg
+  Pkg target : node22-macos-arm64
+  Rust target: aarch64-apple-darwin
+  Output     : src-tauri/binaries/server-aarch64-apple-darwin
+
+[0/7] Removing stale sidecar (if any)
+  Nothing to remove
+
+[1/7] Bundling API server with esbuild (format=cjs, outdir=dist-sea)
+
+  dist-sea/index.cjs                       2.2mb ⚠️
+  dist-sea/pino-worker.cjs               152.4kb
+  dist-sea/pino-file.cjs                 141.4kb
+  dist-sea/pino-pretty.cjs               113.7kb
+  dist-sea/thread-stream-worker.cjs        6.8kb
+  dist-sea/index.cjs.map                   3.9mb
+  dist-sea/pino-worker.cjs.map           258.4kb
+  dist-sea/pino-file.cjs.map             230.4kb
+  dist-sea/pino-pretty.cjs.map           206.2kb
+  dist-sea/thread-stream-worker.cjs.map   12.2kb
+
+⚡ Done in 126ms
+  CJS files in dist-sea/:
+    index.cjs
+    pino-file.cjs
+    pino-pretty.cjs
+    pino-worker.cjs
+    thread-stream-worker.cjs
+
+[2/7] Writing pkg-config.json
+  Scripts: dist-sea/pino-file.cjs, dist-sea/pino-pretty.cjs, dist-sea/pino-worker.cjs, dist-sea/thread-stream-worker.cjs
+
+[2.5/7] Staging @libsql/* packages into dist-sea/node_modules/
+
+FATAL: @libsql/darwin-arm64 is not installed in this workspace.
+       Run:  pnpm install  then retry.
+
+/Users/sarahdawn/sentinel/sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 build:server: `node scripts/build-server.mjs`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro sentinel % 

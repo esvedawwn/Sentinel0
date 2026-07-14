@@ -258,6 +258,7 @@ cargo check --manifest-path src-tauri/Cargo.toml
 | pkg download fails on first run | Internet connectivity issue — retry `pnpm desktop:build:server` |
 | Smoke test fails | Binary didn't execute — check if macOS blocked it: `xattr -cr <binary>` |
 | Health check timeout | `@libsql/darwin-arm64.node` blocked by Gatekeeper: `xattr -cr <binary>` then retry |
+| `FATAL: @libsql/darwin-arm64 is not installed` | Should no longer happen — step 2.5 auto-installs it. If it does, run `pnpm install` then retry |
 | `FATAL: @yao-pkg/pkg exited ...` | See stdout — usually a missing module; ensure `pnpm install` ran |
 | `error: linker 'cc' not found` | `xcode-select --install` |
 | App opens but API fails | Check that port 38080 isn't in use (`lsof -i :38080`) |
