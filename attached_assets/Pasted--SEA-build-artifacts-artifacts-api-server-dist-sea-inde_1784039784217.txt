@@ -1,0 +1,73 @@
+
+── SEA build artifacts (artifacts/api-server/dist-sea/) ──
+  ✓  index.cjs found (SEA main entry)
+  ✗  sea-prep.blob not found — run: pnpm desktop:build:server
+  ·  Pino worker files in dist-sea/ (not bundled into app — not needed at runtime):
+  ·    pino-worker.cjs
+  ·    thread-stream-worker.cjs
+  ·    pino-file.cjs
+  ·    pino-pretty.cjs
+
+── @yao-pkg/pkg Node.js runtime cache (~/.pkg-cache) ──
+  ·  pkg cache exists but no Node.js 22 runtime found.
+       First run of pnpm desktop:build:server will download it (~70 MB).
+
+── Server sidecar binary (@yao-pkg/pkg compiled) ──
+  ✓  server-aarch64-apple-darwin (69 MB)
+  ✓  Binary type: Mach-O 64-bit executable arm64
+
+❌  Fix the issues above, then re-run: pnpm desktop:check
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro sentinel % pnpm desktop:build
+$ pnpm --filter @workspace/desktop run build
+$ tauri build
+        Info Looking up installed tauri packages to check mismatched versions...
+        Warn The bundle identifier "dev.sentinel.app" set in `"tauri.conf.json" identifier` ends with `.app`. This is not recommended because it conflicts with the application bundle extension on macOS.
+     Running beforeBuildCommand `PORT=18756 BASE_PATH=/ pnpm --filter @workspace/sentinel run build`
+$ vite build --config vite.config.ts
+/Users/sarahdawn/sentinel/sentinel/node_modules/.pnpm/rollup@4.62.2/node_modules/rollup/dist/native.js:121
+		throw new Error(
+		      ^
+
+Error: Cannot find module @rollup/rollup-darwin-arm64. npm has a bug related to optional dependencies (https://github.com/npm/cli/issues/4828). Please try `npm i` again after removing both package-lock.json and node_modules directory.
+    at requireWithFriendlyError (/Users/sarahdawn/sentinel/sentinel/node_modules/.pnpm/rollup@4.62.2/node_modules/rollup/dist/native.js:121:9)
+    at Object.<anonymous> (/Users/sarahdawn/sentinel/sentinel/node_modules/.pnpm/rollup@4.62.2/node_modules/rollup/dist/native.js:130:76)
+    at Module._compile (node:internal/modules/cjs/loader:1781:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1913:10)
+    at Module.load (node:internal/modules/cjs/loader:1505:32)
+    at Module._load (node:internal/modules/cjs/loader:1309:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at loadCJSModuleWithModuleLoad (node:internal/modules/esm/translators:335:3)
+    at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:235:7)
+    at ModuleJob.run (node:internal/modules/esm/module_job:343:25) {
+  [cause]: Error: Cannot find module '@rollup/rollup-darwin-arm64'
+  Require stack:
+  - /Users/sarahdawn/sentinel/sentinel/node_modules/.pnpm/rollup@4.62.2/node_modules/rollup/dist/native.js
+      at Module._resolveFilename (node:internal/modules/cjs/loader:1430:15)
+      at defaultResolveImpl (node:internal/modules/cjs/loader:1040:19)
+      at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1045:22)
+      at Module._load (node:internal/modules/cjs/loader:1216:25)
+      at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+      at Module.require (node:internal/modules/cjs/loader:1527:12)
+      at require (node:internal/modules/helpers:147:16)
+      at requireWithFriendlyError (/Users/sarahdawn/sentinel/sentinel/node_modules/.pnpm/rollup@4.62.2/node_modules/rollup/dist/native.js:103:10)
+      at Object.<anonymous> (/Users/sarahdawn/sentinel/sentinel/node_modules/.pnpm/rollup@4.62.2/node_modules/rollup/dist/native.js:130:76)
+      at Module._compile (node:internal/modules/cjs/loader:1781:14) {
+    code: 'MODULE_NOT_FOUND',
+    requireStack: [
+      '/Users/sarahdawn/sentinel/sentinel/node_modules/.pnpm/rollup@4.62.2/node_modules/rollup/dist/native.js'
+    ]
+  }
+}
+
+Node.js v22.23.1
+/Users/sarahdawn/sentinel/sentinel/artifacts/sentinel:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/sentinel@0.0.0 build: `vite build --config vite.config.ts`
+Exit status 1
+beforeBuildCommand `PORT=18756 BASE_PATH=/ pnpm --filter @workspace/sentinel run build` failed with exit code 1
+       Error beforeBuildCommand `PORT=18756 BASE_PATH=/ pnpm --filter @workspace/sentinel run build` failed with exit code 1
+/Users/sarahdawn/sentinel/sentinel/artifacts/desktop:
+[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] @workspace/desktop@0.1.0 build: `tauri build`
+Exit status 1
+[ELIFECYCLE] Command failed with exit code 1.
+sarahdawn@sarahs-MacBook-Pro sentinel % 
