@@ -60,28 +60,43 @@ artifacts/
 
 ## Sidecar Build Pipeline
 
-The Express API server is packaged as a **Node.js Single Executable
-Application (SEA)** so it can run inside the Tauri bundle without requiring
-a Node.js installation on the user's machine.
+The Express API server is packaged as a **self-contained binary** using
+[`@yao-pkg/pkg`](https://github.com/yao-pkg/pkg) so it can run inside the
+Tauri bundle without requiring a Node.js installation on the user's machine.
+`@yao-pkg/pkg` downloads and embeds its own verified Node.js 22 arm64 runtime
+(cached in `~/.pkg-cache` after the first download).
 
-### Steps (run by `pnpm --filter @workspace/desktop run build:server`)
+> **Why not Node.js SEA/postject?** Homebrew's `node@22` strips the SEA fuse
+> marker that postject requires, and even with an official Node.js binary the
+> resulting arm64 binary segfaults on macOS. `@yao-pkg/pkg` has no such
+> requirement and produces a stable binary.
 
-1. **Bundle** — `esbuild` produces a single CJS file
-   (`artifacts/api-server/dist-sea/server.cjs`).
-2. **SEA blob** — `node --experimental-sea-config` generates
-   `sea-prep.blob`.
-3. **Inject** — `postject` injects the blob into a copy of the local
-   `node` binary.
-4. **Sign** — on macOS, `codesign --sign -` re-signs the binary.
-5. **Place** — output is `src-tauri/binaries/server-<target-triple>`
+### Steps (run by `pnpm desktop:build:server`)
+
+1. **Bundle** — `esbuild` produces `artifacts/api-server/dist-sea/index.cjs`
+   (CJS format) plus Pino worker files.
+2. **Config** — `pkg-config.json` is written listing worker scripts and the
+   native `@libsql/darwin-arm64` asset path.
+3. **Stage native module** — `@libsql/darwin-arm64` (the SQLite native binding)
+   is copied as real files into `dist-sea/node_modules/` so pkg can detect and
+   package the `.node` file. Auto-installed via npm if not in the pnpm store
+   (expected on a fresh macOS clone, since the lockfile is generated on Linux).
+4. **Package** — `@yao-pkg/pkg` snapshots `index.cjs` + native assets into a
+   single `node22-macos-arm64` binary, then the staging directory is removed.
+5. **Verify** — size check (> 30 MB), `file` command confirms Mach-O arm64.
+6. **Smoke test** — `SENTINEL_SMOKE_TEST=1` exits 0 and prints
+   `sentinel-sidecar-smoke-test: ok` (fires before any native module loads).
+7. **Health check** — sidecar starts on a temp port; `GET /api/healthz` → 200
+   (first check that exercises `@libsql/darwin-arm64.node`).
+8. **Place** — output is `src-tauri/binaries/server-<rust-target-triple>`
    (the naming convention required by Tauri's sidecar mechanism).
 
 ### Full macOS build
 
 ```bash
-pnpm --filter @workspace/desktop run build:server   # build the SEA
-pnpm --filter @workspace/sentinel run build         # build frontend
-pnpm --filter @workspace/desktop run build          # tauri build → .dmg
+pnpm desktop:build:server              # package the Node.js sidecar
+pnpm --filter @workspace/sentinel run build   # build React frontend
+pnpm desktop:build                     # tauri build → Sentinel.app + .dmg
 ```
 
 > **Rust/Cargo is required** — only available on macOS/Linux. The Tauri
